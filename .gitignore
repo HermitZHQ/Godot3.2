@@ -353,4 +353,3 @@ compile_commands.json
 
 # Cppcheck
 *.cppcheck
-*.fbx
