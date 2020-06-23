@@ -302,12 +302,7 @@ struct aiBone {
             : mName(),
               mNumWeights(0),
               mWeights(nullptr),
-              mOffsetMatrix(),
-#ifndef ASSIMP_BUILD_NO_ARMATUREPOPULATE_PROCESS
-              mArmature(0),
-              mNode(0)
-#endif
-    {
+              mOffsetMatrix() {
         // empty
     }
 

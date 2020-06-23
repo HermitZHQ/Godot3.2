@@ -327,16 +327,20 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	if (scene->mRootNode) {
 		state.nodes.push_back(scene->mRootNode);
 
+		// 生成所有节点数据，父节点为非Bone，而本身为Bone的，父节点转化为Armature节点（可以和Armature处理流程中得到的指针对应）
 		// make flat node tree - in order to make processing deterministic
 		for (unsigned int i = 0; i < scene->mRootNode->mNumChildren; i++) {
 			_generate_node(state, scene->mRootNode->mChildren[i]);
 		}
 
+		// 根据scene重新获取所有bone节点，存入stack_bone下
 		RegenerateBoneStack(state);
 
 		Node *last_valid_parent = NULL;
 
 		List<const aiNode *>::Element *iter;
+		// 循环创建所有节点，之前创建为Armature的节点转换为Skeleton（空间节点）节点（该节点中可以存放子bones）
+		// 有父节点的会把子节点加入父节点的显示中
 		for (iter = state.nodes.front(); iter; iter = iter->next()) {
 			const aiNode *element_assimp_node = iter->get();
 			const aiNode *parent_assimp_node = element_assimp_node->mParent;
@@ -414,11 +418,9 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 		}
 		print_verbose("node counts: " + itos(state.nodes.size()));
 
-		// make clean bone stack
+		// make clean bone stack----------------------------------------------------
 		RegenerateBoneStack(state);
-
 		print_verbose("generating godot bone data");
-
 		print_verbose("Godot bone stack count: " + itos(state.bone_stack.size()));
 
 		// This is a list of bones, duplicates are from other meshes and must be dealt with properly
@@ -436,6 +438,10 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			aiNode *parent_node = bone_node->mParent;
 
 			String bone_name = AssimpUtils::get_anim_string_from_assimp(bone->mName);
+			if (armature_for_bone == NULL) {
+				int i = 5;
+				i += 2;
+			}
 			ERR_CONTINUE_MSG(armature_for_bone == NULL, "Armature for bone invalid: " + bone_name);
 			Skeleton *skeleton = state.armature_skeletons[armature_for_bone];
 
@@ -464,8 +470,8 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			}
 		}
 
+		//----------------------------------------------------------------------------------------
 		print_verbose("generating mesh phase from skeletal mesh");
-
 		List<Spatial *> cleanup_template_nodes;
 
 		for (Map<const aiNode *, Spatial *>::Element *key_value_pair = state.flat_node_map.front(); key_value_pair; key_value_pair = key_value_pair->next()) {
@@ -531,6 +537,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 		}
 	}
 
+	// ---------------------------------------Handle Animation infos
 	if (p_flags & IMPORT_ANIMATION && scene->mNumAnimations) {
 
 		state.animation_player = memnew(AnimationPlayer);

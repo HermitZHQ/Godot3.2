@@ -694,29 +694,8 @@ const aiScene* Importer::ReadFile( const char* _pFile, unsigned int pFlags) {
                 profiler->EndRegion("preprocess");
             }
 
-                        int iCount = 0;
-            for (int i = 0; i < pimpl->mScene->mNumMeshes; ++i) {
-                aiMesh *m = pimpl->mScene->mMeshes[i];
-                for (int j = 0; j < m->mNumBones; ++j) {
-                    aiBone *b = m->mBones[j];
-                    if (b->mNode != nullptr) {
-                        iCount++;
-                    }
-                }
-            }
             // Ensure that the validation process won't be called twice
             ApplyPostProcessing(pFlags & (~aiProcess_ValidateDataStructure));
-
-                                    iCount = 0;
-            for (int i = 0; i < pimpl->mScene->mNumMeshes; ++i) {
-                aiMesh *m = pimpl->mScene->mMeshes[i];
-                for (int j = 0; j < m->mNumBones; ++j) {
-                    aiBone *b = m->mBones[j];
-                    if (b->mNode != nullptr) {
-                        iCount++;
-                    }
-                }
-            }
         }
         // if failed, extract the error string
         else if( !pimpl->mScene) {
