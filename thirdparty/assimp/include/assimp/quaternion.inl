@@ -3,7 +3,7 @@
 Open Asset Import Library (assimp)
 ---------------------------------------------------------------------------
 
-Copyright (c) 2006-2019, assimp team
+Copyright (c) 2006-2020, assimp team
 
 
 
@@ -277,7 +277,7 @@ inline aiQuaterniont<TReal>& aiQuaterniont<TReal>::Conjugate ()
 
 // ---------------------------------------------------------------------------
 template<typename TReal>
-inline aiVector3t<TReal> aiQuaterniont<TReal>::Rotate (const aiVector3t<TReal>& v)
+inline aiVector3t<TReal> aiQuaterniont<TReal>::Rotate (const aiVector3t<TReal>& v) const
 {
     aiQuaterniont q2(0.f,v.x,v.y,v.z), q = *this, qinv = q;
     qinv.Conjugate();

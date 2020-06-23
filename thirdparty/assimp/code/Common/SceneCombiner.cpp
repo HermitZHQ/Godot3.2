@@ -2,7 +2,7 @@
 Open Asset Import Library (assimp)
 ----------------------------------------------------------------------
 
-Copyright (c) 2006-2019, assimp team
+Copyright (c) 2006-2020, assimp team
 
 
 All rights reserved.
@@ -66,6 +66,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace Assimp {
 
+#if (__GNUC__ >= 8 && __GNUC_MINOR__ >= 0)
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
+
 // ------------------------------------------------------------------------------------------------
 // Add a prefix to a string
 inline
@@ -75,7 +80,7 @@ void PrefixString(aiString& string,const char* prefix, unsigned int len) {
         return;
 
     if (len+string.length>=MAXLEN-1) {
-        ASSIMP_LOG_DEBUG("Can't add an unique prefix because the string is too long");
+        ASSIMP_LOG_VERBOSE_DEBUG("Can't add an unique prefix because the string is too long");
         ai_assert(false);
         return;
     }
@@ -98,8 +103,9 @@ void SceneCombiner::AddNodeHashes(aiNode* node, std::set<unsigned int>& hashes) 
     }
 
     // Process all children recursively
-    for (unsigned int i = 0; i < node->mNumChildren;++i)
+    for (unsigned int i = 0; i < node->mNumChildren;++i) {
         AddNodeHashes(node->mChildren[i],hashes);
+    }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -994,8 +1000,7 @@ void SceneCombiner::CopySceneFlat(aiScene** _dest,const aiScene* src) {
     } else {
         *_dest = new aiScene();
     }
-
-    ::memcpy(*_dest,src,sizeof(aiScene));
+    CopyScene(_dest, src, false);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1066,7 +1071,7 @@ void SceneCombiner::Copy( aiMesh** _dest, const aiMesh* src ) {
     aiMesh* dest = *_dest = new aiMesh();
 
     // get a flat copy
-    ::memcpy(dest,src,sizeof(aiMesh));
+    *dest = *src;
 
     // and reallocate all arrays
     GetArrayCopy( dest->mVertices,   dest->mNumVertices );
@@ -1075,12 +1080,14 @@ void SceneCombiner::Copy( aiMesh** _dest, const aiMesh* src ) {
     GetArrayCopy( dest->mBitangents, dest->mNumVertices );
 
     unsigned int n = 0;
-    while (dest->HasTextureCoords(n))
-        GetArrayCopy( dest->mTextureCoords[n++],   dest->mNumVertices );
+    while (dest->HasTextureCoords(n)) {
+        GetArrayCopy( dest->mTextureCoords[n++], dest->mNumVertices );
+    }
 
     n = 0;
-    while (dest->HasVertexColors(n))
-        GetArrayCopy( dest->mColors[n++],   dest->mNumVertices );
+    while (dest->HasVertexColors(n)) {
+        GetArrayCopy( dest->mColors[n++], dest->mNumVertices );
+    }
 
     // make a deep copy of all bones
     CopyPtrArray(dest->mBones,dest->mBones,dest->mNumBones);
@@ -1105,7 +1112,7 @@ void SceneCombiner::Copy(aiAnimMesh** _dest, const aiAnimMesh* src) {
     aiAnimMesh* dest = *_dest = new aiAnimMesh();
 
     // get a flat copy
-    ::memcpy(dest, src, sizeof(aiAnimMesh));
+    *dest = *src;
 
     // and reallocate all arrays
     GetArrayCopy(dest->mVertices, dest->mNumVertices);
@@ -1162,7 +1169,7 @@ void SceneCombiner::Copy(aiTexture** _dest, const aiTexture* src) {
     aiTexture* dest = *_dest = new aiTexture();
 
     // get a flat copy
-    ::memcpy(dest,src,sizeof(aiTexture));
+    *dest = *src;
 
     // and reallocate all arrays. We must do it manually here
     const char* old = (const char*)dest->pcData;
@@ -1192,7 +1199,7 @@ void SceneCombiner::Copy( aiAnimation** _dest, const aiAnimation* src ) {
     aiAnimation* dest = *_dest = new aiAnimation();
 
     // get a flat copy
-    ::memcpy(dest,src,sizeof(aiAnimation));
+    *dest = *src;
 
     // and reallocate all arrays
     CopyPtrArray( dest->mChannels, src->mChannels, dest->mNumChannels );
@@ -1208,7 +1215,7 @@ void SceneCombiner::Copy(aiNodeAnim** _dest, const aiNodeAnim* src) {
     aiNodeAnim* dest = *_dest = new aiNodeAnim();
 
     // get a flat copy
-    ::memcpy(dest,src,sizeof(aiNodeAnim));
+    *dest = *src;
 
     // and reallocate all arrays
     GetArrayCopy( dest->mPositionKeys, dest->mNumPositionKeys );
@@ -1224,7 +1231,7 @@ void SceneCombiner::Copy(aiMeshMorphAnim** _dest, const aiMeshMorphAnim* src) {
     aiMeshMorphAnim* dest = *_dest = new aiMeshMorphAnim();
 
     // get a flat copy
-    ::memcpy(dest,src,sizeof(aiMeshMorphAnim));
+    *dest = *src;
 
     // and reallocate all arrays
     GetArrayCopy( dest->mKeys, dest->mNumKeys );
@@ -1245,7 +1252,7 @@ void SceneCombiner::Copy( aiCamera** _dest,const  aiCamera* src) {
     aiCamera* dest = *_dest = new aiCamera();
 
     // get a flat copy, that's already OK
-    ::memcpy(dest,src,sizeof(aiCamera));
+    *dest = *src;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1257,7 +1264,7 @@ void SceneCombiner::Copy(aiLight** _dest, const aiLight* src) {
     aiLight* dest = *_dest = new aiLight();
 
     // get a flat copy, that's already OK
-    ::memcpy(dest,src,sizeof(aiLight));
+    *dest = *src;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1269,10 +1276,7 @@ void SceneCombiner::Copy(aiBone** _dest, const aiBone* src) {
     aiBone* dest = *_dest = new aiBone();
 
     // get a flat copy
-    ::memcpy(dest,src,sizeof(aiBone));
-
-    // and reallocate all arrays
-    GetArrayCopy( dest->mWeights, dest->mNumWeights );
+    *dest = *src;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1283,7 +1287,7 @@ void SceneCombiner::Copy     (aiNode** _dest, const aiNode* src)
     aiNode* dest = *_dest = new aiNode();
 
     // get a flat copy
-    ::memcpy(dest,src,sizeof(aiNode));
+    *dest = *src;
 
     if (src->mMetaData) {
         Copy(&dest->mMetaData, src->mMetaData);
@@ -1312,7 +1316,6 @@ void SceneCombiner::Copy(aiMetadata** _dest, const aiMetadata* src) {
     aiMetadata* dest = *_dest = aiMetadata::Alloc( src->mNumProperties );
     std::copy(src->mKeys, src->mKeys + src->mNumProperties, dest->mKeys);
 
-    dest->mValues = new aiMetadataEntry[src->mNumProperties];
     for (unsigned int i = 0; i < src->mNumProperties; ++i) {
         aiMetadataEntry& in = src->mValues[i];
         aiMetadataEntry& out = dest->mValues[i];
@@ -1345,6 +1348,10 @@ void SceneCombiner::Copy(aiMetadata** _dest, const aiMetadata* src) {
         }
     }
 }
+
+#if (__GNUC__ >= 8 && __GNUC_MINOR__ >= 0)
+#   pragma GCC diagnostic pop
+#endif
 
 } // Namespace Assimp
 

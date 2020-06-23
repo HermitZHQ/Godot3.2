@@ -145,6 +145,7 @@ Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_f
 								 //aiProcess_SplitByBoneCount |
 								 0;
 	String g_path = ProjectSettings::get_singleton()->globalize_path(p_path);
+// 	post_process_Steps = 62889679;// assimp viewer steps
 	aiScene *scene = (aiScene *)importer.ReadFile(g_path.utf8().ptr(), post_process_Steps);
 
 	ERR_FAIL_COND_V_MSG(scene == NULL, NULL, String("Open Asset Import failed to open: ") + String(importer.GetErrorString()));
@@ -423,6 +424,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 		// This is a list of bones, duplicates are from other meshes and must be dealt with properly
 		for (List<aiBone *>::Element *element = state.bone_stack.front(); element; element = element->next()) {
 			aiBone *bone = element->get();
+// 			continue;
 
 			ERR_CONTINUE_MSG(!bone, "invalid bone read from assimp?");
 
@@ -879,6 +881,7 @@ EditorSceneImporterAssimp::_generate_mesh_from_surface_indices(ImportState &stat
 		if (ai_mesh->mNumBones > 0) {
 			for (size_t b = 0; b < ai_mesh->mNumBones; b++) {
 				aiBone *bone = ai_mesh->mBones[b];
+// 				continue;
 
 				if (!skeleton_assigned) {
 					print_verbose("Assigned mesh skeleton during mesh creation");

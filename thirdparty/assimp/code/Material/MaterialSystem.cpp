@@ -2,7 +2,7 @@
 Open Asset Import Library (assimp)
 ----------------------------------------------------------------------
 
-Copyright (c) 2006-2019, assimp team
+Copyright (c) 2006-2020, assimp team
 
 
 All rights reserved.
@@ -273,14 +273,14 @@ aiReturn aiGetMaterialColor(const aiMaterial* pMat,
 }
 
 // ------------------------------------------------------------------------------------------------
-// Get a aiUVTransform (4 floats) from the material
+// Get a aiUVTransform (5 floats) from the material
 aiReturn aiGetMaterialUVTransform(const aiMaterial* pMat,
     const char* pKey,
     unsigned int type,
     unsigned int index,
     aiUVTransform* pOut)
 {
-    unsigned int iMax = 4;
+    unsigned int iMax = 5;
     return aiGetMaterialFloatArray(pMat,pKey,type,index,(ai_real*)pOut,&iMax);
 }
 
@@ -332,8 +332,7 @@ unsigned int aiGetMaterialTextureCount(const C_STRUCT aiMaterial* pMat,
         aiMaterialProperty* prop = pMat->mProperties[i];
 
         if ( prop /* just a sanity check ... */
-            && 0 == strcmp( prop->mKey.data, _AI_MATKEY_TEXTURE_BASE )
-            && prop->mSemantic == type) {
+				&& 0 == strcmp(prop->mKey.data, _AI_MATKEY_TEXTURE_BASE) && static_cast < aiTextureType>(prop->mSemantic) == type) {
 
             max = std::max(max,prop->mIndex+1);
         }
@@ -471,12 +470,12 @@ aiReturn aiMaterial::AddBinaryProperty (const void* pInput,
     aiPropertyTypeInfo pType
     )
 {
-    ai_assert( pInput != NULL );
-    ai_assert( pKey != NULL );
+    ai_assert( pInput != nullptr );
+	ai_assert(pKey != nullptr );
     ai_assert( 0 != pSizeInBytes );
 
     if ( 0 == pSizeInBytes ) {
-
+		return AI_FAILURE;
     }
 
     // first search the list whether there is already an entry with this key
@@ -504,7 +503,7 @@ aiReturn aiMaterial::AddBinaryProperty (const void* pInput,
     pcNew->mData = new char[pSizeInBytes];
     memcpy (pcNew->mData,pInput,pSizeInBytes);
 
-    pcNew->mKey.length = ::strlen(pKey);
+    pcNew->mKey.length = static_cast<ai_uint32>( ::strlen(pKey) );
     ai_assert ( MAXLEN > pcNew->mKey.length);
     strcpy( pcNew->mKey.data, pKey );
 
@@ -562,7 +561,8 @@ uint32_t Assimp::ComputeMaterialHash(const aiMaterial* mat, bool includeMatName 
 
         // Exclude all properties whose first character is '?' from the hash
         // See doc for aiMaterialProperty.
-        if ((prop = mat->mProperties[i]) && (includeMatName || prop->mKey.data[0] != '?'))  {
+        prop = mat->mProperties[ i ];
+        if ( nullptr != prop && (includeMatName || prop->mKey.data[0] != '?'))  {
 
             hash = SuperFastHash(prop->mKey.data,(unsigned int)prop->mKey.length,hash);
             hash = SuperFastHash(prop->mData,prop->mDataLength,hash);

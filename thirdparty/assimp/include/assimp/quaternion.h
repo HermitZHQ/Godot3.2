@@ -2,7 +2,7 @@
 Open Asset Import Library (assimp)
 ----------------------------------------------------------------------
 
-Copyright (c) 2006-2019, assimp team
+Copyright (c) 2006-2020, assimp team
 
 
 All rights reserved.
@@ -99,7 +99,7 @@ public:
     aiQuaterniont& Conjugate ();
 
     /** Rotate a point by this quaternion */
-    aiVector3t<TReal> Rotate (const aiVector3t<TReal>& in);
+    aiVector3t<TReal> Rotate (const aiVector3t<TReal>& in) const;
 
     /** Multiply two quaternions */
     aiQuaterniont operator* (const aiQuaterniont& two) const;

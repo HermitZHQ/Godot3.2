@@ -2,7 +2,7 @@
 Open Asset Import Library (assimp)
 ----------------------------------------------------------------------
 
-Copyright (c) 2006-2008, assimp team
+Copyright (c) 2006-2020, assimp team
 All rights reserved.
 
 Redistribution and use of this software in source and binary forms,
@@ -66,10 +66,16 @@ public:
     : runtime_error(errorText) {
         // empty
     }
-
 };
 
-typedef DeadlyImportError DeadlyExportError;
+class DeadlyExportError : public runtime_error {
+public:
+    /** Constructor with arguments */
+    explicit DeadlyExportError(const std::string &errorText) :
+            runtime_error(errorText) {
+        // empty
+    }
+};
 
 #ifdef _MSC_VER
 #   pragma warning(default : 4275)
@@ -118,6 +124,16 @@ struct ExceptionSwallower<void> {
 #define ASSIMP_BEGIN_EXCEPTION_REGION()\
 {\
     try {
+
+#define ASSIMP_END_EXCEPTION_REGION_WITH_ERROR_STRING(type, ASSIMP_END_EXCEPTION_REGION_errorString)\
+    } catch(const DeadlyImportError& e) {\
+        ASSIMP_END_EXCEPTION_REGION_errorString = e.what();\
+        return ExceptionSwallower<type>()();\
+    } catch(...) {\
+        ASSIMP_END_EXCEPTION_REGION_errorString = "Unknown exception";\
+        return ExceptionSwallower<type>()();\
+    }\
+}
 
 #define ASSIMP_END_EXCEPTION_REGION(type)\
     } catch(...) {\
