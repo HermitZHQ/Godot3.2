@@ -5295,6 +5295,7 @@ int RasterizerStorageGLES3::skeleton_get_bone_count(RID p_skeleton) const {
 
 void RasterizerStorageGLES3::skeleton_bone_set_transform(RID p_skeleton, int p_bone, const Transform &p_transform) {
 
+	// 测试点：骨骼矩阵更新处，此处采用的是texture方式（非数组）更新bone对应矩阵
 	Skeleton *skeleton = skeleton_owner.getornull(p_skeleton);
 
 	ERR_FAIL_COND(!skeleton);

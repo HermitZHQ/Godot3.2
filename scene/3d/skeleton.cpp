@@ -242,6 +242,7 @@ void Skeleton::_notification(int p_what) {
 				if (b.global_pose_override_amount >= 0.999) {
 					b.pose_global = b.global_pose_override;
 				} else {
+					// 注释点：不明所以的rest矩阵，不曾出现在assimp-viewer或者教程中
 					if (b.disable_rest) {
 						if (b.enabled) {
 
@@ -274,14 +275,32 @@ void Skeleton::_notification(int p_what) {
 							if (b.custom_pose_enable) {
 								pose = b.custom_pose * pose;
 							}
-							if (b.parent >= 0) {
 
-								b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
-							} else {
+							// 修改点：尝试使用assimp-viewer的处理流程，它这里的处理流程完全意义不明，注释掉了原有处理流程
+// 							if (b.parent >= 0) {
+// 
+// 								b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
+// 							} else {
+// 
+// 								b.pose_global = b.rest * pose;
+// 							}
 
-								b.pose_global = b.rest * pose;
+							b.pose_global = b.pose;
+							NodeAnim *node = FindAnimNodeByBoneName(anim_node_root, b.name);
+							NodeAnim *parent = nullptr;
+							if (node)
+							{
+								parent = node->parent;
 							}
-						} else {
+
+							while (nullptr != parent)
+							{
+								b.pose_global = parent->localTransform * b.pose_global;
+
+								parent = parent->parent;
+							}
+						}
+						else {
 
 							if (b.parent >= 0) {
 
@@ -312,8 +331,18 @@ void Skeleton::_notification(int p_what) {
 				}
 			}
 
+			// 测试点：只更新一个skin，观察差异
+			int iTest = 0;
 			//update skins
 			for (Set<SkinReference *>::Element *E = skin_bindings.front(); E; E = E->next()) {
+
+				//测试点：
+				if (0 != iTest) {
+					continue;
+				}
+				if (0 == iTest) {
+					iTest = 1;
+				}
 
 				const Skin *skin = E->get()->skin.operator->();
 				RID skeleton = E->get()->skeleton;
@@ -366,7 +395,11 @@ void Skeleton::_notification(int p_what) {
 				for (uint32_t i = 0; i < bind_count; i++) {
 					uint32_t bone_index = E->get()->skin_bone_indices_ptrs[i];
 					ERR_CONTINUE(bone_index >= (uint32_t)len);
-					vs->skeleton_bone_set_transform(skeleton, i, bonesptr[bone_index].pose_global * skin->get_bind_pose(i));
+					// 测试点：查看这里的骨骼transform影响
+					auto pose = skin->get_bind_pose(i);
+					auto globalPose = bonesptr[bone_index].pose_global;
+					auto finalPose = globalPose * pose;
+					vs->skeleton_bone_set_transform(skeleton, i, finalPose);
 				}
 			}
 
@@ -400,8 +433,8 @@ Transform Skeleton::get_bone_global_pose(int p_bone) const {
 }
 
 // skeleton creation api
-void Skeleton::add_bone(const String &p_name) {
-
+void Skeleton::add_bone(const String &p_name)
+{
 	ERR_FAIL_COND(p_name == "" || p_name.find(":") != -1 || p_name.find("/") != -1);
 
 	for (int i = 0; i < bones.size(); i++) {
@@ -417,6 +450,7 @@ void Skeleton::add_bone(const String &p_name) {
 	_make_dirty();
 	update_gizmo();
 }
+
 int Skeleton::find_bone(const String &p_name) const {
 
 	for (int i = 0; i < bones.size(); i++) {
@@ -427,11 +461,37 @@ int Skeleton::find_bone(const String &p_name) const {
 
 	return -1;
 }
+
 String Skeleton::get_bone_name(int p_bone) const {
 
 	ERR_FAIL_INDEX_V(p_bone, bones.size(), "");
 
 	return bones[p_bone].name;
+}
+
+void Skeleton::SetNodeAnimRoot(NodeAnim *root)
+{
+	anim_node_root = root;
+}
+
+Skeleton::NodeAnim* Skeleton::FindAnimNodeByBoneName(NodeAnim *root, String boneName)
+{
+	Skeleton::NodeAnim *node = nullptr;
+	FindAnimNodeRecursive(root, boneName, &node);
+	return node;
+}
+
+void Skeleton::FindAnimNodeRecursive(NodeAnim *nodeAnim, String boneName, NodeAnim **node)
+{
+	if (nodeAnim->name == boneName) {
+		*node = nodeAnim;
+		return;
+	}
+
+	for (int i = 0; i < nodeAnim->childs.size(); ++i)
+	{
+		FindAnimNodeRecursive(nodeAnim->childs[i], boneName, node);
+	}
 }
 
 bool Skeleton::is_bone_parent_of(int p_bone, int p_parent_bone_id) const {
@@ -576,6 +636,10 @@ void Skeleton::set_bone_pose(int p_bone, const Transform &p_pose) {
 	ERR_FAIL_INDEX(p_bone, bones.size());
 
 	bones.write[p_bone].pose = p_pose;
+	// 修改点：同时更新animNode的tranfrom
+// 	if (bones.write[p_bone].nodeAnim->channelId != -1) {
+// 		bones.write[p_bone].nodeAnim->localTransform = p_pose;
+// 	}
 	if (is_inside_tree()) {
 		_make_dirty();
 	}
@@ -895,7 +959,9 @@ void Skeleton::_bind_methods() {
 	BIND_CONSTANT(NOTIFICATION_UPDATE_SKELETON);
 }
 
-Skeleton::Skeleton() {
+Skeleton::Skeleton()
+	:anim_node_root(nullptr)
+{
 
 	dirty = false;
 	version = 1;

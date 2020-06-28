@@ -76,6 +76,23 @@ private:
 
 	void _skin_changed();
 
+	// 修改点：加入Skeleton中的Bone信息添加NodeAnim，否则无法找到父节点计算正确的global矩阵
+public:
+	struct NodeAnim
+	{
+		String					name;
+		NodeAnim				*parent;
+		Vector<NodeAnim*>		childs;
+		Transform				localTransform;
+		Transform				globalTransform;
+		int						channelId;
+
+		NodeAnim()
+			:channelId(-1), parent(NULL)
+		{}
+	};
+private:
+
 	struct Bone {
 
 		String name;
@@ -97,6 +114,8 @@ private:
 		bool global_pose_override_reset;
 		Transform global_pose_override;
 
+		NodeAnim *nodeAnim;
+
 #ifndef _3D_DISABLED
 		PhysicalBone *physical_bone;
 		PhysicalBone *cache_parent_physical_bone;
@@ -115,6 +134,7 @@ private:
 			physical_bone = NULL;
 			cache_parent_physical_bone = NULL;
 #endif // _3D_DISABLED
+			nodeAnim = NULL;
 		}
 	};
 
@@ -160,6 +180,11 @@ public:
 	void add_bone(const String &p_name);
 	int find_bone(const String &p_name) const;
 	String get_bone_name(int p_bone) const;
+
+	// 修改点，添加函数，用于记录animNode的root节点，由于add_bone耦合性较高，无法直接使用
+	void SetNodeAnimRoot(NodeAnim *root);
+	NodeAnim* FindAnimNodeByBoneName(NodeAnim *root, String boneName);
+	void FindAnimNodeRecursive(NodeAnim *nodeAnim, String boneName, NodeAnim **node);
 
 	bool is_bone_parent_of(int p_bone_id, int p_parent_bone_id) const;
 
@@ -226,6 +251,9 @@ public:
 public:
 	Skeleton();
 	~Skeleton();
+
+private:
+	NodeAnim *anim_node_root;
 };
 
 #endif

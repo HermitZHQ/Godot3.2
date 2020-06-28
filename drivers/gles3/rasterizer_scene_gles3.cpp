@@ -1974,6 +1974,8 @@ void RasterizerSceneGLES3::_set_cull(bool p_front, bool p_disabled, bool p_rever
 
 void RasterizerSceneGLES3::_render_list(RenderList::Element **p_elements, int p_element_count, const Transform &p_view_transform, const CameraMatrix &p_projection, RasterizerStorageGLES3::Sky *p_sky, bool p_reverse_cull, bool p_alpha_pass, bool p_shadow, bool p_directional_add, bool p_directional_shadows) {
 
+	static int i = -1;
+
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, state.scene_ubo); //bind globals ubo
 
 	bool use_radiance_map = false;
@@ -2020,7 +2022,6 @@ void RasterizerSceneGLES3::_render_list(RenderList::Element **p_elements, int p_
 	RasterizerStorageGLES3::Geometry *prev_geometry = NULL;
 	RasterizerStorageGLES3::GeometryOwner *prev_owner = NULL;
 	VS::InstanceType prev_base_type = VS::INSTANCE_MAX;
-
 	int current_blend_mode = -1;
 
 	int prev_shading = -1;
@@ -2034,9 +2035,15 @@ void RasterizerSceneGLES3::_render_list(RenderList::Element **p_elements, int p_
 	storage->info.render.draw_call_count += p_element_count;
 	bool prev_opaque_prepass = false;
 
+	if (i != -1) {
+		p_element_count = i;
+	}
 	for (int i = 0; i < p_element_count; i++) {
-
+// 		continue;
 		RenderList::Element *e = p_elements[i];
+		if (nullptr == e)
+			continue;
+
 		RasterizerStorageGLES3::Material *material = e->material;
 		RasterizerStorageGLES3::Skeleton *skeleton = NULL;
 		if (e->instance->skeleton.is_valid()) {

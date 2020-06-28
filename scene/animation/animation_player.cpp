@@ -382,6 +382,11 @@ void AnimationPlayer::_animation_process_animation(AnimationData *p_anim, float 
 				Error err = a->transform_track_interpolate(i, p_time, &loc, &rot, &scale);
 				//ERR_CONTINUE(err!=OK); //used for testing, should be removed
 
+				// 测试点：测试混合后的矩阵结果
+				Transform t;
+				t.origin = loc;
+				t.basis.set_quat_scale(rot, scale);
+
 				if (err != OK)
 					continue;
 
@@ -392,6 +397,11 @@ void AnimationPlayer::_animation_process_animation(AnimationData *p_anim, float 
 					nc->loc_accum = loc;
 					nc->rot_accum = rot;
 					nc->scale_accum = scale;
+
+					// 测试矩阵结果
+					Transform t;
+					t.origin = nc->loc_accum;
+					t.basis.set_quat_scale(rot, scale);
 
 				} else {
 

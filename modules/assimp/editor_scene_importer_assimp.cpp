@@ -138,7 +138,7 @@ Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_f
 								 //aiProcess_FixInfacingNormals |
 								 //aiProcess_ValidateDataStructure |
 								 aiProcess_OptimizeMeshes |
-								 aiProcess_PopulateArmatureData |
+								 //aiProcess_PopulateArmatureData |
 								 //aiProcess_OptimizeGraph |
 								 //aiProcess_Debone |
 								 // aiProcess_EmbedTextures |
@@ -327,14 +327,36 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	if (scene->mRootNode) {
 		state.nodes.push_back(scene->mRootNode);
 
-		// 生成所有节点数据，父节点为非Bone，而本身为Bone的，父节点转化为Armature节点（可以和Armature处理流程中得到的指针对应）
+		// 注释点：生成所有节点数据，父节点为非Bone，而本身为Bone的，父节点转化为Armature节点（可以和Armature处理流程中得到的指针对应）
 		// make flat node tree - in order to make processing deterministic
 		for (unsigned int i = 0; i < scene->mRootNode->mNumChildren; i++) {
 			_generate_node(state, scene->mRootNode->mChildren[i]);
 		}
 
-		// 根据scene重新获取所有bone节点，存入stack_bone下
+		// 注释点：根据scene重新获取所有bone节点，存入stack_bone下
 		RegenerateBoneStack(state);
+
+		// 修改点：创建animNode的所有节点链表用于动画寻找父节点
+		Skeleton::NodeAnim *nodeAnimRoot = nullptr;
+		CreateAnimNodeFromScene(scene, &nodeAnimRoot);
+
+		// 修改点：手动赋值总的armature节点给所有bone node，并给mNode赋值有效地址
+		int iCount = 0;
+		for (auto e = state.nodes.front(); e; e = e->next())
+		{
+			aiBone *bone = get_bone_by_name(state.assimp_scene, e->get()->mName);
+			if (nullptr != bone)
+			{
+				++iCount;
+				bone->mArmature = state.armature_nodes[0];
+				void* addr = (void*)e->get();
+				bone->mNode = (aiNode*)addr;
+				if (addr) {
+					int i = 0;
+					++i;
+				}
+			}
+		}
 
 		Node *last_valid_parent = NULL;
 
@@ -362,10 +384,14 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				// create skeleton
 				print_verbose("Making skeleton: " + node_name);
 				Skeleton *skeleton = memnew(Skeleton);
+				skeleton->SetNodeAnimRoot(nodeAnimRoot);
 				spatial = skeleton;
 				if (!state.armature_skeletons.has(element_assimp_node)) {
 					state.armature_skeletons.insert(element_assimp_node, skeleton);
 				}
+
+				// 修改点：尝试使用spatial节点替换skeleton，替换后不显示骨骼，还可以显示静态模型
+// 				spatial = memnew(Spatial);
 			} else if (bone != NULL) {
 				continue;
 			} else {
@@ -426,6 +452,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 		// This is a list of bones, duplicates are from other meshes and must be dealt with properly
 		for (List<aiBone *>::Element *element = state.bone_stack.front(); element; element = element->next()) {
 			aiBone *bone = element->get();
+			// 测试点：关闭骨骼信息录入，还需要关闭后面生成mesh时的地方
 // 			continue;
 
 			ERR_CONTINUE_MSG(!bone, "invalid bone read from assimp?");
@@ -465,6 +492,8 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				if (parent_node != NULL) {
 					int parent_bone_id = skeleton->find_bone(AssimpUtils::get_anim_string_from_assimp(parent_node->mName));
 					int current_bone_id = boneIdx;
+
+					// 修改点：尝试屏蔽父节点设置
 					skeleton->set_bone_parent(current_bone_id, parent_bone_id);
 				}
 			}
@@ -566,6 +595,46 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	return state.root;
 }
 
+void EditorSceneImporterAssimp::CreateAnimNodeFromScene(const aiScene *scene, Skeleton::NodeAnim **root)
+{
+	*root = new Skeleton::NodeAnim();
+	(*root)->name = AssimpUtils::get_assimp_string(scene->mRootNode->mName);
+	(*root)->parent = nullptr;
+	(*root)->localTransform = AssimpUtils::assimp_matrix_transform(scene->mRootNode->mTransformation);
+
+	for (int i = 0; i < scene->mRootNode->mNumChildren; ++i)
+	{
+		(*root)->childs.push_back(CreateAnimNodes(scene, scene->mRootNode->mChildren[i], *root));
+	}
+}
+static int iTest2 = 0;
+Skeleton::NodeAnim* EditorSceneImporterAssimp::CreateAnimNodes(const aiScene *scene, const aiNode *node, Skeleton::NodeAnim *parent)
+{
+	++iTest2;
+	Skeleton::NodeAnim *animNode = new Skeleton::NodeAnim;
+	animNode->name = AssimpUtils::get_assimp_string(node->mName);
+	animNode->parent = parent;
+	animNode->localTransform = AssimpUtils::assimp_matrix_transform(node->mTransformation);
+
+	// default to use animation 0, for now(todo)
+	aiAnimation *anim = scene->mAnimations[0];
+	for (int i = 0; i < anim->mNumChannels; ++i)
+	{
+		if (anim->mChannels[i]->mNodeName == node->mName) {
+			animNode->channelId = i;
+			break;
+		}
+	}
+
+	for (int i = 0; i < node->mNumChildren; ++i)
+	{
+		auto childNode = CreateAnimNodes(scene, node->mChildren[i], animNode);
+		animNode->childs.push_back(childNode);
+	}
+
+	return animNode;
+}
+
 void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, const aiAnimation *assimp_anim, int track_id,
 		int anim_fps, Ref<Animation> animation, float ticks_per_second,
 		Skeleton *skeleton, const NodePath &node_path,
@@ -635,7 +704,8 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 				xform.basis.set_quat_scale(rot, scale);
 				xform.origin = pos;
 
-				xform = skeleton->get_bone_pose(skeleton_bone).inverse() * xform;
+				// 修改点：这个矩阵乘法完全意义不明...
+// 				xform = skeleton->get_bone_pose(skeleton_bone).inverse() * xform;
 
 				rot = xform.basis.get_rotation_quat();
 				rot.normalize();
@@ -893,6 +963,9 @@ EditorSceneImporterAssimp::_generate_mesh_from_surface_indices(ImportState &stat
 				if (!skeleton_assigned) {
 					print_verbose("Assigned mesh skeleton during mesh creation");
 					skeleton_assigned = state.skeleton_bone_map[bone];
+					if (nullptr == skeleton_assigned) {
+						continue;
+					}
 
 					if (!skin.is_valid()) {
 						print_verbose("Configured new skin");
@@ -1218,7 +1291,7 @@ EditorSceneImporterAssimp::_generate_mesh_from_surface_indices(ImportState &stat
 		Mesh::PrimitiveType primitive = Mesh::PRIMITIVE_TRIANGLES;
 
 		for (size_t j = 0; j < ai_mesh->mNumAnimMeshes; j++) {
-
+// 			continue;
 			String ai_anim_mesh_name = AssimpUtils::get_assimp_string(ai_mesh->mAnimMeshes[j]->mName);
 
 			if (ai_anim_mesh_name.empty()) {
@@ -1513,10 +1586,26 @@ void EditorSceneImporterAssimp::_generate_node(
 	aiBone *parent_bone = get_bone_by_name(state.assimp_scene, assimp_node->mParent->mName);
 	aiBone *current_bone = get_bone_by_name(state.assimp_scene, assimp_node->mName);
 
+	// 我们应该检测到最root节点，如果只是parent_bone为空，但是上层父节点还有bone不为空的话也不能算为armature节点
+// 	if (nullptr == parent_bone && current_bone)
+// 	{
+// 		aiNode *parentNode = assimp_node->mParent;
+// 		while (parentNode)
+// 		{
+// 			parent_bone = get_bone_by_name(state.assimp_scene, parentNode->mName);
+// 			if (nullptr != parent_bone) {
+// 				break;
+// 			}
+// 
+// 			parentNode = parentNode->mParent;
+// 		}
+// 	}
+
 	// is this an armature
 	// parent null
 	// and this is the first bone :)
-	if (parent_bone == NULL && current_bone) {
+	if (parent_bone == NULL && current_bone && state.armature_nodes.size() == 0) {
+		
 		state.armature_nodes.push_back(assimp_node->mParent);
 		print_verbose("found valid armature: " + parent_name);
 	}
