@@ -286,7 +286,7 @@ void Skeleton::_notification(int p_what) {
 // 							}
 
 							b.pose_global = b.pose;
-							NodeAnim *node = FindAnimNodeByBoneName(anim_node_root, b.name);
+							NodeAnim *node = anim_node_root ? FindAnimNodeByBoneName(anim_node_root, b.name) : nullptr;
 							NodeAnim *parent = nullptr;
 							if (node)
 							{
