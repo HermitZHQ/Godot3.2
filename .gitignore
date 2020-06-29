@@ -85,8 +85,6 @@ logs/
 *.suo
 *.user
 *.sln.docstates
-*.sln
-*.vcxproj*
 
 # Custom SCons configuration override
 /custom.py
