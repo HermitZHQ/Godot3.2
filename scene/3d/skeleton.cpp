@@ -231,8 +231,13 @@ void Skeleton::_notification(int p_what) {
 			Bone *bonesptr = bones.ptrw();
 			int len = bones.size();
 
-			_update_process_order();
+			// 修改点：update所有非bone节点的global transform，否则有些节点不会转变
+			anim_node_root = (NodeAnim*)get_anim_root_node_addr();
+			if (anim_node_root) {
+// 				UpdateAllNoneBoneAnimNodes(anim_node_root);
+			}
 
+			_update_process_order();
 			const int *order = process_order.ptr();
 
 			for (int i = 0; i < len; i++) {
@@ -286,17 +291,16 @@ void Skeleton::_notification(int p_what) {
 // 							}
 
 							b.pose_global = b.pose;
-							NodeAnim *node = anim_node_root ? FindAnimNodeByBoneName(anim_node_root, b.name) : nullptr;
+							NodeAnim *node = b.nodeAnim ? b.nodeAnim : 
+								(anim_node_root ?
+									FindAnimNodeByBoneName(anim_node_root, b.name) : nullptr);
 							NodeAnim *parent = nullptr;
-							if (node)
-							{
+							if (node) {
 								parent = node->parent;
 							}
 
-							while (nullptr != parent)
-							{
+							while (nullptr != parent) {
 								b.pose_global = parent->localTransform * b.pose_global;
-
 								parent = parent->parent;
 							}
 						}
@@ -337,12 +341,12 @@ void Skeleton::_notification(int p_what) {
 			for (Set<SkinReference *>::Element *E = skin_bindings.front(); E; E = E->next()) {
 
 				//测试点：
-				if (0 != iTest) {
-					continue;
-				}
-				if (0 == iTest) {
-					iTest = 1;
-				}
+// 				if (0 != iTest) {
+// 					continue;
+// 				}
+// 				if (0 == iTest) {
+// 					iTest = 1;
+// 				}
 
 				const Skin *skin = E->get()->skin.operator->();
 				RID skeleton = E->get()->skeleton;
@@ -469,10 +473,15 @@ String Skeleton::get_bone_name(int p_bone) const {
 	return bones[p_bone].name;
 }
 
-void Skeleton::SetNodeAnimRoot(NodeAnim *root)
-{
-	anim_node_root = root;
-}
+// void Skeleton::SetNodeAnimRoot(int64_t rootAddr)
+// {
+// 	anim_node_root = static_cast<NodeAnim*>((void*)rootAddr);
+// }
+// 
+// int64_t Skeleton::GetNodeAnimRoot() const
+// {
+// 	return (int64_t)(anim_node_root);
+// }
 
 Skeleton::NodeAnim* Skeleton::FindAnimNodeByBoneName(NodeAnim *root, String boneName)
 {
@@ -491,6 +500,22 @@ void Skeleton::FindAnimNodeRecursive(NodeAnim *nodeAnim, String boneName, NodeAn
 	for (int i = 0; i < nodeAnim->childs.size(); ++i)
 	{
 		FindAnimNodeRecursive(nodeAnim->childs[i], boneName, node);
+	}
+}
+
+void Skeleton::UpdateAllNoneBoneAnimNodes(NodeAnim *node)
+{
+	node->globalTransform = node->localTransform;
+	NodeAnim *parentNode = node->parent;
+	while (parentNode)
+	{
+		node->globalTransform = parentNode->localTransform * node->globalTransform;
+		parentNode = parentNode->parent;
+	}
+
+	for (int i = 0; i < node->childs.size(); ++i)
+	{
+		UpdateAllNoneBoneAnimNodes(node->childs[i]);
 	}
 }
 
@@ -637,9 +662,24 @@ void Skeleton::set_bone_pose(int p_bone, const Transform &p_pose) {
 
 	bones.write[p_bone].pose = p_pose;
 	// 修改点：同时更新animNode的tranfrom
-// 	if (bones.write[p_bone].nodeAnim->channelId != -1) {
-// 		bones.write[p_bone].nodeAnim->localTransform = p_pose;
-// 	}
+	if (nullptr == bones.write[p_bone].nodeAnim) {
+		NodeAnim *root = (NodeAnim*)get_anim_root_node_addr();
+		bones.write[p_bone].nodeAnim = (nullptr == root) ? nullptr : FindAnimNodeByBoneName(root, bones.write[p_bone].name);
+	}
+	if (bones.write[p_bone].nodeAnim /*&& bones.write[p_bone].nodeAnim->channelId != -1*/) {
+		bones.write[p_bone].nodeAnim->localTransform = p_pose;
+
+		bones.write[p_bone].nodeAnim->globalTransform = bones.write[p_bone].nodeAnim->localTransform;
+		NodeAnim *parent = bones.write[p_bone].nodeAnim->parent;
+		while (parent)
+		{
+			bones.write[p_bone].nodeAnim->globalTransform = parent->localTransform * bones.write[p_bone].nodeAnim->globalTransform;
+			parent = parent->parent;
+		}
+
+		bones.write[p_bone].pose_global = bones.write[p_bone].nodeAnim->globalTransform;
+	}
+
 	if (is_inside_tree()) {
 		_make_dirty();
 	}
@@ -955,6 +995,11 @@ void Skeleton::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("physical_bones_remove_collision_exception", "exception"), &Skeleton::physical_bones_remove_collision_exception);
 
 #endif // _3D_DISABLED
+
+// 	ClassDB::bind_method(D_METHOD("SetNodeAnimRoot", "addr"), &Skeleton::SetNodeAnimRoot);
+// 	ClassDB::bind_method(D_METHOD("GetNodeAnimRoot"), &Skeleton::GetNodeAnimRoot);
+// 	ADD_GROUP("AnimTest", "");
+// 	ADD_PROPERTY(PropertyInfo(Variant::INT, "AnimAddr", PROPERTY_HINT_NONE, "123", PROPERTY_USAGE_EDITOR), "SetNodeAnimRoot", "GetNodeAnimRoot");
 
 	BIND_CONSTANT(NOTIFICATION_UPDATE_SKELETON);
 }

@@ -86,9 +86,10 @@ public:
 		Transform				localTransform;
 		Transform				globalTransform;
 		int						channelId;
+		bool					isBone;
 
 		NodeAnim()
-			:channelId(-1), parent(NULL)
+			:channelId(-1), parent(NULL), isBone(false)
 		{}
 	};
 private:
@@ -182,9 +183,11 @@ public:
 	String get_bone_name(int p_bone) const;
 
 	// 修改点，添加函数，用于记录animNode的root节点，由于add_bone耦合性较高，无法直接使用
-	void SetNodeAnimRoot(NodeAnim *root);
+// 	void SetNodeAnimRoot(int64_t rootAddr);
+// 	int64_t GetNodeAnimRoot() const;
 	NodeAnim* FindAnimNodeByBoneName(NodeAnim *root, String boneName);
 	void FindAnimNodeRecursive(NodeAnim *nodeAnim, String boneName, NodeAnim **node);
+	void UpdateAllNoneBoneAnimNodes(NodeAnim *node);
 
 	bool is_bone_parent_of(int p_bone_id, int p_parent_bone_id) const;
 

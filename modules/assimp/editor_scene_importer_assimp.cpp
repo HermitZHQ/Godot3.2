@@ -123,7 +123,7 @@ Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_f
 								 aiProcess_FlipWindingOrder |
 								 // very important for culling so that it is done in the correct order.
 								 //aiProcess_DropNormals |
-								 //aiProcess_GenSmoothNormals |
+								 aiProcess_GenSmoothNormals |
 								 //aiProcess_JoinIdenticalVertices |
 								 aiProcess_ImproveCacheLocality |
 								 //aiProcess_RemoveRedundantMaterials | // Causes a crash
@@ -138,10 +138,10 @@ Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_f
 								 //aiProcess_FixInfacingNormals |
 								 //aiProcess_ValidateDataStructure |
 								 aiProcess_OptimizeMeshes |
-								 //aiProcess_PopulateArmatureData |
+								 aiProcess_PopulateArmatureData |
 								 //aiProcess_OptimizeGraph |
 								 //aiProcess_Debone |
-								 // aiProcess_EmbedTextures |
+								 //aiProcess_EmbedTextures |
 								 //aiProcess_SplitByBoneCount |
 								 0;
 	String g_path = ProjectSettings::get_singleton()->globalize_path(p_path);
@@ -351,7 +351,11 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				bone->mArmature = state.armature_nodes[0];
 				void* addr = (void*)e->get();
 				bone->mNode = (aiNode*)addr;
-				if (addr) {
+				if (bone->mNode->mName == aiString("Bip001 Prop2")) {
+					int i = 0;
+					++i;
+				}
+				if (bone->mNode == nullptr) {
 					int i = 0;
 					++i;
 				}
@@ -370,6 +374,11 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			String node_name = AssimpUtils::get_assimp_string(element_assimp_node->mName);
 			//print_verbose("node: " + node_name);
 
+			if (element_assimp_node->mName == aiString("Bip001 Prop2")) {
+				int i = 0;
+				++i;
+			}
+
 			Spatial *spatial = NULL;
 			Transform transform = AssimpUtils::assimp_matrix_transform(element_assimp_node->mTransformation);
 
@@ -384,13 +393,14 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				// create skeleton
 				print_verbose("Making skeleton: " + node_name);
 				Skeleton *skeleton = memnew(Skeleton);
-				skeleton->SetNodeAnimRoot(nodeAnimRoot);
+				skeleton->set_anim_root_node_addr((int64_t)nodeAnimRoot);
+				skeleton->set_name("just test");
 				spatial = skeleton;
 				if (!state.armature_skeletons.has(element_assimp_node)) {
 					state.armature_skeletons.insert(element_assimp_node, skeleton);
 				}
 
-				// 修改点：尝试使用spatial节点替换skeleton，替换后不显示骨骼，还可以显示静态模型
+				// 修改点：尝试使用spatial节点替换skeleton，替换后不显示骨骼，可以显示静态模型
 // 				spatial = memnew(Spatial);
 			} else if (bone != NULL) {
 				continue;
@@ -479,7 +489,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				WARN_PRINT("Untitled bone name detected... report with file please");
 			}
 
-			// todo: this is where skin support goes
+			// todo: this is where skin support goescreate
 			if (skeleton && skeleton->find_bone(bone_name) == -1) {
 				print_verbose("[Godot Glue] Imported bone" + bone_name);
 				int boneIdx = skeleton->get_bone_count();
@@ -493,7 +503,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 					int parent_bone_id = skeleton->find_bone(AssimpUtils::get_anim_string_from_assimp(parent_node->mName));
 					int current_bone_id = boneIdx;
 
-					// 修改点：尝试屏蔽父节点设置
+					// 修改点：尝试屏蔽父节点设置，这里不能随意改动，强行-1父节点会导致skin的骨架不显示
 					skeleton->set_bone_parent(current_bone_id, parent_bone_id);
 				}
 			}
@@ -614,6 +624,7 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::CreateAnimNodes(const aiScene *sc
 	Skeleton::NodeAnim *animNode = new Skeleton::NodeAnim;
 	animNode->name = AssimpUtils::get_assimp_string(node->mName);
 	animNode->parent = parent;
+	animNode->isBone = get_bone_by_name(scene, node->mName) ? true : false;
 	animNode->localTransform = AssimpUtils::assimp_matrix_transform(node->mTransformation);
 
 	// default to use animation 0, for now(todo)
@@ -1578,6 +1589,11 @@ void EditorSceneImporterAssimp::_generate_node(
 	state.nodes.push_back(assimp_node);
 	String parent_name = AssimpUtils::get_assimp_string(assimp_node->mParent->mName);
 
+	if (assimp_node->mName == aiString("Bip001 Pelvis")) {
+		int i = 0;
+		++i;
+	}
+
 	// please note
 	// duplicate bone names exist
 	// this is why we only check if the bone exists
@@ -1586,7 +1602,7 @@ void EditorSceneImporterAssimp::_generate_node(
 	aiBone *parent_bone = get_bone_by_name(state.assimp_scene, assimp_node->mParent->mName);
 	aiBone *current_bone = get_bone_by_name(state.assimp_scene, assimp_node->mName);
 
-	// 我们应该检测到最root节点，如果只是parent_bone为空，但是上层父节点还有bone不为空的话也不能算为armature节点
+	// 测试点：我们应该检测到最root节点，如果只是parent_bone为空，但是上层父节点还有bone不为空的话也不能算为armature节点
 // 	if (nullptr == parent_bone && current_bone)
 // 	{
 // 		aiNode *parentNode = assimp_node->mParent;
@@ -1604,10 +1620,15 @@ void EditorSceneImporterAssimp::_generate_node(
 	// is this an armature
 	// parent null
 	// and this is the first bone :)
-	if (parent_bone == NULL && current_bone && state.armature_nodes.size() == 0) {
-		
-		state.armature_nodes.push_back(assimp_node->mParent);
-		print_verbose("found valid armature: " + parent_name);
+// 	if (parent_bone == NULL && current_bone) {		
+// 		state.armature_nodes.push_back(assimp_node->mParent);
+// 		print_verbose("found valid armature: " + parent_name);
+// 	}
+
+	// 测试点：使用rootNode充当唯一的armature节点
+	if (state.armature_nodes.size() == 0 /*&& assimp_node->mName == aiString("Bip001")*/) {
+		state.armature_nodes.push_back((aiNode *const)assimp_node);
+		print_verbose("use root node be the only one armature node");
 	}
 
 	for (size_t i = 0; i < assimp_node->mNumChildren; i++) {
