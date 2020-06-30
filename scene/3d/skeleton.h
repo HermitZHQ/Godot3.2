@@ -185,7 +185,7 @@ public:
 	// 修改点，添加函数，用于记录animNode的root节点，由于add_bone耦合性较高，无法直接使用
 // 	void SetNodeAnimRoot(int64_t rootAddr);
 // 	int64_t GetNodeAnimRoot() const;
-	NodeAnim* FindAnimNodeByBoneName(NodeAnim *root, String boneName);
+	NodeAnim* FindAnimNodeByName(NodeAnim *root, String boneName);
 	void FindAnimNodeRecursive(NodeAnim *nodeAnim, String boneName, NodeAnim **node);
 	void UpdateAllNoneBoneAnimNodes(NodeAnim *node);
 
@@ -221,6 +221,9 @@ public:
 
 	void set_bone_pose(int p_bone, const Transform &p_pose);
 	Transform get_bone_pose(int p_bone) const;
+
+	// 修改点：增加接口处理非bone节点的channel trans更新
+	void set_none_bone_pose(StringName name, const Transform &p_pose);
 
 	void set_bone_custom_pose(int p_bone, const Transform &p_custom_pose);
 	Transform get_bone_custom_pose(int p_bone) const;

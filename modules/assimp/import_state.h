@@ -88,6 +88,8 @@ struct ImportState {
 	// this means we can detect
 	// what bones are for other armatures
 	List<aiBone *> bone_stack;
+	// 修改点：需要记录aiBone对应的mesh，每个mesh的bone应该是分开处理的
+	List<unsigned int> bone_stack_mesh_index;
 
 	// EditorSceneImporter::ImportFlags
 	uint32_t import_flags;

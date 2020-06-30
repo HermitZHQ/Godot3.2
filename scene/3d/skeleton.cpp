@@ -35,6 +35,7 @@
 #include "core/project_settings.h"
 #include "scene/3d/physics_body.h"
 #include "scene/resources/surface_tool.h"
+#include <assimp/ai_assert.h>
 
 void SkinReference::_skin_changed() {
 	if (skeleton_node) {
@@ -290,10 +291,15 @@ void Skeleton::_notification(int p_what) {
 // 								b.pose_global = b.rest * pose;
 // 							}
 
-							b.pose_global = b.pose;
 							NodeAnim *node = b.nodeAnim ? b.nodeAnim : 
 								(anim_node_root ?
-									FindAnimNodeByBoneName(anim_node_root, b.name) : nullptr);
+									FindAnimNodeByName(anim_node_root, b.name) : nullptr);
+							if (nullptr == b.nodeAnim && node) {
+								b.nodeAnim = node;
+								b.pose = b.rest;
+							}
+
+							b.pose_global = b.pose;
 							NodeAnim *parent = nullptr;
 							if (node) {
 								parent = node->parent;
@@ -403,7 +409,16 @@ void Skeleton::_notification(int p_what) {
 					auto pose = skin->get_bind_pose(i);
 					auto globalPose = bonesptr[bone_index].pose_global;
 					auto finalPose = globalPose * pose;
-					vs->skeleton_bone_set_transform(skeleton, i, finalPose);
+					if (i < bind_count /*- 1 - 4*/)
+					{
+						vs->skeleton_bone_set_transform(skeleton, i, finalPose);
+					} 
+					else
+					{
+						Transform t;
+						t.set(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0);
+						vs->skeleton_bone_set_transform(skeleton, i, t);
+					}
 				}
 			}
 
@@ -446,6 +461,12 @@ void Skeleton::add_bone(const String &p_name)
 		ERR_FAIL_COND(bones[i].name == p_name);
 	}
 
+	// 测试点：查看weapon sub拷贝时，到底发生了什么
+	if (p_name == "weapon sub") {
+		int i = 0;
+		++i;
+	}
+
 	Bone b;
 	b.name = p_name;
 	bones.push_back(b);
@@ -483,7 +504,7 @@ String Skeleton::get_bone_name(int p_bone) const {
 // 	return (int64_t)(anim_node_root);
 // }
 
-Skeleton::NodeAnim* Skeleton::FindAnimNodeByBoneName(NodeAnim *root, String boneName)
+Skeleton::NodeAnim* Skeleton::FindAnimNodeByName(NodeAnim *root, String boneName)
 {
 	Skeleton::NodeAnim *node = nullptr;
 	FindAnimNodeRecursive(root, boneName, &node);
@@ -661,23 +682,35 @@ void Skeleton::set_bone_pose(int p_bone, const Transform &p_pose) {
 	ERR_FAIL_INDEX(p_bone, bones.size());
 
 	bones.write[p_bone].pose = p_pose;
-	// 修改点：同时更新animNode的tranfrom
+	// 修改点：同时更新animNode的tranfrom（local和global）
+	// 错误：经过测试后发现不能在这里进行更新global，因为这里所有的channels没有更新完毕，这样的话有些父节点的local trans就没有更新
+	// 这里只能更新对应nodeAnim的local trans
+	if (bones.write[p_bone].name == "weapon sub") {
+		int i = 0;
+		++i;
+	}
 	if (nullptr == bones.write[p_bone].nodeAnim) {
 		NodeAnim *root = (NodeAnim*)get_anim_root_node_addr();
-		bones.write[p_bone].nodeAnim = (nullptr == root) ? nullptr : FindAnimNodeByBoneName(root, bones.write[p_bone].name);
+		bones.write[p_bone].nodeAnim = (nullptr == root) ? nullptr : FindAnimNodeByName(root, bones.write[p_bone].name);
 	}
-	if (bones.write[p_bone].nodeAnim /*&& bones.write[p_bone].nodeAnim->channelId != -1*/) {
-		bones.write[p_bone].nodeAnim->localTransform = p_pose;
 
-		bones.write[p_bone].nodeAnim->globalTransform = bones.write[p_bone].nodeAnim->localTransform;
-		NodeAnim *parent = bones.write[p_bone].nodeAnim->parent;
-		while (parent)
-		{
-			bones.write[p_bone].nodeAnim->globalTransform = parent->localTransform * bones.write[p_bone].nodeAnim->globalTransform;
-			parent = parent->parent;
-		}
+	NodeAnim *nodeAnim = bones.write[p_bone].nodeAnim;
+	if (nodeAnim /*&& nodeAnim->channelId != -1*/) {
+		nodeAnim->localTransform = p_pose;
 
-		bones.write[p_bone].pose_global = bones.write[p_bone].nodeAnim->globalTransform;
+		// 更新global trans
+// 		nodeAnim->globalTransform = nodeAnim->localTransform;
+// 		NodeAnim *parent = nodeAnim->parent;
+// 		while (parent)
+// 		{
+// 			nodeAnim->globalTransform = parent->localTransform * nodeAnim->globalTransform;
+// 			parent = parent->parent;
+// 		}
+// 
+// 		bones.write[p_bone].pose_global = nodeAnim->globalTransform;
+	}
+	else {
+		ai_assert(0);
 	}
 
 	if (is_inside_tree()) {
@@ -688,6 +721,19 @@ Transform Skeleton::get_bone_pose(int p_bone) const {
 
 	ERR_FAIL_INDEX_V(p_bone, bones.size(), Transform());
 	return bones[p_bone].pose;
+}
+
+void Skeleton::set_none_bone_pose(StringName name, const Transform &p_pose)
+{
+	NodeAnim *root = (NodeAnim*)get_anim_root_node_addr();
+	NodeAnim *nodeAnim = (nullptr == root) ? nullptr : FindAnimNodeByName(root, name);
+
+	if (nodeAnim) {
+		nodeAnim->localTransform = p_pose;
+	}
+	else {
+		ai_assert(0);
+	}
 }
 
 void Skeleton::set_bone_custom_pose(int p_bone, const Transform &p_custom_pose) {

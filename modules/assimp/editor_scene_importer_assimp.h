@@ -109,7 +109,8 @@ private:
 			Skeleton *skeleton, const NodePath &node_path,
 			const String &node_name, aiBone *track_bone);
 
-	void _import_animation(ImportState &state, int p_animation_index, int p_bake_fps);
+	// 修改点：让动画导入支持指定的Mesh
+	void _import_animation(ImportState &state, int p_animation_index, int p_bake_fps, unsigned int mesh_id);
 	Node *get_node_by_name(ImportState &state, String name);
 	aiBone *get_bone_from_stack(ImportState &state, aiString name);
 	Spatial *_generate_scene(const String &p_path, aiScene *scene, const uint32_t p_flags, int p_bake_fps, const int32_t p_max_bone_weights);

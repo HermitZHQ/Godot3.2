@@ -341,23 +341,17 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 		CreateAnimNodeFromScene(scene, &nodeAnimRoot);
 
 		// 修改点：手动赋值总的armature节点给所有bone node，并给mNode赋值有效地址
-		int iCount = 0;
-		for (auto e = state.nodes.front(); e; e = e->next())
+		// 修改2：分开处理不同的mesh中的bone，绑定不同的armature
+		int bone_stack_size = state.bone_stack.size();
+		for (int i = 0; i < bone_stack_size; ++i)
 		{
-			aiBone *bone = get_bone_by_name(state.assimp_scene, e->get()->mName);
-			if (nullptr != bone)
+			state.bone_stack[i]->mArmature = state.armature_nodes[state.bone_stack_mesh_index[i]];
+
+			for (auto n = state.nodes.front(); n; n = n->next())
 			{
-				++iCount;
-				bone->mArmature = state.armature_nodes[0];
-				void* addr = (void*)e->get();
-				bone->mNode = (aiNode*)addr;
-				if (bone->mNode->mName == aiString("Bip001 Prop2")) {
-					int i = 0;
-					++i;
-				}
-				if (bone->mNode == nullptr) {
-					int i = 0;
-					++i;
+				if (n->get()->mName == state.bone_stack[i]->mName) {
+					state.bone_stack[i]->mNode = (aiNode*)n->get();
+					break;
 				}
 			}
 		}
@@ -374,7 +368,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			String node_name = AssimpUtils::get_assimp_string(element_assimp_node->mName);
 			//print_verbose("node: " + node_name);
 
-			if (element_assimp_node->mName == aiString("Bip001 Prop2")) {
+			if (element_assimp_node->mName == aiString("omniknight")) {
 				int i = 0;
 				++i;
 			}
@@ -385,6 +379,8 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			// retrieve this node bone
 			aiBone *bone = get_bone_from_stack(state, element_assimp_node->mName);
 
+			// 修改点：尝试设置任意节点为skeleton，不要给其增加父节点
+// 			bool bSkeletonFlag = false;
 			if (state.light_cache.has(node_name)) {
 				spatial = create_light(state, node_name, transform);
 			} else if (state.camera_cache.has(node_name)) {
@@ -397,6 +393,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				skeleton->set_name("just test");
 				spatial = skeleton;
 				if (!state.armature_skeletons.has(element_assimp_node)) {
+// 					bSkeletonFlag = true;
 					state.armature_skeletons.insert(element_assimp_node, skeleton);
 				}
 
@@ -431,10 +428,15 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				ERR_FAIL_COND_V_MSG(parent_node == NULL, state.root,
 						"Parent node invalid even though lookup successful, out of ram?")
 
-				if (spatial != state.root) {
+				if (spatial != state.root /*&& !bSkeletonFlag*/) {
 					parent_node->add_child(spatial);
 					spatial->set_owner(state.root);
-				} else {
+				}
+// 				else if (bSkeletonFlag) {
+// 					state.root->add_child(spatial);
+// // 					spatial->set_owner(state.root);
+// 				}
+				else {
 					// required - think about it root never has a parent yet is valid, anything else without a parent is not valid.
 				}
 			} else if (spatial != state.root) {
@@ -476,8 +478,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 
 			String bone_name = AssimpUtils::get_anim_string_from_assimp(bone->mName);
 			if (armature_for_bone == NULL) {
-				int i = 5;
-				i += 2;
+				ai_assert(0);
 			}
 			ERR_CONTINUE_MSG(armature_for_bone == NULL, "Armature for bone invalid: " + bone_name);
 			Skeleton *skeleton = state.armature_skeletons[armature_for_bone];
@@ -498,6 +499,8 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				skeleton->add_bone(bone_name);
 				skeleton->set_bone_rest(boneIdx, pform);
 				skeleton->set_bone_pose(boneIdx, pform);
+
+				ai_assert(skeleton->get_bone_count() <= 110);
 
 				if (parent_node != NULL) {
 					int parent_bone_id = skeleton->find_bone(AssimpUtils::get_anim_string_from_assimp(parent_node->mName));
@@ -569,6 +572,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			}
 		}
 
+		// 修改点：屏蔽删除numMeshes>0的mesh节点，测试创建多Skeleton节点（基于这个ainode）
 		for (List<Spatial *>::Element *element = cleanup_template_nodes.front(); element; element = element->next()) {
 			if (element->get()) {
 				memdelete(element->get());
@@ -579,12 +583,17 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	// ---------------------------------------Handle Animation infos
 	if (p_flags & IMPORT_ANIMATION && scene->mNumAnimations) {
 
-		state.animation_player = memnew(AnimationPlayer);
-		state.root->add_child(state.animation_player);
-		state.animation_player->set_owner(state.root);
+// 		state.animation_player = memnew_arr(AnimationPlayer, state.armature_skeletons.size());
+		for (int a = 0; a < state.armature_skeletons.size(); ++a)
+		{
 
-		for (uint32_t i = 0; i < scene->mNumAnimations; i++) {
-			_import_animation(state, i, p_bake_fps);
+			state.animation_player = memnew(AnimationPlayer);
+			state.root->add_child(state.animation_player);
+			state.animation_player->set_owner(state.root);
+	
+			for (uint32_t i = 0; i < scene->mNumAnimations; i++) {
+				_import_animation(state, i, p_bake_fps, a);
+			}
 		}
 	}
 
@@ -626,6 +635,11 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::CreateAnimNodes(const aiScene *sc
 	animNode->parent = parent;
 	animNode->isBone = get_bone_by_name(scene, node->mName) ? true : false;
 	animNode->localTransform = AssimpUtils::assimp_matrix_transform(node->mTransformation);
+
+	if (animNode->name == "weapon sub") {
+		int i = 0;
+		++i;
+	}
 
 	// default to use animation 0, for now(todo)
 	aiAnimation *anim = scene->mAnimations[0];
@@ -758,6 +772,7 @@ Node *EditorSceneImporterAssimp::get_node_by_name(ImportState &state, String nam
 void EditorSceneImporterAssimp::RegenerateBoneStack(ImportState &state) {
 
 	state.bone_stack.clear();
+	state.bone_stack_mesh_index.clear();
 	// build bone stack list
 	for (unsigned int mesh_id = 0; mesh_id < state.assimp_scene->mNumMeshes; ++mesh_id) {
 		aiMesh *mesh = state.assimp_scene->mMeshes[mesh_id];
@@ -770,6 +785,7 @@ void EditorSceneImporterAssimp::RegenerateBoneStack(ImportState &state) {
 			if (!state.bone_stack.find(bone)) {
 				//print_verbose("[assimp] bone stack added: " + String(bone->mName.C_Str()) );
 				state.bone_stack.push_back(bone);
+				state.bone_stack_mesh_index.push_back(mesh_id);
 			}
 		}
 	}
@@ -789,7 +805,7 @@ void EditorSceneImporterAssimp::RegenerateBoneStack(ImportState &state, aiMesh *
 
 // animation tracks are per bone
 
-void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_animation_index, int p_bake_fps) {
+void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_animation_index, int p_bake_fps, unsigned int mesh_id) {
 
 	ERR_FAIL_INDEX(p_animation_index, (int)state.assimp_scene->mNumAnimations);
 
@@ -825,8 +841,9 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		animation->set_loop(true);
 	}
 
+	// 修改点：使用mesh指定的bone生成接口
 	// generate bone stack for animation import
-	RegenerateBoneStack(state);
+	RegenerateBoneStack(state, state.assimp_scene->mMeshes[mesh_id]);
 
 	//regular tracks
 	for (size_t i = 0; i < anim->mNumChannels; i++) {
@@ -1626,8 +1643,22 @@ void EditorSceneImporterAssimp::_generate_node(
 // 	}
 
 	// 测试点：使用rootNode充当唯一的armature节点
-	if (state.armature_nodes.size() == 0 /*&& assimp_node->mName == aiString("Bip001")*/) {
-		state.armature_nodes.push_back((aiNode *const)assimp_node);
+	// 由于需要对多Mesh对应一个animation做处理，而不同mesh的bone对应顺序并不一样，必须单独分开处理，所以Armature可以创立到有mesh的节点下
+	if (/*state.armature_nodes.size() == 0 &&*/ assimp_node->mNumMeshes > 0 /*&& assimp_node->mName == aiString("Bip001")*/) {
+		// 伪造和mesh节点同级的新aiNode用作Armature节点
+		aiNode *parent = assimp_node->mParent;
+		aiNode *newMeshNode = new aiNode();
+		newMeshNode->mParent = parent;
+		newMeshNode->mNumChildren = 0;
+		aiString name = assimp_node->mName;
+		name.Append("ArmatureNode");
+		newMeshNode->mName = name;
+		newMeshNode->mNumMeshes = 0;
+		newMeshNode->mTransformation = aiMatrix4x4();
+
+		parent->addChildren(1, &newMeshNode);
+
+		state.armature_nodes.push_back((aiNode *const)newMeshNode);
 		print_verbose("use root node be the only one armature node");
 	}
 
