@@ -138,7 +138,7 @@ Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_f
 								 //aiProcess_FixInfacingNormals |
 								 //aiProcess_ValidateDataStructure |
 								 aiProcess_OptimizeMeshes |
-								 aiProcess_PopulateArmatureData |
+								 //aiProcess_PopulateArmatureData |
 								 //aiProcess_OptimizeGraph |
 								 //aiProcess_Debone |
 								 //aiProcess_EmbedTextures |
@@ -507,6 +507,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 					int current_bone_id = boneIdx;
 
 					// 修改点：尝试屏蔽父节点设置，这里不能随意改动，强行-1父节点会导致skin的骨架不显示
+					// 这里的父节点的设置，其实是为了重新计算（校正）骨骼的offsetMat，很有用
 					skeleton->set_bone_parent(current_bone_id, parent_bone_id);
 				}
 			}
