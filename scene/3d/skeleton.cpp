@@ -37,6 +37,7 @@
 #include "scene/resources/surface_tool.h"
 #include <assimp/ai_assert.h>
 #include "core/os/os.h"
+#include <functional>
 
 void SkinReference::_skin_changed() {
 	if (skeleton_node) {
@@ -167,6 +168,23 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 	return true;
 }
 void Skeleton::_get_property_list(List<PropertyInfo> *p_list) const {
+	// 修改点：整理整个animNodeTree的顺序ID，并按照顺序存入property中，最后再尝试取出
+	static std::function<void(NodeAnim *, unsigned int &, Vector<NodeAnim*> &)> gen_anim_node_tree_id_func = [&](NodeAnim *node, unsigned int &startId, Vector<NodeAnim*> &animNodeVec) {
+		node->nodeId = startId++;
+		animNodeVec.push_back(node);
+
+		for (int i = 0; i < node->childs.size(); ++i)
+		{
+			gen_anim_node_tree_id_func(node->childs[i], startId, animNodeVec);
+		}
+	};
+	unsigned int Id = 0;
+	Vector<NodeAnim*> animNodeVec;
+	animNodeVec.clear();
+	if (anim_node_root)
+	{
+		gen_anim_node_tree_id_func(anim_node_root, Id, animNodeVec);
+	}
 
 	for (int i = 0; i < bones.size(); i++) {
 
@@ -182,6 +200,13 @@ void Skeleton::_get_property_list(List<PropertyInfo> *p_list) const {
 		p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node", PROPERTY_HINT_NONE, ""));
 		if (0 == i) {
 			p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_root_addr", PROPERTY_HINT_NONE, ""));
+
+			for (int a = 0; a < Id; ++a)
+			{
+				NodeAnim *node = animNodeVec[a];
+
+				p_list->push_back(PropertyInfo(Variant::STRING, prep + "anim_node_name" + itos(a)));
+			}
 		}
 	}
 }
@@ -314,7 +339,7 @@ void Skeleton::_notification(int p_what) {
 							if (nullptr == b.nodeAnim && node) {
 								b.nodeAnim = node;
 							}
-							b.pose = b.nodeAnim->localTransform;
+							b.pose = b.nodeAnim ? b.nodeAnim->localTransform : b.rest;
 
 							b.pose_global = b.pose;
 							NodeAnim *parent = nullptr;
@@ -1099,6 +1124,7 @@ void Skeleton::_bind_methods() {
 
 Skeleton::Skeleton()
 	:anim_node_root(nullptr)
+	, anim_node_addr(0)
 {
 
 	dirty = false;

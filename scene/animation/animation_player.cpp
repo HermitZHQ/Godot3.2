@@ -877,6 +877,7 @@ void AnimationPlayer::_animation_update_transforms() {
 				nc->spatial->set_transform(t);
 
 				// 修改点：确保非Bone的channel节点也必须进行更新，否则动画不能完全正常
+				// 这里需要注意的是，后期应该是支持更新多Skeleton，目前测试写死了一个
 				if (nullptr == g_test_skeleton) {
 					for (int a = 0; a < cache_update_size; a++) {
 						TrackNodeCache *tnc = cache_update[a];

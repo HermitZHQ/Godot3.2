@@ -87,9 +87,10 @@ public:
 		Transform				globalTransform;
 		int						channelId;
 		bool					isBone;
+		int						nodeId;// 为了存储在tsn文件中还原时使用
 
 		NodeAnim()
-			:channelId(-1), parent(NULL), isBone(false)
+			:channelId(-1), parent(NULL), isBone(false), nodeId(-1)
 		{}
 	};
 private:
