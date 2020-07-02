@@ -292,17 +292,6 @@ Transform Spatial::get_global_transform() const {
 	return data.global_transform;
 }
 
-int64_t Spatial::get_anim_root_node_addr() const
-{
-	return anim_node_addr;
-}
-
-void Spatial::set_anim_root_node_addr(int64_t d)
-{
-	anim_node_addr = d;
-	_change_notify("animAddr");
-}
-
 #ifdef TOOLS_ENABLED
 Transform Spatial::get_global_gizmo_transform() const {
 	return get_global_transform();
@@ -827,17 +816,11 @@ void Spatial::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "visible"), "set_visible", "is_visible");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "gizmo", PROPERTY_HINT_RESOURCE_TYPE, "SpatialGizmo", 0), "set_gizmo", "get_gizmo");
 
-	ClassDB::bind_method(D_METHOD("set_anim_root_node_addr", "a"), &Spatial::set_anim_root_node_addr);
-	ClassDB::bind_method(D_METHOD("get_anim_root_node_addr"), &Spatial::get_anim_root_node_addr);
-	ADD_GROUP("Anim", "");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "animAddr", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_anim_root_node_addr", "get_anim_root_node_addr");
-
 	ADD_SIGNAL(MethodInfo("visibility_changed"));
 }
 
 Spatial::Spatial() :
 		xform_change(this)
-	, anim_node_addr(0)
 {
 
 	data.dirty = DIRTY_NONE;

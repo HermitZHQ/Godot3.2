@@ -142,9 +142,6 @@ public:
 	Transform get_transform() const;
 	Transform get_global_transform() const;
 
-	int64_t get_anim_root_node_addr() const;
-	void set_anim_root_node_addr(int64_t addr);
-
 #ifdef TOOLS_ENABLED
 	virtual Transform get_global_gizmo_transform() const;
 	virtual Transform get_local_gizmo_transform() const;
@@ -207,7 +204,6 @@ public:
 	~Spatial();
 
 private:
-	int64_t anim_node_addr;
 };
 
 #endif

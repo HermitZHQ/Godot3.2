@@ -36,6 +36,7 @@
 #include "scene/3d/physics_body.h"
 #include "scene/resources/surface_tool.h"
 #include <assimp/ai_assert.h>
+#include "core/os/os.h"
 
 void SkinReference::_skin_changed() {
 	if (skeleton_node) {
@@ -92,6 +93,11 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 		set_bone_enabled(which, p_value);
 	else if (what == "pose")
 		set_bone_pose(which, p_value);
+	// 修改点：增加属性存储
+	else if (what == "anim_node")
+		set_bone_anim_node(which, p_value);
+	else if (what == "anim_node_root_addr")
+		set_anim_root_node_addr(p_value);
 	else if (what == "bound_children") {
 		Array children = p_value;
 
@@ -136,6 +142,11 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 		r_ret = is_bone_enabled(which);
 	else if (what == "pose")
 		r_ret = get_bone_pose(which);
+	// 修改点：增加animNode相关属性存储
+	else if (what == "anim_node")
+		r_ret = (int64_t)get_bone_anim_node(which);
+	else if (what == "anim_node_root_addr")
+		r_ret = get_anim_root_node_addr();
 	else if (what == "bound_children") {
 		Array children;
 
@@ -166,6 +177,12 @@ void Skeleton::_get_property_list(List<PropertyInfo> *p_list) const {
 		p_list->push_back(PropertyInfo(Variant::BOOL, prep + "enabled"));
 		p_list->push_back(PropertyInfo(Variant::TRANSFORM, prep + "pose", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR));
 		p_list->push_back(PropertyInfo(Variant::ARRAY, prep + "bound_children"));
+
+		// 修改点：增加animNode相关属性
+		p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node", PROPERTY_HINT_NONE, ""));
+		if (0 == i) {
+			p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_root_addr", PROPERTY_HINT_NONE, ""));
+		}
 	}
 }
 
@@ -296,8 +313,8 @@ void Skeleton::_notification(int p_what) {
 									FindAnimNodeByName(anim_node_root, b.name) : nullptr);
 							if (nullptr == b.nodeAnim && node) {
 								b.nodeAnim = node;
-								b.pose = b.rest;
 							}
+							b.pose = b.nodeAnim->localTransform;
 
 							b.pose_global = b.pose;
 							NodeAnim *parent = nullptr;
@@ -307,6 +324,16 @@ void Skeleton::_notification(int p_what) {
 
 							while (nullptr != parent) {
 								b.pose_global = parent->localTransform * b.pose_global;
+
+								// 测试点：对比每次生成的global矩阵
+// 								if (b.name == "Bip001 L Forearm")
+// 								{
+// 									OS::get_singleton()->print("test parent[%S] mat:[%f], [%f], [%f]\n",
+// 										parent->name.ptr(),
+// 										b.pose_global.basis.elements[0].x,
+// 										b.pose_global.basis.elements[0].y,
+// 										b.pose_global.basis.elements[0].z);
+// 								}
 								parent = parent->parent;
 							}
 						}
@@ -736,6 +763,26 @@ void Skeleton::set_none_bone_pose(StringName name, const Transform &p_pose)
 	}
 }
 
+int64_t Skeleton::get_anim_root_node_addr() const
+{
+	return anim_node_addr;
+}
+
+void Skeleton::set_anim_root_node_addr(int64_t addr)
+{
+	anim_node_addr = addr;
+}
+
+Skeleton::NodeAnim* Skeleton::get_bone_anim_node(int p_bone) const
+{
+	return bones.ptr()[p_bone].nodeAnim;
+}
+
+void Skeleton::set_bone_anim_node(int p_bone, int64_t addr)
+{
+	bones.ptrw()[p_bone].nodeAnim = (NodeAnim *)addr;
+}
+
 void Skeleton::set_bone_custom_pose(int p_bone, const Transform &p_custom_pose) {
 
 	ERR_FAIL_INDEX(p_bone, bones.size());
@@ -1042,10 +1089,10 @@ void Skeleton::_bind_methods() {
 
 #endif // _3D_DISABLED
 
-// 	ClassDB::bind_method(D_METHOD("SetNodeAnimRoot", "addr"), &Skeleton::SetNodeAnimRoot);
-// 	ClassDB::bind_method(D_METHOD("GetNodeAnimRoot"), &Skeleton::GetNodeAnimRoot);
-// 	ADD_GROUP("AnimTest", "");
-// 	ADD_PROPERTY(PropertyInfo(Variant::INT, "AnimAddr", PROPERTY_HINT_NONE, "123", PROPERTY_USAGE_EDITOR), "SetNodeAnimRoot", "GetNodeAnimRoot");
+	ClassDB::bind_method(D_METHOD("set_anim_root_node_addr", "a"), &Skeleton::set_anim_root_node_addr);
+	ClassDB::bind_method(D_METHOD("get_anim_root_node_addr"), &Skeleton::get_anim_root_node_addr);
+	ADD_GROUP("Anim", "");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "animAddr", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_anim_root_node_addr", "get_anim_root_node_addr");
 
 	BIND_CONSTANT(NOTIFICATION_UPDATE_SKELETON);
 }

@@ -225,6 +225,12 @@ public:
 	// 修改点：增加接口处理非bone节点的channel trans更新
 	void set_none_bone_pose(StringName name, const Transform &p_pose);
 
+	// 增加animNode root的set get接口
+	int64_t get_anim_root_node_addr() const;
+	void set_anim_root_node_addr(int64_t addr);
+	NodeAnim* get_bone_anim_node(int p_bone) const;
+	void set_bone_anim_node(int p_bone, int64_t addr);
+
 	void set_bone_custom_pose(int p_bone, const Transform &p_custom_pose);
 	Transform get_bone_custom_pose(int p_bone) const;
 
@@ -260,6 +266,7 @@ public:
 
 private:
 	NodeAnim *anim_node_root;
+	int64_t anim_node_addr;
 };
 
 #endif

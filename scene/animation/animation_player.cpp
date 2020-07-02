@@ -856,9 +856,9 @@ void AnimationPlayer::_animation_process2(float p_delta, bool p_started) {
 	}
 }
 
-static Skeleton *g_test_skeleton = nullptr;
 void AnimationPlayer::_animation_update_transforms() {
 	{
+		Skeleton *g_test_skeleton = nullptr;
 		Transform t;
 		for (int i = 0; i < cache_update_size; i++) {
 
@@ -870,11 +870,6 @@ void AnimationPlayer::_animation_update_transforms() {
 			t.basis.set_quat_scale(nc->rot_accum, nc->scale_accum);
 			if (nc->skeleton && nc->bone_idx >= 0) {
 
-				// 测试点：记录一个有效的skeleton，测试调用函数，后面再修改，先测试效果
-				if (g_test_skeleton == nullptr) {
-					g_test_skeleton = nc->skeleton;
-				}
-
 				nc->skeleton->set_bone_pose(nc->bone_idx, t);
 
 			} else if (nc->spatial) {
@@ -882,10 +877,16 @@ void AnimationPlayer::_animation_update_transforms() {
 				nc->spatial->set_transform(t);
 
 				// 修改点：确保非Bone的channel节点也必须进行更新，否则动画不能完全正常
-				if (g_test_skeleton) {
-					auto name = nc->spatial->get_name();
-					g_test_skeleton->set_none_bone_pose(name, t);
+				if (nullptr == g_test_skeleton) {
+					for (int a = 0; a < cache_update_size; a++) {
+						TrackNodeCache *tnc = cache_update[a];
+						if (tnc->skeleton) {
+							g_test_skeleton = tnc->skeleton;
+						}
+					}
 				}
+				auto name = nc->spatial->get_name();
+				g_test_skeleton->set_none_bone_pose(name, t);
 			}
 		}
 	}
