@@ -68,6 +68,34 @@ SkinReference::~SkinReference() {
 	VS::get_singleton()->free(skeleton);
 }
 
+void Skeleton::_check_load_vec_func(int pos) {
+
+	if (pos >= anim_node_load_vec.size()) {
+		NodeAnim *node = new NodeAnim;
+		anim_node_load_vec.push_back(node);
+	}
+}
+
+void Skeleton::_regenerate_anim_node_tree()
+{
+	std::function<void(NodeAnim *, NodeAnim *, int)> _generate_anim_node_tree = [&](NodeAnim *node, NodeAnim *parent, int id) {
+		node->parent = parent;
+
+		for (int i = 0; i < node->childs.size(); ++i)
+		{
+			node->childs.ptrw()[i] = anim_node_load_vec.get(id + (i + 1));
+		}
+
+		for (int i = 0; i < node->childs.size(); ++i)
+		{
+			_generate_anim_node_tree(node->childs[i], node, id + (i + 1));
+		}
+	};
+
+	_generate_anim_node_tree(anim_node_load_vec.ptrw()[0], nullptr, 0);
+	anim_node_root = anim_node_load_vec.ptrw()[0];
+}
+
 bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 
 	String path = p_path;
@@ -77,6 +105,8 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 
 	int which = path.get_slicec('/', 1).to_int();
 	String what = path.get_slicec('/', 2);
+	int pos = path.get_slicec('/', 3).to_int();
+
 
 	if (which == bones.size() && what == "name") {
 
@@ -95,10 +125,38 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 	else if (what == "pose")
 		set_bone_pose(which, p_value);
 	// 修改点：增加属性存储
-	else if (what == "anim_node")
-		set_bone_anim_node(which, p_value);
-	else if (what == "anim_node_root_addr")
-		set_anim_root_node_addr(p_value);
+// 	else if (what == "anim_node")
+// 		set_bone_anim_node(which, p_value);
+// 	else if (what == "anim_node_root_addr")
+// 		set_anim_root_node_addr(p_value);
+	else if (what == "anim_node_name") {
+		_check_load_vec_func(pos);
+		anim_node_load_vec.ptrw()[pos]->name = p_value;
+	}
+	else if (what == "anim_node_child_num") {
+		_check_load_vec_func(pos);
+		for (int64_t i = 0; i < (int64_t)p_value; ++i)
+		{
+			// 先按照数量填充无效child，后面再进行组合
+			anim_node_load_vec.ptrw()[pos]->childs.push_back(0);
+		}
+	}
+	else if (what == "anim_node_local_transform") {
+		_check_load_vec_func(pos);
+		anim_node_load_vec.ptrw()[pos]->localTransform = p_value;
+	}
+	else if (what == "anim_node_global_transform") {
+		_check_load_vec_func(pos);
+		anim_node_load_vec.ptrw()[pos]->globalTransform = p_value;
+	}
+	else if (what == "anim_node_channel_id") {
+		_check_load_vec_func(pos);
+		anim_node_load_vec.ptrw()[pos]->channelId = p_value;
+	}
+	else if (what == "anim_node_is_bone") {
+		_check_load_vec_func(pos);
+		anim_node_load_vec.ptrw()[pos]->isBone = p_value;
+	}
 	else if (what == "bound_children") {
 		Array children = p_value;
 
@@ -130,6 +188,7 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 
 	int which = path.get_slicec('/', 1).to_int();
 	String what = path.get_slicec('/', 2);
+	int pos = path.get_slicec('/', 3).to_int();
 
 	ERR_FAIL_INDEX_V(which, bones.size(), false);
 
@@ -144,10 +203,28 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 	else if (what == "pose")
 		r_ret = get_bone_pose(which);
 	// 修改点：增加animNode相关属性存储
-	else if (what == "anim_node")
-		r_ret = (int64_t)get_bone_anim_node(which);
-	else if (what == "anim_node_root_addr")
-		r_ret = get_anim_root_node_addr();
+// 	else if (what == "anim_node")
+// 		r_ret = (int64_t)get_bone_anim_node(which);
+// 	else if (what == "anim_node_root_addr")
+// 		r_ret = get_anim_root_node_addr();
+	else if (what == "anim_node_name") {
+		r_ret = anim_node_save_vec.ptr()[pos]->name;
+	}
+	else if (what == "anim_node_child_num") {
+		r_ret = (int64_t)anim_node_save_vec.ptr()[pos]->childs.size();
+	}
+	else if (what == "anim_node_local_transform") {
+		r_ret = anim_node_save_vec.ptr()[pos]->localTransform;
+	}
+	else if (what == "anim_node_global_transform") {
+		r_ret = anim_node_save_vec.ptr()[pos]->globalTransform;
+	}
+	else if (what == "anim_node_channel_id") {
+		r_ret = (int64_t)anim_node_save_vec.ptr()[pos]->channelId;
+	}
+	else if (what == "anim_node_is_bone") {
+		r_ret = anim_node_save_vec.ptr()[pos]->isBone;
+	}
 	else if (what == "bound_children") {
 		Array children;
 
@@ -169,22 +246,6 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 }
 void Skeleton::_get_property_list(List<PropertyInfo> *p_list) const {
 	// 修改点：整理整个animNodeTree的顺序ID，并按照顺序存入property中，最后再尝试取出
-	static std::function<void(NodeAnim *, unsigned int &, Vector<NodeAnim*> &)> gen_anim_node_tree_id_func = [&](NodeAnim *node, unsigned int &startId, Vector<NodeAnim*> &animNodeVec) {
-		node->nodeId = startId++;
-		animNodeVec.push_back(node);
-
-		for (int i = 0; i < node->childs.size(); ++i)
-		{
-			gen_anim_node_tree_id_func(node->childs[i], startId, animNodeVec);
-		}
-	};
-	unsigned int Id = 0;
-	Vector<NodeAnim*> animNodeVec;
-	animNodeVec.clear();
-	if (anim_node_root)
-	{
-		gen_anim_node_tree_id_func(anim_node_root, Id, animNodeVec);
-	}
 
 	for (int i = 0; i < bones.size(); i++) {
 
@@ -197,15 +258,20 @@ void Skeleton::_get_property_list(List<PropertyInfo> *p_list) const {
 		p_list->push_back(PropertyInfo(Variant::ARRAY, prep + "bound_children"));
 
 		// 修改点：增加animNode相关属性
-		p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node", PROPERTY_HINT_NONE, ""));
+// 		p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node", PROPERTY_HINT_NONE, ""));
 		if (0 == i) {
-			p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_root_addr", PROPERTY_HINT_NONE, ""));
+// 			p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_root_addr", PROPERTY_HINT_NONE, ""));
 
-			for (int a = 0; a < Id; ++a)
+			for (int a = 0; a < anim_node_save_vec.size(); ++a)
 			{
-				NodeAnim *node = animNodeVec[a];
+				NodeAnim *node = anim_node_save_vec[a];
 
-				p_list->push_back(PropertyInfo(Variant::STRING, prep + "anim_node_name" + itos(a)));
+				p_list->push_back(PropertyInfo(Variant::STRING, prep + "anim_node_name/" + itos(a)));
+				p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_child_num/" + itos(a)));
+				p_list->push_back(PropertyInfo(Variant::TRANSFORM, prep + "anim_node_local_transform/" + itos(a)));
+				p_list->push_back(PropertyInfo(Variant::TRANSFORM, prep + "anim_node_global_transform/" + itos(a)));
+				p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_channel_id/" + itos(a)));
+				p_list->push_back(PropertyInfo(Variant::BOOL, prep + "anim_node_is_bone/" + itos(a)));
 			}
 		}
 	}
@@ -278,6 +344,11 @@ void Skeleton::_notification(int p_what) {
 			anim_node_root = (NodeAnim*)get_anim_root_node_addr();
 			if (anim_node_root) {
 // 				UpdateAllNoneBoneAnimNodes(anim_node_root);
+			}
+
+			// 修改点：检测是anim_node_root为null，是的话，从load的anim node vec中重新组合出tree
+			if (nullptr == anim_node_root) {
+				_regenerate_anim_node_tree();
 			}
 
 			_update_process_order();
@@ -796,6 +867,23 @@ int64_t Skeleton::get_anim_root_node_addr() const
 void Skeleton::set_anim_root_node_addr(int64_t addr)
 {
 	anim_node_addr = addr;
+	anim_node_root = (NodeAnim *)addr;
+
+	static std::function<void(NodeAnim *, unsigned int &, Vector<NodeAnim*> &)> gen_anim_node_tree_id_func = [&](NodeAnim *node, unsigned int &startId, Vector<NodeAnim*> &animNodeVec) {
+		node->nodeId = startId++;
+		animNodeVec.push_back(node);
+
+		for (int i = 0; i < node->childs.size(); ++i)
+		{
+			gen_anim_node_tree_id_func(node->childs[i], startId, animNodeVec);
+		}
+	};
+	unsigned int Id = 0;
+	anim_node_save_vec.clear();
+	if (anim_node_root)
+	{
+		gen_anim_node_tree_id_func(anim_node_root, Id, anim_node_save_vec);
+	}
 }
 
 Skeleton::NodeAnim* Skeleton::get_bone_anim_node(int p_bone) const
@@ -1130,6 +1218,10 @@ Skeleton::Skeleton()
 	dirty = false;
 	version = 1;
 	process_order_dirty = true;
+
+	// 修改点：
+	anim_node_load_vec.clear();
+	anim_node_save_vec.clear();
 }
 
 Skeleton::~Skeleton() {

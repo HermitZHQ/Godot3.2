@@ -254,6 +254,10 @@ private:
 	PhysicalBone *_get_physical_bone_parent(int p_bone);
 	void _rebuild_physical_bones_cache();
 
+	// 修改点：
+	void _check_load_vec_func(int pos);
+	void _regenerate_anim_node_tree();
+
 public:
 	void physical_bones_stop_simulation();
 	void physical_bones_start_simulation_on(const Array &p_bones);
@@ -268,6 +272,8 @@ public:
 private:
 	NodeAnim *anim_node_root;
 	int64_t anim_node_addr;
+	Vector<NodeAnim*> anim_node_save_vec;
+	Vector<NodeAnim*> anim_node_load_vec;
 };
 
 #endif
