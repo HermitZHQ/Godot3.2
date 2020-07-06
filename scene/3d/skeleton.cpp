@@ -1215,11 +1215,6 @@ void Skeleton::_bind_methods() {
 
 #endif // _3D_DISABLED
 
-	ClassDB::bind_method(D_METHOD("set_anim_root_node_addr", "a"), &Skeleton::set_anim_root_node_addr);
-	ClassDB::bind_method(D_METHOD("get_anim_root_node_addr"), &Skeleton::get_anim_root_node_addr);
-	ADD_GROUP("Anim", "");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "animAddr", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_anim_root_node_addr", "get_anim_root_node_addr");
-
 	BIND_CONSTANT(NOTIFICATION_UPDATE_SKELETON);
 }
 

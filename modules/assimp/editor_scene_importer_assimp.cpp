@@ -584,14 +584,13 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	// ---------------------------------------Handle Animation infos
 	if (p_flags & IMPORT_ANIMATION && scene->mNumAnimations) {
 
-// 		state.animation_player = memnew_arr(AnimationPlayer, state.armature_skeletons.size());
+		state.animation_player = memnew(AnimationPlayer);
+		state.root->add_child(state.animation_player);
+		state.animation_player->set_owner(state.root);
+
 		for (int a = 0; a < state.armature_skeletons.size(); ++a)
 		{
-
-			state.animation_player = memnew(AnimationPlayer);
-			state.root->add_child(state.animation_player);
-			state.animation_player->set_owner(state.root);
-	
+			// 修改点：尝试不创建多anim，在同一anim下插入不同skeleton的track
 			for (uint32_t i = 0; i < scene->mNumAnimations; i++) {
 				_import_animation(state, i, p_bake_fps, a);
 			}
@@ -812,6 +811,9 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 
 	const aiAnimation *anim = state.assimp_scene->mAnimations[p_animation_index];
 	String name = AssimpUtils::get_anim_string_from_assimp(anim->mName);
+	// 修改点：尝试根据不同mesh id，改变不同的anim name
+	name = name + "-" + itos(mesh_id);
+
 	if (name == String()) {
 		name = "Animation " + itos(p_animation_index + 1);
 	}
