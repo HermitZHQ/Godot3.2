@@ -78,22 +78,20 @@ void Skeleton::_check_load_vec_func(int pos) {
 
 void Skeleton::_regenerate_anim_node_tree()
 {
-	std::function<void(NodeAnim *, NodeAnim *, int)> _generate_anim_node_tree = [&](NodeAnim *node, NodeAnim *parent, int id) {
-		node->parent = parent;
+	for (int i = 0; i < anim_node_load_vec.size(); ++i)
+	{
+		anim_node_load_vec.ptrw()[i]->parent = (anim_node_load_vec.ptrw()[i]->parent == 0) ?
+			0 : anim_node_load_vec.ptrw()[(int)anim_node_load_vec.ptrw()[i]->parent];
 
-		for (int i = 0; i < node->childs.size(); ++i)
+		for (int j = 0; j < anim_node_load_vec.ptrw()[i]->childs.size(); ++j)
 		{
-			node->childs.ptrw()[i] = anim_node_load_vec.get(id + (i + 1));
+			anim_node_load_vec.ptrw()[i]->childs.ptrw()[j] = anim_node_load_vec.ptrw()[(int)anim_node_load_vec.ptrw()[i]->childs[j]];
 		}
+	}
 
-		for (int i = 0; i < node->childs.size(); ++i)
-		{
-			_generate_anim_node_tree(node->childs[i], node, id + (i + 1));
-		}
-	};
 
-	_generate_anim_node_tree(anim_node_load_vec.ptrw()[0], nullptr, 0);
 	anim_node_root = anim_node_load_vec.ptrw()[0];
+	anim_node_addr = (int64_t)anim_node_root;
 }
 
 bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
@@ -133,12 +131,16 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 		_check_load_vec_func(pos);
 		anim_node_load_vec.ptrw()[pos]->name = p_value;
 	}
-	else if (what == "anim_node_child_num") {
+	else if (what == "anim_node_child_id_array") {
 		_check_load_vec_func(pos);
-		for (int64_t i = 0; i < (int64_t)p_value; ++i)
+		PoolVector<int> id_vec = p_value;
+		// get out the parent id
+		anim_node_load_vec.ptrw()[pos]->parent = (NodeAnim*)(id_vec[0] == -1 ? 0 : id_vec[0]);
+		// get out the childs id
+		for (int64_t i = 1; i < id_vec.size(); ++i)
 		{
 			// 先按照数量填充无效child，后面再进行组合
-			anim_node_load_vec.ptrw()[pos]->childs.push_back(0);
+			anim_node_load_vec.ptrw()[pos]->childs.push_back((NodeAnim*)id_vec[i]);
 		}
 	}
 	else if (what == "anim_node_local_transform") {
@@ -210,8 +212,19 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 	else if (what == "anim_node_name") {
 		r_ret = anim_node_save_vec.ptr()[pos]->name;
 	}
-	else if (what == "anim_node_child_num") {
-		r_ret = (int64_t)anim_node_save_vec.ptr()[pos]->childs.size();
+	else if (what == "anim_node_child_id_array") {
+		PoolVector<int> id_vec;
+		// parent id
+		id_vec.push_back((int)(anim_node_save_vec.ptr()[pos]->parent ?
+			anim_node_save_vec.ptr()[pos]->parent->nodeId :
+			-1));
+		// child ids
+		for (int i = 0; i < anim_node_save_vec.ptr()[pos]->childs.size(); ++i)
+		{
+			id_vec.push_back(anim_node_save_vec.ptr()[pos]->childs[i]->nodeId);
+		}
+
+		r_ret = id_vec;
 	}
 	else if (what == "anim_node_local_transform") {
 		r_ret = anim_node_save_vec.ptr()[pos]->localTransform;
@@ -267,7 +280,7 @@ void Skeleton::_get_property_list(List<PropertyInfo> *p_list) const {
 				NodeAnim *node = anim_node_save_vec[a];
 
 				p_list->push_back(PropertyInfo(Variant::STRING, prep + "anim_node_name/" + itos(a)));
-				p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_child_num/" + itos(a)));
+				p_list->push_back(PropertyInfo(Variant::ARRAY, prep + "anim_node_child_id_array/" + itos(a)));
 				p_list->push_back(PropertyInfo(Variant::TRANSFORM, prep + "anim_node_local_transform/" + itos(a)));
 				p_list->push_back(PropertyInfo(Variant::TRANSFORM, prep + "anim_node_global_transform/" + itos(a)));
 				p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_channel_id/" + itos(a)));
