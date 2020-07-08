@@ -78,6 +78,10 @@ void Skeleton::_check_load_vec_func(int pos) {
 
 void Skeleton::_regenerate_anim_node_tree()
 {
+	if (anim_node_load_vec.size() == 0) {
+		return;
+	}
+
 	for (int i = 0; i < anim_node_load_vec.size(); ++i)
 	{
 		anim_node_load_vec.ptrw()[i]->parent = (anim_node_load_vec.ptrw()[i]->parent == 0) ?
@@ -423,12 +427,23 @@ void Skeleton::_notification(int p_what) {
 							if (nullptr == b.nodeAnim && node) {
 								b.nodeAnim = node;
 							}
-							b.pose = b.nodeAnim ? b.nodeAnim->localTransform : b.rest;
+							// 这个pose还不能随意设置，否则不能兼容其他tscn
+// 							if (anim_node_root) {
+								b.pose_global = b.nodeAnim ? b.nodeAnim->localTransform : b.rest;
+// 							}
 
-							b.pose_global = b.pose;
 							NodeAnim *parent = nullptr;
 							if (node) {
 								parent = node->parent;
+							}
+
+							// 兼容处理其他tscn过来的模型，如果没有从nodeAnim中找到parent（不正常情况）
+							// 那么我们采用原有流程的global计算，进行兼容
+							if (nullptr == parent && -1 != b.parent) {
+								b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
+							}
+							else if (nullptr == parent && -1 == b.parent) {
+								b.pose_global = (b.rest * pose);
 							}
 
 							while (nullptr != parent) {
@@ -545,16 +560,7 @@ void Skeleton::_notification(int p_what) {
 					auto pose = skin->get_bind_pose(i);
 					auto globalPose = bonesptr[bone_index].pose_global;
 					auto finalPose = globalPose * pose;
-					if (i < bind_count /*- 1 - 4*/)
-					{
-						vs->skeleton_bone_set_transform(skeleton, i, finalPose);
-					} 
-					else
-					{
-						Transform t;
-						t.set(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0);
-						vs->skeleton_bone_set_transform(skeleton, i, t);
-					}
+					vs->skeleton_bone_set_transform(skeleton, i, finalPose);
 				}
 			}
 
