@@ -76,7 +76,7 @@ private:
 
 	void _skin_changed();
 
-	// 修改点：加入Skeleton中的Bone信息添加NodeAnim，否则无法找到父节点计算正确的global矩阵
+	// 修改点：加入Skeleton中的Bone信息添加NodeAnim，否则无法找到所有父节点计算正确的global矩阵
 public:
 	struct NodeAnim
 	{

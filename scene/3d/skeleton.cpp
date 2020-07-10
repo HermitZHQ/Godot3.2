@@ -379,6 +379,7 @@ void Skeleton::_notification(int p_what) {
 					b.pose_global = b.global_pose_override;
 				} else {
 					// 注释点：不明所以的rest矩阵，不曾出现在assimp-viewer或者教程中
+					// rest已经清楚了，用来保持原始矩阵，并且绘制skin用的
 					if (b.disable_rest) {
 						if (b.enabled) {
 
@@ -439,10 +440,10 @@ void Skeleton::_notification(int p_what) {
 
 							// 兼容处理其他tscn过来的模型，如果没有从nodeAnim中找到parent（不正常情况）
 							// 那么我们采用原有流程的global计算，进行兼容
-							if (nullptr == parent && -1 != b.parent) {
+							if (nullptr == parent && -1 != b.parent && !anim_node_root) {
 								b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
 							}
-							else if (nullptr == parent && -1 == b.parent) {
+							else if (nullptr == parent && -1 == b.parent && !anim_node_root) {
 								b.pose_global = (b.rest * pose);
 							}
 

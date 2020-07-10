@@ -883,6 +883,7 @@ void AnimationPlayer::_animation_update_transforms() {
 						TrackNodeCache *tnc = cache_update[a];
 						if (tnc->skeleton) {
 							g_test_skeleton = tnc->skeleton;
+							break;
 						}
 					}
 				}

@@ -626,6 +626,7 @@ void EditorSceneImporterAssimp::CreateAnimNodeFromScene(const aiScene *scene, Sk
 		(*root)->childs.push_back(CreateAnimNodes(scene, scene->mRootNode->mChildren[i], *root));
 	}
 }
+
 static int iTest2 = 0;
 Skeleton::NodeAnim* EditorSceneImporterAssimp::CreateAnimNodes(const aiScene *scene, const aiNode *node, Skeleton::NodeAnim *parent)
 {
@@ -729,7 +730,9 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 				xform.basis.set_quat_scale(rot, scale);
 				xform.origin = pos;
 
-				// 修改点：这个矩阵乘法完全意义不明...
+				// 修改点：取消此矩阵计算，意义不明
+				// 此矩阵的注释，在目前看来是必须的，否则会导致后面的骨骼动画不正常
+				// 此处修改，应该只会影响到骨骼动画流程，不会影响到其他地方
 // 				xform = skeleton->get_bone_pose(skeleton_bone).inverse() * xform;
 
 				rot = xform.basis.get_rotation_quat();
