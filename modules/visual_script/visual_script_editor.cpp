@@ -1029,6 +1029,37 @@ void VisualScriptEditor::_update_members() {
 	base_type_select->set_text(base_type);
 	base_type_select->set_icon(Control::get_icon(icon_type, "EditorIcons"));
 
+	TreeItem *_customs = members->create_item(root);
+	_customs->set_selectable(0, false);
+	_customs->set_text(0, TTR("Customs:"));
+	_customs->add_button(0, Control::get_icon("Add", "EditorIcons"), -1, false, TTR("Create a new signal."));
+	_customs->set_custom_color(0, Control::get_color("mono_color", "Editor"));
+	for (int i = 0; i < 5; i++)	{
+		TreeItem *ti = members->create_item(_signals);
+		String str(L"中文");
+		if (0 == i) {
+			str = "_process";
+		}
+
+		ti->set_text(0, str);
+		ti->set_selectable(0, true);
+		ti->set_editable(0, true);
+		ti->set_metadata(0, str);
+	}
+
+	for (int i = 0; i < 5; i++) {
+		TreeItem *ti = members->create_item(_customs);
+		String str(L"中文");
+		if (0 == i) {
+			str = "_process";
+		}
+
+		ti->set_text(0, str);
+		ti->set_selectable(0, true);
+		ti->set_editable(0, true);
+		ti->set_metadata(0, str);
+	}
+
 	updating_members = false;
 }
 
@@ -1856,7 +1887,12 @@ Variant VisualScriptEditor::get_drag_data_fw(const Point2 &p_point, Control *p_f
 			dd["type"] = "visual_script_signal_drag";
 			dd["signal"] = type;
 
-		} else {
+		}
+		else if (it->get_parent() == root->get_children()->get_next()->get_next()->get_next()) {
+			dd["type"] = "visual_script_custom_drag";
+			dd["custom"] = type;
+		}
+		else {
 			return Variant();
 		}
 
@@ -1881,7 +1917,8 @@ bool VisualScriptEditor::can_drop_data_fw(const Point2 &p_point, const Variant &
 						String(d["type"]) == "obj_property" ||
 						String(d["type"]) == "resource" ||
 						String(d["type"]) == "files" ||
-						String(d["type"]) == "nodes")) {
+						String(d["type"]) == "nodes" ||
+						String(d["type"]) == "visual_script_custom_drag")) {
 
 			if (String(d["type"]) == "obj_property") {
 
@@ -2347,6 +2384,40 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 			undo_redo->add_do_method(this, "_update_graph");
 			undo_redo->add_undo_method(this, "_update_graph");
 			undo_redo->commit_action();
+		}
+	}
+
+	// 修改点：加入自定义拖放后的创建流程
+	if (String(d["type"]) == "visual_script_custom_drag") {
+
+		Vector2 ofs = graph->get_scroll_ofs() + p_point;
+		if (graph->is_using_snap()) {
+			int snap = graph->get_snap();
+			ofs = ofs.snapped(Vector2(snap, snap));
+		}
+
+		ofs /= EDSCALE;
+
+		Ref<VisualScriptFunctionCall> vnode;
+		vnode.instance();
+		vnode->set_call_mode(VisualScriptFunctionCall::CALL_MODE_SELF);
+
+		int new_id = script->get_available_id();
+
+		undo_redo->create_action(TTR("Add Node"));
+		undo_redo->add_do_method(script.ptr(), "add_node", default_func, new_id, vnode, ofs);
+		undo_redo->add_do_method(vnode.ptr(), "set_base_type", script->get_instance_base_type());
+		undo_redo->add_do_method(vnode.ptr(), "set_function", d["function"]);
+
+		undo_redo->add_undo_method(script.ptr(), "remove_node", default_func, new_id);
+		undo_redo->add_do_method(this, "_update_graph");
+		undo_redo->add_undo_method(this, "_update_graph");
+		undo_redo->commit_action();
+
+		Node *node = graph->get_node(itos(new_id));
+		if (node) {
+			graph->set_selected(node);
+			_node_selected(node);
 		}
 	}
 }
