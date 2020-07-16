@@ -43,6 +43,8 @@
 #include "visual_script_flow_control.h"
 #include "visual_script_func_nodes.h"
 #include "visual_script_nodes.h"
+// 修改点：
+#include "gdi_visual_script_test_nodes.h"
 
 #ifdef TOOLS_ENABLED
 class VisualScriptEditorSignalEdit : public Object {
@@ -2387,7 +2389,7 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 		}
 	}
 
-	// 修改点：加入自定义拖放后的创建流程
+	// 修改点：加入自定义拖放后的创建流程----------------------------------
 	if (String(d["type"]) == "visual_script_custom_drag") {
 
 		Vector2 ofs = graph->get_scroll_ofs() + p_point;
@@ -2398,16 +2400,16 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 
 		ofs /= EDSCALE;
 
-		Ref<VisualScriptFunctionCall> vnode;
+		Ref<VisualScriptFunctionCall2> vnode;
 		vnode.instance();
-		vnode->set_call_mode(VisualScriptFunctionCall::CALL_MODE_SELF);
+		vnode->set_call_mode(VisualScriptFunctionCall2::CALL_MODE_SELF);
 
 		int new_id = script->get_available_id();
 
 		undo_redo->create_action(TTR("Add Node"));
 		undo_redo->add_do_method(script.ptr(), "add_node", default_func, new_id, vnode, ofs);
 		undo_redo->add_do_method(vnode.ptr(), "set_base_type", script->get_instance_base_type());
-		undo_redo->add_do_method(vnode.ptr(), "set_function", d["function"]);
+		undo_redo->add_do_method(vnode.ptr(), "set_function", d["custom"]);
 
 		undo_redo->add_undo_method(script.ptr(), "remove_node", default_func, new_id);
 		undo_redo->add_do_method(this, "_update_graph");
