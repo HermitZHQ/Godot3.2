@@ -44,7 +44,7 @@
 #include "visual_script_func_nodes.h"
 #include "visual_script_nodes.h"
 // 修改点：
-#include "gdi_visual_script_test_nodes.h"
+#include "gdi_visual_script_custom_nodes.h"
 
 #ifdef TOOLS_ENABLED
 class VisualScriptEditorSignalEdit : public Object {
@@ -1034,32 +1034,18 @@ void VisualScriptEditor::_update_members() {
 	TreeItem *_customs = members->create_item(root);
 	_customs->set_selectable(0, false);
 	_customs->set_text(0, TTR("Customs:"));
-	_customs->add_button(0, Control::get_icon("Add", "EditorIcons"), -1, false, TTR("Create a new signal."));
+// 	_customs->add_button(0, Control::get_icon("Add", "EditorIcons"), -1, false, TTR("Create a new signal."));
 	_customs->set_custom_color(0, Control::get_color("mono_color", "Editor"));
-	for (int i = 0; i < 5; i++)	{
-		TreeItem *ti = members->create_item(_signals);
-		String str(L"中文");
-		if (0 == i) {
-			str = "_process";
-		}
-
-		ti->set_text(0, str);
-		ti->set_selectable(0, true);
-		ti->set_editable(0, true);
-		ti->set_metadata(0, str);
-	}
-
-	for (int i = 0; i < 5; i++) {
+	static String str_custom_node_list[] = { L"激活", L"循环", L"鼠标", L"键盘",
+											 L"测试1", L"测试2" };
+	auto custom_node_size = sizeof(str_custom_node_list) / sizeof(String);
+	for (int i = 0; i < custom_node_size; i++) {
 		TreeItem *ti = members->create_item(_customs);
-		String str(L"中文");
-		if (0 == i) {
-			str = "_process";
-		}
 
-		ti->set_text(0, str);
+		ti->set_text(0, str_custom_node_list[i]);
 		ti->set_selectable(0, true);
 		ti->set_editable(0, true);
-		ti->set_metadata(0, str);
+		ti->set_metadata(0, str_custom_node_list[i]);
 	}
 
 	updating_members = false;
@@ -2400,16 +2386,29 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 
 		ofs /= EDSCALE;
 
-		Ref<VisualScriptFunctionCall2> vnode;
+		Ref<GDIVisualScriptCustomNode> vnode;
 		vnode.instance();
-		vnode->set_call_mode(VisualScriptFunctionCall2::CALL_MODE_SELF);
+// 		OS::get_singleton()->print("drop node instance[%x]\n", *vnode);
+
+		if (d["custom"] == String(L"激活")) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::ACTIVE);
+		}
+		else if (d["custom"] == String(L"循环")) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::LOOP);
+		}
+		else if (d["custom"] == String(L"键盘")) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::KEYBOARD);
+		}
+		else if (d["custom"] == String(L"鼠标")) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::MOUSE);
+		}
 
 		int new_id = script->get_available_id();
 
 		undo_redo->create_action(TTR("Add Node"));
 		undo_redo->add_do_method(script.ptr(), "add_node", default_func, new_id, vnode, ofs);
-		undo_redo->add_do_method(vnode.ptr(), "set_base_type", script->get_instance_base_type());
-		undo_redo->add_do_method(vnode.ptr(), "set_function", d["custom"]);
+// 		undo_redo->add_do_method(vnode.ptr(), "set_base_type", script->get_instance_base_type());
+// 		undo_redo->add_do_method(vnode.ptr(), "set_function", d["custom"]);
 
 		undo_redo->add_undo_method(script.ptr(), "remove_node", default_func, new_id);
 		undo_redo->add_do_method(this, "_update_graph");

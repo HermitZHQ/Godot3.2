@@ -35,7 +35,6 @@
 #include "core/project_settings.h"
 #include "scene/3d/physics_body.h"
 #include "scene/resources/surface_tool.h"
-#include <assimp/ai_assert.h>
 #include "core/os/os.h"
 #include <functional>
 
@@ -852,9 +851,6 @@ void Skeleton::set_bone_pose(int p_bone, const Transform &p_pose) {
 // 
 // 		bones.write[p_bone].pose_global = nodeAnim->globalTransform;
 	}
-	else {
-		ai_assert(0);
-	}
 
 	if (is_inside_tree()) {
 		_make_dirty();
@@ -873,9 +869,6 @@ void Skeleton::set_none_bone_pose(StringName name, const Transform &p_pose)
 
 	if (nodeAnim) {
 		nodeAnim->localTransform = p_pose;
-	}
-	else {
-		ai_assert(0);
 	}
 }
 

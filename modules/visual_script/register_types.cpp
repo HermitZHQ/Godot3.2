@@ -40,6 +40,7 @@
 #include "visual_script_func_nodes.h"
 #include "visual_script_nodes.h"
 #include "visual_script_yield_nodes.h"
+#include "gdi_visual_script_custom_nodes.h"
 
 VisualScriptLanguage *visual_script_language = NULL;
 #ifdef TOOLS_ENABLED
@@ -89,6 +90,8 @@ void register_visual_script_types() {
 	ClassDB::register_class<VisualScriptPropertyGet>();
 	//ClassDB::register_type<VisualScriptScriptCall>();
 	ClassDB::register_class<VisualScriptEmitSignal>();
+
+	ClassDB::register_class<GDIVisualScriptCustomNode>();
 
 	ClassDB::register_class<VisualScriptReturn>();
 	ClassDB::register_class<VisualScriptCondition>();

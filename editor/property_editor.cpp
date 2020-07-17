@@ -706,6 +706,12 @@ bool CustomPropertyEditor::edit(Object *p_owner, const String &p_name, Variant::
 				updating = false;
 				return false;
 
+			} else if (hint == PROPERTY_HINT_TYPE_STRING_CHAR) {
+				List<String> names;
+				names.push_back(L"键值:");
+				config_value_editors(1, 1, 50, names);
+				value_editor[0]->set_max_length(1);
+				value_editor[0]->set_text(v);
 			} else {
 				List<String> names;
 				names.push_back("string:");
