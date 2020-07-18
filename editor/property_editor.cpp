@@ -377,6 +377,12 @@ bool CustomPropertyEditor::edit(Object *p_owner, const String &p_name, Variant::
 
 	type = (p_variant.get_type() != Variant::NIL && p_variant.get_type() != Variant::_RID && p_type != Variant::OBJECT) ? p_variant.get_type() : p_type;
 
+	// 修改点：
+	static int original_max_len = -1;
+	if (-1 != original_max_len) {
+		value_editor[0]->set_max_length(original_max_len);
+	}
+
 	switch (type) {
 
 		case Variant::BOOL: {
@@ -706,10 +712,16 @@ bool CustomPropertyEditor::edit(Object *p_owner, const String &p_name, Variant::
 				updating = false;
 				return false;
 
-			} else if (hint == PROPERTY_HINT_TYPE_STRING_CHAR) {
+			}
+			// 修改点：
+			else if (hint == PROPERTY_HINT_TYPE_STRING_CHAR) {
 				List<String> names;
 				names.push_back(L"键值:");
 				config_value_editors(1, 1, 50, names);
+
+				if (-1 == original_max_len) {
+					original_max_len = value_editor[0]->get_max_length();
+				}
 				value_editor[0]->set_max_length(1);
 				value_editor[0]->set_text(v);
 			} else {

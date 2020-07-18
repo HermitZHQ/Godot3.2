@@ -1,33 +1,3 @@
-/*************************************************************************/
-/*  visual_script_func_nodes.cpp                                         */
-/*************************************************************************/
-/*                       This file is part of:                           */
-/*                           GODOT ENGINE                                */
-/*                      https://godotengine.org                          */
-/*************************************************************************/
-/* Copyright (c) 2007-2020 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2020 Godot Engine contributors (cf. AUTHORS.md).   */
-/*                                                                       */
-/* Permission is hereby granted, free of charge, to any person obtaining */
-/* a copy of this software and associated documentation files (the       */
-/* "Software"), to deal in the Software without restriction, including   */
-/* without limitation the rights to use, copy, modify, merge, publish,   */
-/* distribute, sublicense, and/or sell copies of the Software, and to    */
-/* permit persons to whom the Software is furnished to do so, subject to */
-/* the following conditions:                                             */
-/*                                                                       */
-/* The above copyright notice and this permission notice shall be        */
-/* included in all copies or substantial portions of the Software.       */
-/*                                                                       */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
-/*************************************************************************/
-
 #include "gdi_visual_script_custom_nodes.h"
 
 #include "core/engine.h"
@@ -40,9 +10,6 @@
 #include "core/os/input.h"
 #include "core/bind/core_bind.h"
 
-//////////////////////////////////////////
-////////////////CALL//////////////////////
-//////////////////////////////////////////
 
 int GDIVisualScriptCustomNode::get_output_sequence_port_count() const {
 
@@ -232,16 +199,19 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 		case 0: {
 			ret.name = L"左键";
 			ret.type = Variant::BOOL;
+// 			OS::get_singleton()->print("test1");
 			break;
 		}
 		case 1: {
 			ret.name = L"右键";
 			ret.type = Variant::BOOL;
+// 			OS::get_singleton()->print("test2");
 			break;
 		}
 		case 2: {
 			ret.name = L"双击";
 			ret.type = Variant::BOOL;
+// 			OS::get_singleton()->print("test3");
 			break;
 		}
 		default: {
@@ -681,26 +651,40 @@ public:
 			break;
 		}
 		case GDIVisualScriptCustomNode::MOUSE: {
-			*p_outputs[0] = input->is_mouse_button_pressed(BUTTON_LEFT);
-			*p_outputs[1] = input->is_mouse_button_pressed(BUTTON_RIGHT);
+			auto left_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_LEFT);
+			auto right_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_RIGHT);
+			*p_outputs[0] = left_button_pressed_flag;
+			*p_outputs[1] = right_button_pressed_flag;
 			*p_outputs[2] = false;
 
+// 			os->print("test output[%d], [%d], [%d]\n", b1, b2,*p_outputs[2]);
+
 			static uint64_t time = 0;
-			static bool first_click_flag = false;
-			static bool second_click_flag = false;
-			if (!first_click_flag && (bool)(*p_outputs[0]) == true) {
+			static bool first_click_pressed_flag = false;
+			static bool first_click_released_flag = false;
+			static bool second_click_pressed_flag = false;
+			static const unsigned int double_click_interval = 500;
+
+			if (!first_click_pressed_flag && left_button_pressed_flag) {
 				time = os->get_system_time_msecs();
-				first_click_flag = true;
+				first_click_pressed_flag = true;
 			}
-			else if (first_click_flag && (bool)(*p_outputs[0]) == true) {
+			else if (first_click_pressed_flag && !left_button_pressed_flag) {
+				first_click_released_flag = true;
+			}
+			else if (first_click_pressed_flag && first_click_released_flag && left_button_pressed_flag) {
+				second_click_pressed_flag = true;
+
 				auto diff_time = os->get_system_time_msecs() - time;
-				os->print("enter second click, diff time[%d]\n", diff_time);
-				if (diff_time < 200) {
+// 				os->print("enter second click, diff time[%d]\n", diff_time);
+				if (diff_time < double_click_interval) {
 					*p_outputs[2] = true;
-					first_click_flag = false;
-					second_click_flag = false;
-					time = 0;
 				}
+
+				time = 0;
+				second_click_pressed_flag = false;
+				first_click_pressed_flag = false;
+				first_click_released_flag = false;
 			}
 
 			break;
