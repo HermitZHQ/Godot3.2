@@ -2395,6 +2395,64 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 		}
 		else if (d["custom"] == String(L"循环")) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::LOOP);
+
+			String name = "_process";
+			if (script->has_function(name)) {
+				EditorNode::get_singleton()->show_warning(vformat(TTR("Script already has function '%s'"), name));
+				return;
+			}
+
+			MethodInfo minfo;
+			{
+				List<MethodInfo> methods;
+				bool found = false;
+				ClassDB::get_virtual_methods(script->get_instance_base_type(), &methods);
+				for (List<MethodInfo>::Element *E = methods.front(); E; E = E->next()) {
+					if (E->get().name == name) {
+						minfo = E->get();
+						found = true;
+					}
+				}
+
+				ERR_FAIL_COND(!found);
+			}
+
+			selected = name;
+			Ref<VisualScriptFunction> func_node;
+			func_node.instance();
+			func_node->set_name(L"循环调用");
+// 			func_node->set_name(name);
+
+			undo_redo->create_action(TTR("Add Function"));
+			undo_redo->add_do_method(script.ptr(), "add_function", name);
+
+			for (int i = 0; i < minfo.arguments.size(); i++) {
+// 				func_node->add_argument(minfo.arguments[i].type, minfo.arguments[i].name, -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
+				func_node->add_argument(minfo.arguments[i].type, L"帧时差", -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
+			}
+
+			Vector2 ofs = _get_available_pos();
+
+			undo_redo->add_do_method(script.ptr(), "add_node", name, script->get_available_id(), func_node, ofs);
+// 			undo_redo->add_do_method(script.ptr(), "add_node", L"循环调用", script->get_available_id(), func_node, ofs);
+			if (minfo.return_val.type != Variant::NIL || minfo.return_val.usage & PROPERTY_USAGE_NIL_IS_VARIANT) {
+				Ref<VisualScriptReturn> ret_node;
+				ret_node.instance();
+				ret_node->set_return_type(minfo.return_val.type);
+				ret_node->set_enable_return_value(true);
+				ret_node->set_name(name);
+				undo_redo->add_do_method(script.ptr(), "add_node", name, script->get_available_id() + 1, ret_node, _get_available_pos(false, ofs + Vector2(500, 0)));
+			}
+
+			undo_redo->add_undo_method(script.ptr(), "remove_function", name);
+			undo_redo->add_do_method(this, "_update_members");
+			undo_redo->add_undo_method(this, "_update_members");
+			undo_redo->add_do_method(this, "_update_graph");
+			undo_redo->add_undo_method(this, "_update_graph");
+
+			undo_redo->commit_action();
+
+			_update_graph();
 		}
 		else if (d["custom"] == String(L"键盘")) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::KEYBOARD);

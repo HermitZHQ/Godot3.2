@@ -170,7 +170,11 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 
 	PropertyInfo ret;
 	if (custom_mode == ACTIVE) {
-		ret.name = "active";
+		ret.name = L"激活";
+		ret.type = Variant::BOOL;
+	}
+	else if (custom_mode == LOOP) {
+		ret.name = L"循环";
 		ret.type = Variant::BOOL;
 	}
 	else if (custom_mode == KEYBOARD) {
@@ -586,17 +590,17 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "validate"), "set_validate", "get_validate");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "rpc_call_mode", PROPERTY_HINT_ENUM, "Disabled,Reliable,Unreliable,ReliableToID,UnreliableToID"), "set_rpc_call_mode", "get_rpc_call_mode"); //when set, if loaded properly, will override argument count.
 
-// 	BIND_ENUM_CONSTANT(CALL_MODE_SELF);
-// 	BIND_ENUM_CONSTANT(CALL_MODE_NODE_PATH);
-// 	BIND_ENUM_CONSTANT(CALL_MODE_INSTANCE);
-// 	BIND_ENUM_CONSTANT(CALL_MODE_BASIC_TYPE);
-// 	BIND_ENUM_CONSTANT(CALL_MODE_SINGLETON);
-// 
-// 	BIND_ENUM_CONSTANT(RPC_DISABLED);
-// 	BIND_ENUM_CONSTANT(RPC_RELIABLE);
-// 	BIND_ENUM_CONSTANT(RPC_UNRELIABLE);
-// 	BIND_ENUM_CONSTANT(RPC_RELIABLE_TO_ID);
-// 	BIND_ENUM_CONSTANT(RPC_UNRELIABLE_TO_ID);
+	BIND_ENUM_CONSTANT(CALL_MODE_SELF);
+	BIND_ENUM_CONSTANT(CALL_MODE_NODE_PATH);
+	BIND_ENUM_CONSTANT(CALL_MODE_INSTANCE);
+	BIND_ENUM_CONSTANT(CALL_MODE_BASIC_TYPE);
+	BIND_ENUM_CONSTANT(CALL_MODE_SINGLETON);
+
+	BIND_ENUM_CONSTANT(RPC_DISABLED);
+	BIND_ENUM_CONSTANT(RPC_RELIABLE);
+	BIND_ENUM_CONSTANT(RPC_UNRELIABLE);
+	BIND_ENUM_CONSTANT(RPC_RELIABLE_TO_ID);
+	BIND_ENUM_CONSTANT(RPC_UNRELIABLE_TO_ID);
 }
 
 class GDIVisualScriptNodeInstanceCustom : public VisualScriptNodeInstance {
@@ -630,10 +634,19 @@ public:
 		if (nullptr == input) {
 			input = Input::get_singleton();
 		}
+		if (p_start_mode == VisualScriptCustomNode::START_MODE_BEGIN_SEQUENCE) {
+// 			os->print("Test begin sequence....\n");
+		}
 
 		switch (custom_mode) {
 		case GDIVisualScriptCustomNode::ACTIVE: {
 
+			break;
+		}
+		case GDIVisualScriptCustomNode::LOOP: {
+
+			Object *object = instance->get_owner_ptr();
+			*p_outputs[0] = object->call("_process", p_inputs, input_args, r_error);
 			break;
 		}
 		case GDIVisualScriptCustomNode::KEYBOARD: {
@@ -710,7 +723,7 @@ VisualScriptNodeInstance *GDIVisualScriptCustomNode::instance(VisualScriptInstan
 	instance->singleton = singleton;
 	instance->function = function;
 	instance->custom_mode = get_custom_mode();
-	OS::get_singleton()->print("custom mode:[%d], this[%x]\n", instance->custom_mode, this);
+// 	OS::get_singleton()->print("custom mode:[%d], this[%x]\n", instance->custom_mode, this);
 	instance->returns = get_output_value_port_count();
 	instance->node_path = base_path;
 	instance->input_args = get_input_value_port_count();

@@ -790,11 +790,15 @@ public:
 
 	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
 
+		OS::get_singleton()->print("Invoke step call11111, function[%s]\n", function);
 		switch (call_mode) {
 
 			case VisualScriptFunctionCall::CALL_MODE_SELF: {
 
 				Object *object = instance->get_owner_ptr();
+
+				//测试点：
+				OS::get_singleton()->print("Invoke step call, function[%s]\n", function);
 
 				if (rpc_mode) {
 					call_rpc(object, p_inputs, input_args);
