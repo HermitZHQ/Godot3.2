@@ -55,7 +55,7 @@ aiBone *get_bone_by_name(const aiScene *scene, aiString bone_name) {
 
 			aiBone *bone = mesh->mBones[boneIndex];
 			if (bone->mName == bone_name) {
-				printf("matched bone by name: %s\n", bone->mName.C_Str());
+// 				printf("matched bone by name: %s\n", bone->mName.C_Str());
 				return bone;
 			}
 		}
@@ -644,9 +644,11 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::CreateAnimNodes(const aiScene *sc
 
 	// default to use animation 0, for now(todo)
 	if (scene->mNumAnimations > 0) {
+		if (scene->mNumAnimations > 1) {
+			OS::get_singleton()->print("[Warning!!!animation num over 1......, what you handled before is wrong\n");
+		}
 		aiAnimation *anim = scene->mAnimations[0];
-		for (int i = 0; i < anim->mNumChannels; ++i)
-		{
+		for (int i = 0; i < anim->mNumChannels; ++i) {
 			if (anim->mChannels[i]->mNodeName == node->mName) {
 				animNode->channelId = i;
 				break;
@@ -1661,19 +1663,29 @@ void EditorSceneImporterAssimp::_generate_node(
 	// 由于需要对多Mesh对应一个animation做处理，而不同mesh的bone对应顺序并不一样，必须单独分开处理，所以Armature可以创立到有mesh的节点下
 	if (/*state.armature_nodes.size() == 0 &&*/ assimp_node->mNumMeshes > 0 /*&& assimp_node->mName == aiString("Bip001")*/) {
 		// 伪造和mesh节点同级的新aiNode用作Armature节点
-		aiNode *parent = assimp_node->mParent;
-		aiNode *newMeshNode = new aiNode();
-		newMeshNode->mParent = parent;
-		newMeshNode->mNumChildren = 0;
-		aiString name = assimp_node->mName;
-		name.Append("ArmatureNode");
-		newMeshNode->mName = name;
-		newMeshNode->mNumMeshes = 0;
-		newMeshNode->mTransformation = aiMatrix4x4();
+		if (assimp_node->mNumMeshes > 1) {
+			OS::get_singleton()->print("[Warning]Gen node to armature with num meshes:[%d], node name[%s]\n", assimp_node->mNumMeshes, assimp_node->mName.data);
+		}
 
-		parent->addChildren(1, &newMeshNode);
+		for (int i = 0; i < assimp_node->mNumMeshes; ++i) {
+			aiMesh *mesh = state.assimp_scene->mMeshes[assimp_node->mMeshes[i]];
+			if (mesh->mNumBones <= 0) {
+				continue;
+			}
 
-		state.armature_nodes.push_back((aiNode *const)newMeshNode);
+			aiNode *parent = assimp_node->mParent;
+			aiNode *newMeshNode = new aiNode();
+			newMeshNode->mParent = parent;
+			newMeshNode->mNumChildren = 0;
+			aiString name = assimp_node->mName;
+			name.Append("_ArmatureNode");
+			newMeshNode->mName = name;
+			newMeshNode->mNumMeshes = 0;
+			newMeshNode->mTransformation = aiMatrix4x4();
+			parent->addChildren(1, &newMeshNode);
+	
+			state.armature_nodes.push_back((aiNode *const)newMeshNode);
+		}
 		print_verbose("use root node be the only one armature node");
 	}
 
