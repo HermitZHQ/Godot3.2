@@ -50,6 +50,7 @@ class VisualScriptFunction : public VisualScriptNode {
 	int stack_size;
 	MultiplayerAPI::RPCMode rpc_mode;
 	bool sequenced;
+	String caption;
 
 protected:
 	bool _set(const StringName &p_name, const Variant &p_value);
@@ -71,6 +72,8 @@ public:
 	virtual String get_caption() const;
 	virtual String get_text() const;
 	virtual String get_category() const { return "flow_control"; }
+	// 修改点：
+	virtual void set_caption(const String &caption);
 
 	void add_argument(Variant::Type p_type, const String &p_name, int p_index = -1, const PropertyHint p_hint = PROPERTY_HINT_NONE, const String &p_hint_string = String(""));
 	void set_argument_type(int p_argidx, Variant::Type p_type);

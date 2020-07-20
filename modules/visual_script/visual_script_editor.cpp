@@ -922,6 +922,10 @@ void VisualScriptEditor::_port_name_focus_out(const Node *p_name_box, int p_id, 
 void VisualScriptEditor::_update_members() {
 	ERR_FAIL_COND(!script.is_valid());
 
+	// 修改点：尝试在刷新时就加入process和ready节点
+	_gdi_create_ready_func_node();
+	_gdi_create_process_func_node();
+
 	updating_members = true;
 
 	members->clear();
@@ -1874,9 +1878,9 @@ Variant VisualScriptEditor::get_drag_data_fw(const Point2 &p_point, Control *p_f
 
 			dd["type"] = "visual_script_signal_drag";
 			dd["signal"] = type;
-
 		}
 		else if (it->get_parent() == root->get_children()->get_next()->get_next()->get_next()) {
+
 			dd["type"] = "visual_script_custom_drag";
 			dd["custom"] = type;
 		}
@@ -2390,95 +2394,201 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 		vnode.instance();
 // 		OS::get_singleton()->print("drop node instance[%x]\n", *vnode);
 
+		bool already_create_function_node_flag = false;
+
 		if (d["custom"] == String(L"激活")) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::ACTIVE);
+
+			already_create_function_node_flag = true;
+			_gdi_create_ready_func_node();
 		}
 		else if (d["custom"] == String(L"循环")) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::LOOP);
 
-			String name = "_process";
-			if (script->has_function(name)) {
-				EditorNode::get_singleton()->show_warning(vformat(TTR("Script already has function '%s'"), name));
-				return;
-			}
-
-			MethodInfo minfo;
-			{
-				List<MethodInfo> methods;
-				bool found = false;
-				ClassDB::get_virtual_methods(script->get_instance_base_type(), &methods);
-				for (List<MethodInfo>::Element *E = methods.front(); E; E = E->next()) {
-					if (E->get().name == name) {
-						minfo = E->get();
-						found = true;
-					}
-				}
-
-				ERR_FAIL_COND(!found);
-			}
-
-			selected = name;
-			Ref<VisualScriptFunction> func_node;
-			func_node.instance();
-			func_node->set_name(L"循环调用");
-// 			func_node->set_name(name);
-
-			undo_redo->create_action(TTR("Add Function"));
-			undo_redo->add_do_method(script.ptr(), "add_function", name);
-
-			for (int i = 0; i < minfo.arguments.size(); i++) {
-// 				func_node->add_argument(minfo.arguments[i].type, minfo.arguments[i].name, -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
-				func_node->add_argument(minfo.arguments[i].type, L"帧时差", -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
-			}
-
-			Vector2 ofs = _get_available_pos();
-
-			undo_redo->add_do_method(script.ptr(), "add_node", name, script->get_available_id(), func_node, ofs);
-// 			undo_redo->add_do_method(script.ptr(), "add_node", L"循环调用", script->get_available_id(), func_node, ofs);
-			if (minfo.return_val.type != Variant::NIL || minfo.return_val.usage & PROPERTY_USAGE_NIL_IS_VARIANT) {
-				Ref<VisualScriptReturn> ret_node;
-				ret_node.instance();
-				ret_node->set_return_type(minfo.return_val.type);
-				ret_node->set_enable_return_value(true);
-				ret_node->set_name(name);
-				undo_redo->add_do_method(script.ptr(), "add_node", name, script->get_available_id() + 1, ret_node, _get_available_pos(false, ofs + Vector2(500, 0)));
-			}
-
-			undo_redo->add_undo_method(script.ptr(), "remove_function", name);
-			undo_redo->add_do_method(this, "_update_members");
-			undo_redo->add_undo_method(this, "_update_members");
-			undo_redo->add_do_method(this, "_update_graph");
-			undo_redo->add_undo_method(this, "_update_graph");
-
-			undo_redo->commit_action();
-
-			_update_graph();
+			already_create_function_node_flag = true;
+			_gdi_create_process_func_node();
 		}
 		else if (d["custom"] == String(L"键盘")) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::KEYBOARD);
+
+			// for test
+			{
+				already_create_function_node_flag = true;// 屏蔽测试customNode是否可行
+				Ref<VisualScriptCustomNode> vnode;
+				vnode.instance();
+
+				int new_id = script->get_available_id();
+
+				auto res = ResourceLoader::load("./Projects/Keyboard.gd");
+				auto res2 = ResourceLoader::load("C:\\Keyboard.gd");
+				auto res3 = ResourceLoader::load("./Keyboard.gd");
+				auto res4 = ResourceLoader::load("Keyboard.gd");
+				vnode->set_script(res2.get_ref_ptr());
+
+				undo_redo->create_action(TTR("Add Node"));
+				undo_redo->add_do_method(script.ptr(), "add_node", default_func, new_id, vnode, ofs);
+
+				undo_redo->add_undo_method(script.ptr(), "remove_node", default_func, new_id);
+				undo_redo->add_do_method(this, "_update_graph");
+				undo_redo->add_undo_method(this, "_update_graph");
+				undo_redo->commit_action();
+
+				Node *node = graph->get_node(itos(new_id));
+				if (node) {
+					graph->set_selected(node);
+					_node_selected(node);
+				}
+			}
 		}
 		else if (d["custom"] == String(L"鼠标")) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::MOUSE);
 		}
 
-		int new_id = script->get_available_id();
-
-		undo_redo->create_action(TTR("Add Node"));
-		undo_redo->add_do_method(script.ptr(), "add_node", default_func, new_id, vnode, ofs);
-// 		undo_redo->add_do_method(vnode.ptr(), "set_base_type", script->get_instance_base_type());
-// 		undo_redo->add_do_method(vnode.ptr(), "set_function", d["custom"]);
-
-		undo_redo->add_undo_method(script.ptr(), "remove_node", default_func, new_id);
-		undo_redo->add_do_method(this, "_update_graph");
-		undo_redo->add_undo_method(this, "_update_graph");
-		undo_redo->commit_action();
-
-		Node *node = graph->get_node(itos(new_id));
-		if (node) {
-			graph->set_selected(node);
-			_node_selected(node);
+		if (!already_create_function_node_flag) {
+			int new_id = script->get_available_id();
+	
+			undo_redo->create_action(TTR("Add Node"));
+			undo_redo->add_do_method(script.ptr(), "add_node", default_func, new_id, vnode, ofs);
+	// 		undo_redo->add_do_method(vnode.ptr(), "set_base_type", script->get_instance_base_type());
+	// 		undo_redo->add_do_method(vnode.ptr(), "set_function", d["custom"]);
+	
+			undo_redo->add_undo_method(script.ptr(), "remove_node", default_func, new_id);
+			undo_redo->add_do_method(this, "_update_graph");
+			undo_redo->add_undo_method(this, "_update_graph");
+			undo_redo->commit_action();
+	
+			Node *node = graph->get_node(itos(new_id));
+			if (node) {
+				graph->set_selected(node);
+				_node_selected(node);
+			}
 		}
 	}
+}
+
+void VisualScriptEditor::_gdi_create_process_func_node()
+{
+	String name = "_process";
+	if (script->has_function(name)) {
+// 		EditorNode::get_singleton()->show_warning(L"该任务模块已存在，且只能存在一个");
+		return;
+	}
+
+	MethodInfo minfo;
+	{
+		List<MethodInfo> methods;
+		bool found = false;
+		ClassDB::get_virtual_methods(script->get_instance_base_type(), &methods);
+		for (List<MethodInfo>::Element *E = methods.front(); E; E = E->next()) {
+			if (E->get().name == name) {
+				minfo = E->get();
+				found = true;
+			}
+		}
+
+		ERR_FAIL_COND(!found);
+	}
+
+	selected = name;
+	Ref<VisualScriptFunction> func_node;
+	func_node.instance();
+	func_node->set_caption(L"任务");
+	func_node->set_name(L"循环调用");
+// 	func_node->set_name(name);
+
+	undo_redo->create_action(TTR("Add Function"));
+	undo_redo->add_do_method(script.ptr(), "add_function", name);
+
+	for (int i = 0; i < minfo.arguments.size(); i++) {
+// 		func_node->add_argument(minfo.arguments[i].type, minfo.arguments[i].name, -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
+		func_node->add_argument(minfo.arguments[i].type, L"帧时差", -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
+	}
+
+	Vector2 ofs = _get_available_pos();
+	ofs.y += 20.0;
+
+	undo_redo->add_do_method(script.ptr(), "add_node", name, script->get_available_id(), func_node, ofs);
+// 	undo_redo->add_do_method(script.ptr(), "add_node", L"循环调用", script->get_available_id(), func_node, ofs);
+	if (minfo.return_val.type != Variant::NIL || minfo.return_val.usage & PROPERTY_USAGE_NIL_IS_VARIANT) {
+		Ref<VisualScriptReturn> ret_node;
+		ret_node.instance();
+		ret_node->set_return_type(minfo.return_val.type);
+		ret_node->set_enable_return_value(true);
+		ret_node->set_name(name);
+		undo_redo->add_do_method(script.ptr(), "add_node", name, script->get_available_id() + 1, ret_node, _get_available_pos(false, ofs + Vector2(500, 0)));
+	}
+
+	undo_redo->add_undo_method(script.ptr(), "remove_function", name);
+	undo_redo->add_do_method(this, "_update_members");
+	undo_redo->add_undo_method(this, "_update_members");
+	undo_redo->add_do_method(this, "_update_graph");
+	undo_redo->add_undo_method(this, "_update_graph");
+
+	undo_redo->commit_action();
+
+	_update_graph();
+}
+
+void VisualScriptEditor::_gdi_create_ready_func_node()
+{
+	String name = "_ready";
+	if (script->has_function(name)) {
+// 		EditorNode::get_singleton()->show_warning(L"该任务模块已存在，且只能存在一个");
+		return;
+	}
+
+	MethodInfo minfo;
+	{
+		List<MethodInfo> methods;
+		bool found = false;
+		ClassDB::get_virtual_methods(script->get_instance_base_type(), &methods);
+		for (List<MethodInfo>::Element *E = methods.front(); E; E = E->next()) {
+			if (E->get().name == name) {
+				minfo = E->get();
+				found = true;
+			}
+		}
+
+		ERR_FAIL_COND(!found);
+	}
+
+	selected = name;
+	Ref<VisualScriptFunction> func_node;
+	func_node.instance();
+	func_node->set_caption(L"任务");
+	func_node->set_name(L"初始化调用一次");
+// 	func_node->set_name(name);
+
+	undo_redo->create_action(TTR("Add Function"));
+	undo_redo->add_do_method(script.ptr(), "add_function", name);
+
+	for (int i = 0; i < minfo.arguments.size(); i++) {
+// 		func_node->add_argument(minfo.arguments[i].type, minfo.arguments[i].name, -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
+		func_node->add_argument(minfo.arguments[i].type, L"帧时差", -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
+	}
+
+	Vector2 ofs = _get_available_pos();
+
+	undo_redo->add_do_method(script.ptr(), "add_node", name, script->get_available_id(), func_node, ofs);
+// 	undo_redo->add_do_method(script.ptr(), "add_node", L"循环调用", script->get_available_id(), func_node, ofs);
+	if (minfo.return_val.type != Variant::NIL || minfo.return_val.usage & PROPERTY_USAGE_NIL_IS_VARIANT) {
+		Ref<VisualScriptReturn> ret_node;
+		ret_node.instance();
+		ret_node->set_return_type(minfo.return_val.type);
+		ret_node->set_enable_return_value(true);
+		ret_node->set_name(name);
+		undo_redo->add_do_method(script.ptr(), "add_node", name, script->get_available_id() + 1, ret_node, _get_available_pos(false, ofs + Vector2(500, 0)));
+	}
+
+	undo_redo->add_undo_method(script.ptr(), "remove_function", name);
+	undo_redo->add_do_method(this, "_update_members");
+	undo_redo->add_undo_method(this, "_update_members");
+	undo_redo->add_do_method(this, "_update_graph");
+	undo_redo->add_undo_method(this, "_update_graph");
+
+	undo_redo->commit_action();
+
+	_update_graph();
 }
 
 void VisualScriptEditor::_selected_method(const String &p_method, const String &p_type, const bool p_connecting) {

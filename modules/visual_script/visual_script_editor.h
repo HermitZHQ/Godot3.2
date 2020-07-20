@@ -258,6 +258,10 @@ class VisualScriptEditor : public ScriptEditorBase {
 	bool can_drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) const;
 	void drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from);
 
+	// 修改点：加入创建内置process和ready的函数
+	void _gdi_create_process_func_node();
+	void _gdi_create_ready_func_node();
+
 	int editing_id;
 	int editing_input;
 

@@ -103,6 +103,12 @@ bool VisualScriptFunction::_set(const StringName &p_name, const Variant &p_value
 		return true;
 	}
 
+	// 修改点：
+	if (p_name == "caption") {
+		caption = p_value;
+		return true;
+	}
+
 	return false;
 }
 
@@ -146,6 +152,12 @@ bool VisualScriptFunction::_get(const StringName &p_name, Variant &r_ret) const 
 		return true;
 	}
 
+	// 修改点：
+	if (p_name == "caption") {
+		r_ret = get_caption();
+		return true;
+	}
+
 	return false;
 }
 void VisualScriptFunction::_get_property_list(List<PropertyInfo> *p_list) const {
@@ -168,6 +180,8 @@ void VisualScriptFunction::_get_property_list(List<PropertyInfo> *p_list) const 
 	}
 	p_list->push_back(PropertyInfo(Variant::BOOL, "stack/stackless"));
 	p_list->push_back(PropertyInfo(Variant::INT, "rpc/mode", PROPERTY_HINT_ENUM, "Disabled,Remote,Master,Puppet,Remote Sync,Master Sync,Puppet Sync"));
+	// 修改点：
+	p_list->push_back(PropertyInfo(Variant::STRING, "caption"));
 }
 
 int VisualScriptFunction::get_output_sequence_port_count() const {
@@ -211,12 +225,17 @@ PropertyInfo VisualScriptFunction::get_output_value_port_info(int p_idx) const {
 
 String VisualScriptFunction::get_caption() const {
 
-	return "Function";
+	return caption;
 }
 
 String VisualScriptFunction::get_text() const {
 
 	return get_name(); //use name as function name I guess
+}
+
+void VisualScriptFunction::set_caption(const String &caption)
+{
+	this->caption = caption;
 }
 
 void VisualScriptFunction::add_argument(Variant::Type p_type, const String &p_name, int p_index, const PropertyHint p_hint, const String &p_hint_string) {
@@ -317,7 +336,9 @@ VisualScriptNodeInstance *VisualScriptFunction::instance(VisualScriptInstance *p
 	return instance;
 }
 
-VisualScriptFunction::VisualScriptFunction() {
+VisualScriptFunction::VisualScriptFunction()
+	:caption("Function:")
+{
 
 	stack_size = 256;
 	stack_less = false;
@@ -2973,6 +2994,10 @@ PropertyInfo VisualScriptCustomNode::get_input_value_port_info(int p_idx) const 
 	}
 	if (get_script_instance() && get_script_instance()->has_method("_get_input_value_port_name")) {
 		info.name = get_script_instance()->call("_get_input_value_port_name", p_idx);
+	}
+	// 修改点：加入对hint分类支持
+	if (get_script_instance() && get_script_instance()->has_method("_get_input_value_port_hint")) {
+		info.hint = (PropertyHint)((int)get_script_instance()->call("_get_input_value_port_hint", p_idx));
 	}
 	return info;
 }
