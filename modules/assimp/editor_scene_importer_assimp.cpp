@@ -643,12 +643,14 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::CreateAnimNodes(const aiScene *sc
 	}
 
 	// default to use animation 0, for now(todo)
-	aiAnimation *anim = scene->mAnimations[0];
-	for (int i = 0; i < anim->mNumChannels; ++i)
-	{
-		if (anim->mChannels[i]->mNodeName == node->mName) {
-			animNode->channelId = i;
-			break;
+	if (scene->mNumAnimations > 0) {
+		aiAnimation *anim = scene->mAnimations[0];
+		for (int i = 0; i < anim->mNumChannels; ++i)
+		{
+			if (anim->mChannels[i]->mNodeName == node->mName) {
+				animNode->channelId = i;
+				break;
+			}
 		}
 	}
 
@@ -1461,6 +1463,13 @@ EditorSceneImporterAssimp::create_mesh(ImportState &state, const aiNode *assimp_
 	MeshInstance *mesh_node = memnew(MeshInstance);
 	mesh = state.mesh_cache[mesh_key];
 	mesh_node->set_mesh(mesh);
+
+	// 修改点：拷贝mesh的mat到MeshInstance中
+	auto surface_num = mesh->get_surface_count();
+	for (int i = 0; i < surface_num; ++i) {
+		auto mat = mesh->surface_get_material(i);
+		mesh_node->set_surface_material(i, mat);
+	}
 
 	// if we have a valid skeleton set it up
 	if (skin.is_valid()) {
