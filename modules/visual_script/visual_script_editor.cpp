@@ -1041,7 +1041,7 @@ void VisualScriptEditor::_update_members() {
 // 	_customs->add_button(0, Control::get_icon("Add", "EditorIcons"), -1, false, TTR("Create a new signal."));
 	_customs->set_custom_color(0, Control::get_color("mono_color", "Editor"));
 	static String str_custom_node_list[] = { L"激活", L"循环", L"鼠标", L"键盘",
-											 L"测试1", L"测试2" };
+											 L"材质颜色", L"材质纹理" };
 	auto custom_node_size = sizeof(str_custom_node_list) / sizeof(String);
 	for (int i = 0; i < custom_node_size; i++) {
 		TreeItem *ti = members->create_item(_customs);
@@ -2443,6 +2443,9 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 		else if (d["custom"] == String(L"鼠标")) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::MOUSE);
 		}
+		else if (d["custom"] == String(L"材质颜色")) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::MAT_ALBEDO);
+		}
 
 		if (!already_create_function_node_flag) {
 			int new_id = script->get_available_id();
@@ -2556,7 +2559,7 @@ void VisualScriptEditor::_gdi_create_ready_func_node()
 	Ref<VisualScriptFunction> func_node;
 	func_node.instance();
 	func_node->set_caption(L"任务");
-	func_node->set_name(L"初始化调用一次");
+	func_node->set_name(L"调用一次");
 // 	func_node->set_name(name);
 
 	undo_redo->create_action(TTR("Add Function"));

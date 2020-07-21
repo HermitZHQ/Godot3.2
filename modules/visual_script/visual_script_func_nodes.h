@@ -175,6 +175,8 @@ private:
 	StringName property;
 	StringName index;
 	AssignOp assign_op;
+	// 修改点：surface记录
+	unsigned int gdi_surface_index;
 
 	Node *_get_base_node() const;
 	StringName _get_base_type() const;
@@ -232,6 +234,10 @@ public:
 
 	void set_assign_op(AssignOp p_op);
 	AssignOp get_assign_op() const;
+
+	// 修改点：加入surface的Index记录，这样才能取回正确的surface
+	void gdi_set_surface_index(unsigned int index);
+	unsigned int gdi_get_surface_index() const;
 
 	virtual VisualScriptNodeInstance *instance(VisualScriptInstance *p_instance);
 	virtual TypeGuess guess_output_type(TypeGuess *p_inputs, int p_output) const;

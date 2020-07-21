@@ -37,6 +37,9 @@
 #include "scene/main/scene_tree.h"
 #include "visual_script_nodes.h"
 
+// 修改点：
+#include "scene/3d/mesh_instance.h"
+
 //////////////////////////////////////////
 ////////////////CALL//////////////////////
 //////////////////////////////////////////
@@ -1336,6 +1339,16 @@ VisualScriptPropertySet::AssignOp VisualScriptPropertySet::get_assign_op() const
 	return assign_op;
 }
 
+void VisualScriptPropertySet::gdi_set_surface_index(unsigned int index)
+{
+	gdi_surface_index = index;
+}
+
+unsigned int VisualScriptPropertySet::gdi_get_surface_index() const
+{
+	return gdi_surface_index;
+}
+
 void VisualScriptPropertySet::_validate_property(PropertyInfo &property) const {
 
 	if (property.name == "base_type") {
@@ -1459,6 +1472,10 @@ void VisualScriptPropertySet::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_assign_op", "assign_op"), &VisualScriptPropertySet::set_assign_op);
 	ClassDB::bind_method(D_METHOD("get_assign_op"), &VisualScriptPropertySet::get_assign_op);
 
+	// 修改点：
+	ClassDB::bind_method(D_METHOD("gdi_set_surface_index", "index"), &VisualScriptPropertySet::gdi_set_surface_index);
+	ClassDB::bind_method(D_METHOD("gdi_get_surface_index"), &VisualScriptPropertySet::gdi_get_surface_index);
+
 	String bt;
 	for (int i = 0; i < Variant::VARIANT_MAX; i++) {
 		if (i > 0)
@@ -1488,6 +1505,8 @@ void VisualScriptPropertySet::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "property"), "set_property", "get_property");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "index"), "set_index", "get_index");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "assign_op", PROPERTY_HINT_ENUM, "Assign,Add,Sub,Mul,Div,Mod,ShiftLeft,ShiftRight,BitAnd,BitOr,Bitxor"), "set_assign_op", "get_assign_op");
+	// 修改点：
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "gdi_surface_index"), "gdi_set_surface_index", "gdi_get_surface_index");
 
 	BIND_ENUM_CONSTANT(CALL_MODE_SELF);
 	BIND_ENUM_CONSTANT(CALL_MODE_NODE_PATH);
@@ -1630,6 +1649,18 @@ public:
 					another->set(property, value, &valid);
 				} else {
 					another->set(property, *p_inputs[0], &valid);
+
+					// 修改点：设置失败后，检查property是否为material类型，是的话，先把another转换到MeshInstance再获取到mat设置属性
+					if (!valid) {
+						MeshInstance *mesh = Object::cast_to<MeshInstance>(another);
+						if (nullptr == mesh || mesh->get_surface_material_count() == 0) {
+							return 0;
+						}
+
+						// 处理判断属性后缀的0，1，TODO
+						auto mat = mesh->get_surface_material(0);
+						mat->set(property, *p_inputs[0], &valid);
+					}
 				}
 
 				if (!valid) {
@@ -1695,6 +1726,8 @@ VisualScriptPropertySet::VisualScriptPropertySet() {
 	call_mode = CALL_MODE_SELF;
 	base_type = "Object";
 	basic_type = Variant::NIL;
+	// 修改点：
+	gdi_surface_index = 0;
 }
 
 template <VisualScriptPropertySet::CallMode cmode>
