@@ -1225,7 +1225,7 @@ void AnimationPlayer::play(const StringName &p_name, float p_custom_blend, float
 	}
 
 	if (get_current_animation() != p_name) {
-		_stop_playing_caches();
+// 		_stop_playing_caches();
 	}
 
 	c.current.from = &animation_set[name];
@@ -1290,6 +1290,24 @@ void AnimationPlayer::set_current_animation(const String &p_anim) {
 	} else {
 		// Same animation, do not replay from start
 	}
+}
+
+String AnimationPlayer::gdi_play_all_animation_get() const
+{
+	return "play_all";
+}
+
+
+void AnimationPlayer::gdi_play_all_animation_set(const String &p_anim)
+{
+// 	auto anim = animation_set.front();
+// 	if (anim) {
+// 		play(anim->key());
+// 	}
+
+// 	for (auto e = animation_set.front(); e; e = e->next()) {
+// 		play(e->key());
+// 	}
 }
 
 String AnimationPlayer::get_current_animation() const {
@@ -1705,8 +1723,15 @@ void AnimationPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("seek", "seconds", "update"), &AnimationPlayer::seek, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("advance", "delta"), &AnimationPlayer::advance);
 
+	// 修改点：加入绑定播放全部的函数
+	ClassDB::bind_method(D_METHOD("gdi_play_all_animation_set", "anim"), &AnimationPlayer::gdi_play_all_animation_set);
+	ClassDB::bind_method(D_METHOD("gdi_play_all_animation_get"), &AnimationPlayer::gdi_play_all_animation_get);
+
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "root_node"), "set_root", "get_root");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "current_animation", PROPERTY_HINT_ENUM, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_ANIMATE_AS_TRIGGER), "set_current_animation", "get_current_animation");
+	// 修改点：加入全部播放的属性
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "play_all_animation", PROPERTY_HINT_ENUM, "play, play", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_ANIMATE_AS_TRIGGER), "gdi_play_all_animation_set", "gdi_play_all_animation_get");
+
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "assigned_animation", PROPERTY_HINT_NONE, "", 0), "set_assigned_animation", "get_assigned_animation");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "autoplay", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), "set_autoplay", "get_autoplay");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "current_animation_length", PROPERTY_HINT_NONE, "", 0), "", "get_current_animation_length");

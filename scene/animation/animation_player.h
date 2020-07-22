@@ -324,6 +324,10 @@ public:
 	bool is_playing() const;
 	String get_current_animation() const;
 	void set_current_animation(const String &p_anim);
+	// 修改点：加入播放所有动画的选项
+	String gdi_play_all_animation_get() const;
+	void gdi_play_all_animation_set(const String &p_anim);
+
 	String get_assigned_animation() const;
 	void set_assigned_animation(const String &p_anim);
 	void stop_all();

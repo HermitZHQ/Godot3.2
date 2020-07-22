@@ -368,7 +368,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			String node_name = AssimpUtils::get_assimp_string(element_assimp_node->mName);
 			//print_verbose("node: " + node_name);
 
-			if (element_assimp_node->mName == aiString("omniknight")) {
+			if (element_assimp_node->mName == aiString("mixamorig:Head")) {
 				int i = 0;
 				++i;
 			}
@@ -378,6 +378,9 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 
 			// retrieve this node bone
 			aiBone *bone = get_bone_from_stack(state, element_assimp_node->mName);
+			// 修改点：如果mesh不匹配的话，bone应该重置为0
+			// TODO：这里修改的不正确，应该还需要匹配mesh是否一致
+			bone = (element_assimp_node->mNumMeshes == 0) ? nullptr : bone;
 
 			// 修改点：尝试设置任意节点为skeleton，不要给其增加父节点
 // 			bool bSkeletonFlag = false;
@@ -637,7 +640,7 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::CreateAnimNodes(const aiScene *sc
 	animNode->isBone = get_bone_by_name(scene, node->mName) ? true : false;
 	animNode->localTransform = AssimpUtils::assimp_matrix_transform(node->mTransformation);
 
-	if (animNode->name == "weapon sub") {
+	if (node->mName == aiString("mixamorig:Head")) {
 		int i = 0;
 		++i;
 	}
@@ -854,6 +857,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	// 修改点：使用mesh指定的bone生成接口
 	// generate bone stack for animation import
 	RegenerateBoneStack(state, state.assimp_scene->mMeshes[mesh_id]);
+// 	RegenerateBoneStack(state);
 
 	//regular tracks
 	for (size_t i = 0; i < anim->mNumChannels; i++) {
@@ -890,6 +894,9 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 					}
 				}
 			}
+			else {
+// 				printf("[GDI-Error:Skeleton]:Miss track[%s], can't find bone, mesh id[%d], track id[%d]\n", track->mNodeName.data, mesh_id, i);
+			}
 		}
 
 		// not a bone
@@ -907,12 +914,19 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 						node_path, node_name, nullptr);
 			}
 		}
+		else if (bone == nullptr) {
+			printf("[GDI-Error:Skeleton]:Miss track[%s], can't find it in the normal node, mesh id[%d], track id[%d]\n", track->mNodeName.data, mesh_id, (int)i);
+
+			_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
+				NodePath(), node_name, nullptr);
+		}
 	}
 
 	//blend shape tracks
 
 	for (size_t i = 0; i < anim->mNumMorphMeshChannels; i++) {
 
+		printf("[Skeleton]:enter morph mesh animation.....(TODO)\n");
 		const aiMeshMorphAnim *anim_mesh = anim->mMorphMeshChannels[i];
 
 		const String prop_name = AssimpUtils::get_assimp_string(anim_mesh->mName);
@@ -1623,7 +1637,7 @@ void EditorSceneImporterAssimp::_generate_node(
 	state.nodes.push_back(assimp_node);
 	String parent_name = AssimpUtils::get_assimp_string(assimp_node->mParent->mName);
 
-	if (assimp_node->mName == aiString("Bip001 Pelvis")) {
+	if (assimp_node->mName == aiString("head")) {
 		int i = 0;
 		++i;
 	}
