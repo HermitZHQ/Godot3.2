@@ -822,7 +822,8 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	const aiAnimation *anim = state.assimp_scene->mAnimations[p_animation_index];
 	String name = AssimpUtils::get_anim_string_from_assimp(anim->mName);
 	// 修改点：尝试根据不同mesh id，改变不同的anim name
-	name = name + "-" + itos(mesh_id);
+	aiMesh *mesh = state.assimp_scene->mMeshes[mesh_id];
+	name = name + "-" + "tracks-" + mesh->mName.data + "-" + itos(mesh_id);
 
 	if (name == String()) {
 		name = "Animation " + itos(p_animation_index + 1);

@@ -957,6 +957,16 @@ void AnimationPlayer::_animation_update_transforms() {
 
 void AnimationPlayer::_animation_process(float p_delta) {
 
+	// 修改点：如果开启了播放全部，则播放全部后return，不处理单个
+	if (gdi_play_all_anim_flag) {
+		for (auto e = animation_set.front(); e; e = e->next()) {
+			auto anim_name = e->key();
+			auto v = e->value();
+		}
+
+		return;
+	}
+
 	if (playback.current.from) {
 
 		end_reached = false;
@@ -1225,7 +1235,7 @@ void AnimationPlayer::play(const StringName &p_name, float p_custom_blend, float
 	}
 
 	if (get_current_animation() != p_name) {
-// 		_stop_playing_caches();
+		_stop_playing_caches();
 	}
 
 	c.current.from = &animation_set[name];
@@ -1308,6 +1318,8 @@ void AnimationPlayer::gdi_play_all_animation_set(const String &p_anim)
 // 	for (auto e = animation_set.front(); e; e = e->next()) {
 // 		play(e->key());
 // 	}
+
+	gdi_play_all_anim_flag = true;
 }
 
 String AnimationPlayer::get_current_animation() const {
@@ -1725,12 +1737,12 @@ void AnimationPlayer::_bind_methods() {
 
 	// 修改点：加入绑定播放全部的函数
 	ClassDB::bind_method(D_METHOD("gdi_play_all_animation_set", "anim"), &AnimationPlayer::gdi_play_all_animation_set);
-	ClassDB::bind_method(D_METHOD("gdi_play_all_animation_get"), &AnimationPlayer::gdi_play_all_animation_get);
+// 	ClassDB::bind_method(D_METHOD("gdi_play_all_animation_get"), &AnimationPlayer::gdi_play_all_animation_get);
 
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "root_node"), "set_root", "get_root");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "current_animation", PROPERTY_HINT_ENUM, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_ANIMATE_AS_TRIGGER), "set_current_animation", "get_current_animation");
 	// 修改点：加入全部播放的属性
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "play_all_animation", PROPERTY_HINT_ENUM, "play, play", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_ANIMATE_AS_TRIGGER), "gdi_play_all_animation_set", "gdi_play_all_animation_get");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "play_all_animation", PROPERTY_HINT_ENUM, "play, play", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_ANIMATE_AS_TRIGGER), "gdi_play_all_animation_set", "");
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "assigned_animation", PROPERTY_HINT_NONE, "", 0), "set_assigned_animation", "get_assigned_animation");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "autoplay", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), "set_autoplay", "get_autoplay");
@@ -1775,6 +1787,8 @@ AnimationPlayer::AnimationPlayer() {
 	active = true;
 	playback.seeked = false;
 	playback.started = false;
+	// 修改点：
+	gdi_play_all_anim_flag = false;
 }
 
 AnimationPlayer::~AnimationPlayer() {

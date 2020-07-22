@@ -370,6 +370,9 @@ public:
 
 	AnimationPlayer();
 	~AnimationPlayer();
+
+private:
+	bool gdi_play_all_anim_flag;
 };
 
 VARIANT_ENUM_CAST(AnimationPlayer::AnimationProcessMode);
