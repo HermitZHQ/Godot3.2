@@ -888,6 +888,11 @@ void AnimationPlayer::_animation_update_transforms() {
 						}
 					}
 				}
+				// 存在找不到skeleton的情况，仍然可能为空
+				if (nullptr == g_test_skeleton) {
+					continue;
+				}
+
 				auto name = nc->spatial->get_name();
 				g_test_skeleton->set_none_bone_pose(name, t);
 			}

@@ -587,17 +587,19 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	// ---------------------------------------Handle Animation infos
 	if (p_flags & IMPORT_ANIMATION && scene->mNumAnimations) {
 
-		state.animation_player = memnew(AnimationPlayer);
-		state.root->add_child(state.animation_player);
-		state.animation_player->set_owner(state.root);
-
-		for (int a = 0; a < state.armature_skeletons.size(); ++a)
-		{
 			// 修改点：尝试不创建多anim，在同一anim下插入不同skeleton的track
 			for (uint32_t i = 0; i < scene->mNumAnimations; i++) {
-				_import_animation(state, i, p_bake_fps, a);
+				state.animation_player = memnew(AnimationPlayer);
+				String anim_player_name = "AnimPlayer-" + String(scene->mAnimations[i]->mName.data);
+				state.animation_player->set_name(anim_player_name);
+
+				state.root->add_child(state.animation_player);
+				state.animation_player->set_owner(state.root);
+
+				for (int a = 0; a < state.armature_skeletons.size(); ++a) {
+					_import_animation(state, i, p_bake_fps, a);
+				}
 			}
-		}
 	}
 
 	//
@@ -1638,7 +1640,7 @@ void EditorSceneImporterAssimp::_generate_node(
 	state.nodes.push_back(assimp_node);
 	String parent_name = AssimpUtils::get_assimp_string(assimp_node->mParent->mName);
 
-	if (assimp_node->mName == aiString("head")) {
+	if (assimp_node->mName == aiString("Armature")) {
 		int i = 0;
 		++i;
 	}

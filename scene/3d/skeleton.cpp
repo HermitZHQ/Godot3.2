@@ -359,7 +359,7 @@ void Skeleton::_notification(int p_what) {
 			// 修改点：update所有非bone节点的global transform，否则有些节点不会转变
 			anim_node_root = (NodeAnim*)get_anim_root_node_addr();
 			if (anim_node_root) {
-// 				UpdateAllNoneBoneAnimNodes(anim_node_root);
+				UpdateAllNoneBoneAnimNodes(anim_node_root);
 			}
 
 			// 修改点：检测是anim_node_root为null，是的话，从load的anim node vec中重新组合出tree
