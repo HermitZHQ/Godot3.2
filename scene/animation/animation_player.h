@@ -240,6 +240,8 @@ private:
 		bool seeked;
 		bool started;
 	} playback;
+	// 修改点：需要一个playback的map支持同时播放所有动画
+	Map<StringName, Playback*> playback_map;
 
 	List<StringName> queued;
 
@@ -325,8 +327,14 @@ public:
 	String get_current_animation() const;
 	void set_current_animation(const String &p_anim);
 	// 修改点：加入播放所有动画的选项
-	String gdi_play_all_animation_get() const;
 	void gdi_play_all_animation_set(const String &p_anim);
+private:
+	void _gdi_animation_process2_play_all(float p_delta, bool p_started, Playback &p_playback);
+	void _gdi_animation_update_transforms_play_all();
+	void _gdi_animation_process_data_play_all(PlaybackData &cd, float p_delta, float p_blend, bool p_seeked, bool p_started, Playback &p_playback);
+	void _gdi_reset_all_animation_playback();
+
+public:
 
 	String get_assigned_animation() const;
 	void set_assigned_animation(const String &p_anim);
@@ -373,6 +381,7 @@ public:
 
 private:
 	bool gdi_play_all_anim_flag;
+	bool gdi_play_all_anim_loop_flag;
 };
 
 VARIANT_ENUM_CAST(AnimationPlayer::AnimationProcessMode);
