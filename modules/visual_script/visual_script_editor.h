@@ -78,7 +78,9 @@ class VisualScriptEditor : public ScriptEditorBase {
 	enum MemberType {
 		MEMBER_FUNCTION,
 		MEMBER_VARIABLE,
-		MEMBER_SIGNAL
+		MEMBER_SIGNAL,
+		// 修改点：加入新类型
+		MEMBER_CUSTOM,
 	};
 
 	VBoxContainer *members_section;
@@ -261,6 +263,7 @@ class VisualScriptEditor : public ScriptEditorBase {
 	// 修改点：加入创建内置process和ready的函数
 	void _gdi_create_process_func_node();
 	void _gdi_create_ready_func_node();
+	void _gdi_delete_function(const String &name);
 
 	int editing_id;
 	int editing_input;
@@ -333,6 +336,10 @@ public:
 
 	VisualScriptEditor();
 	~VisualScriptEditor();
+	// 修改点：加入固定常量字符串，搭配gdi_visual_script_custom_nodes类的enum，可以取出固定的字符串
+	// 避免到处手动分散写常量
+private:
+	const String gdi_str_custom_node_list[4] = { L"激活", L"循环", L"键盘", L"鼠标" };
 };
 
 // Singleton

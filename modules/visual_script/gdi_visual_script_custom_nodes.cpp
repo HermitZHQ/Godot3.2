@@ -28,7 +28,6 @@ bool GDIVisualScriptCustomNode::has_input_sequence_port() const {
 		return false;
 	case GDIVisualScriptCustomNode::KEYBOARD:
 	case GDIVisualScriptCustomNode::MOUSE:
-	case GDIVisualScriptCustomNode::MAT_ALBEDO:
 		return true;
 	default:
 		return false;
@@ -110,9 +109,9 @@ int GDIVisualScriptCustomNode::get_input_value_port_count() const {
 	else if (custom_mode == MOUSE) {
 		return 0;
 	}
-	else if (custom_mode == MAT_ALBEDO) {
-		return 3;
-	}
+// 	else if (custom_mode == MAT_ALBEDO) {
+// 		return 3;
+// 	}
 	else {
 		return 0;
 	}
@@ -131,9 +130,9 @@ int GDIVisualScriptCustomNode::get_output_value_port_count() const {
 	else if (custom_mode == MOUSE) {
 		return 3;
 	}
-	else if (custom_mode == MAT_ALBEDO) {
-		return 0;
-	}
+// 	else if (custom_mode == MAT_ALBEDO) {
+// 		return 0;
+// 	}
 	else {
 		return 0;
 	}
@@ -164,28 +163,28 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 		ret.name = L"鼠标";
 		ret.type = Variant::NIL;
 	}
-	else if (custom_mode == MAT_ALBEDO) {
-		switch (p_idx)
-		{
-		case 0: {
-			ret.name = L"MeshInst节点路径";
-			ret.type = Variant::NODE_PATH;
-			break;
-		}
-		case 1: {
-			ret.name = L"颜色";
-			ret.type = Variant::COLOR;
-			break;
-		}
-		case 2: {
-			ret.name = L"surface索引";
-			ret.type = Variant::INT;
-			break;
-		}
-		default:
-			break;
-		}
-	}
+// 	else if (custom_mode == MAT_ALBEDO) {
+// 		switch (p_idx)
+// 		{
+// 		case 0: {
+// 			ret.name = L"MeshInst节点路径";
+// 			ret.type = Variant::NODE_PATH;
+// 			break;
+// 		}
+// 		case 1: {
+// 			ret.name = L"颜色";
+// 			ret.type = Variant::COLOR;
+// 			break;
+// 		}
+// 		case 2: {
+// 			ret.name = L"surface索引";
+// 			ret.type = Variant::INT;
+// 			break;
+// 		}
+// 		default:
+// 			break;
+// 		}
+// 	}
 	else {
 		ret.name = L"未处理类型";
 		ret.type = Variant::NIL;
@@ -266,8 +265,8 @@ String GDIVisualScriptCustomNode::get_caption() const {
 		return L"键盘";
 	else if (custom_mode == MOUSE)
 		return L"鼠标";
-	else if (custom_mode == MAT_ALBEDO)
-		return L"颜色";
+// 	else if (custom_mode == MAT_ALBEDO)
+// 		return L"颜色";
 	else
 		return L"未处理类型";
 }
@@ -282,8 +281,8 @@ String GDIVisualScriptCustomNode::get_text() const {
 		return L"在下方填入键值（如：a）";
 	else if (custom_mode == MOUSE)
 		return L"鼠标按键处理";
-	else if (custom_mode == MAT_ALBEDO)
-		return L"改变材质颜色";
+// 	else if (custom_mode == MAT_ALBEDO)
+// 		return L"改变材质颜色";
 	else
 		return L"未处理类型";
 }
@@ -545,9 +544,7 @@ Dictionary GDIVisualScriptCustomNode::_get_argument_cache() const {
 }
 
 void GDIVisualScriptCustomNode::_validate_property(PropertyInfo &property) const {
-
-	int i = 0;
-	++i;
+		
 }
 
 void GDIVisualScriptCustomNode::_bind_methods() {
@@ -669,6 +666,7 @@ public:
 		if (p_start_mode == VisualScriptCustomNode::START_MODE_BEGIN_SEQUENCE) {
 // 			os->print("Test begin sequence....\n");
 		}
+		static Point2 mouse_point;
 
 		switch (custom_mode) {
 		case GDIVisualScriptCustomNode::ACTIVE: {
@@ -677,8 +675,8 @@ public:
 		}
 		case GDIVisualScriptCustomNode::LOOP: {
 
-			Object *object = instance->get_owner_ptr();
-			*p_outputs[0] = object->call("_process", p_inputs, input_args, r_error);
+// 			Object *object = instance->get_owner_ptr();
+// 			*p_outputs[0] = object->call("_process", p_inputs, input_args, r_error);
 			break;
 		}
 		case GDIVisualScriptCustomNode::KEYBOARD: {
@@ -710,19 +708,31 @@ public:
 			static bool second_click_pressed_flag = false;
 			static const unsigned int double_click_interval = 500;
 
-			if (!first_click_pressed_flag && left_button_pressed_flag) {
-				time = os->get_system_time_msecs();
-				first_click_pressed_flag = true;
+			// reset, if time alreay over
+			if (os->get_system_time_msecs() - time >= double_click_interval) {
+				time = 0;
+				second_click_pressed_flag = false;
+				first_click_pressed_flag = false;
+				first_click_released_flag = false;
 			}
-			else if (first_click_pressed_flag && !left_button_pressed_flag) {
+
+			if (!first_click_pressed_flag && left_button_pressed_flag) {
+				first_click_pressed_flag = true;
+				time = os->get_system_time_msecs();
+				// 防止拖动操作后点击误判为双击
+				mouse_point = os->get_mouse_position();
+			}
+			else if (first_click_pressed_flag && !first_click_released_flag && !left_button_pressed_flag) {
 				first_click_released_flag = true;
 			}
 			else if (first_click_pressed_flag && first_click_released_flag && left_button_pressed_flag) {
 				second_click_pressed_flag = true;
+			}
+			else if (second_click_pressed_flag && !left_button_pressed_flag) {
 
 				auto diff_time = os->get_system_time_msecs() - time;
 // 				os->print("enter second click, diff time[%d]\n", diff_time);
-				if (diff_time < double_click_interval) {
+				if (diff_time < double_click_interval && mouse_point == os->get_mouse_position()) {
 					*p_outputs[2] = true;
 				}
 
@@ -734,67 +744,61 @@ public:
 
 			break;
 		}
-		case GDIVisualScriptCustomNode::MAT_ALBEDO: {
-			Object *object = instance->get_owner_ptr();
-			Node *node = Object::cast_to<Node>(object);
-			if (nullptr == node) {
-// 				os->print("[GDI]Material albedo node, can not convert obj to node\n");
-				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-				r_error_str = "[GDI]Material albedo node, can not convert obj to node";
-				return 0;
-			}
-
-			NodePath path = *p_inputs[0];
-			Node *target_node = node->get_node(path);
-			if (nullptr == target_node) {
-// 				os->print("[GDI]Material albedo node, target node is null\n");
-				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-				r_error_str = "[GDI]Material albedo node, target node is null";
-				return 0;
-			}
-
-			MeshInstance *mesh = Object::cast_to<MeshInstance>(target_node);
-			if (nullptr == mesh) {
-// 				os->print("[GDI]Material albedo node, can not convert to mesh inst\n");
-				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-				r_error_str = "[GDI]Material albedo node, can not convert to mesh inst";
-				return 0;
-			}
-			if (mesh->get_surface_material_count() == 0) {
-// 				os->print("[GDI]Material albedo node, surface is null\n");
-				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-				r_error_str = "[GDI]Material albedo node, surface is null";
-				return 0;
-			}
-
-			unsigned int surface_index = *p_inputs[2];
-			if (surface_index > mesh->get_surface_material_count() - 1) {
-// 				os->print("[GDI]Material albedo node, invalid surface index\n");
-				r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
-				r_error_str = "[GDI]Material albedo node, invalid surface index";
-				return 0;
-			}
-
-			auto mat = Object::cast_to<SpatialMaterial>(*(mesh->get_surface_material(surface_index)));
-			if (nullptr == mat) {
-// 				os->print("[GDI]Material albedo node, can not find material with index[%d]\n", surface_index);
-				r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
-				r_error_str = "[GDI]Material albedo node, can not find material with index";
-				return 0;
-			}
-
-// 			auto copy_mat = Object::cast_to<SpatialMaterial>(*(mat->duplicate()));
-// 			if (nullptr == copy_mat) {
-// // 				os->print("[GDI]Material albedo node, copy mat failed\n");
+		// 先保留下，很有可能后面又会加入这种简化版的节点
+// 		case GDIVisualScriptCustomNode::MAT_ALBEDO: {
+// 			Object *object = instance->get_owner_ptr();
+// 			Node *node = Object::cast_to<Node>(object);
+// 			if (nullptr == node) {
+// // 				os->print("[GDI]Material albedo node, can not convert obj to node\n");
 // 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-// 				r_error_str = "[GDI]Material albedo node, copy mat failed";
+// 				r_error_str = "[GDI]Material albedo node, can not convert obj to node";
 // 				return 0;
 // 			}
-			mat->set_albedo(*p_inputs[1]);
-			mesh->set_surface_material(surface_index, mat);
-
-			break;
-		}
+// 
+// 			NodePath path = *p_inputs[0];
+// 			Node *target_node = node->get_node(path);
+// 			if (nullptr == target_node) {
+// // 				os->print("[GDI]Material albedo node, target node is null\n");
+// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+// 				r_error_str = "[GDI]Material albedo node, target node is null";
+// 				return 0;
+// 			}
+// 
+// 			MeshInstance *mesh = Object::cast_to<MeshInstance>(target_node);
+// 			if (nullptr == mesh) {
+// // 				os->print("[GDI]Material albedo node, can not convert to mesh inst\n");
+// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+// 				r_error_str = "[GDI]Material albedo node, can not convert to mesh inst";
+// 				return 0;
+// 			}
+// 			if (mesh->get_surface_material_count() == 0) {
+// // 				os->print("[GDI]Material albedo node, surface is null\n");
+// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+// 				r_error_str = "[GDI]Material albedo node, surface is null";
+// 				return 0;
+// 			}
+// 
+// 			unsigned int surface_index = *p_inputs[2];
+// 			if (surface_index > mesh->get_surface_material_count() - 1) {
+// // 				os->print("[GDI]Material albedo node, invalid surface index\n");
+// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+// 				r_error_str = "[GDI]Material albedo node, invalid surface index";
+// 				return 0;
+// 			}
+// 
+// 			auto mat = Object::cast_to<SpatialMaterial>(*(mesh->get_surface_material(surface_index)));
+// 			if (nullptr == mat) {
+// // 				os->print("[GDI]Material albedo node, can not find material with index[%d]\n", surface_index);
+// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+// 				r_error_str = "[GDI]Material albedo node, can not find material with index";
+// 				return 0;
+// 			}
+// 
+// 			mat->set_albedo(*p_inputs[1]);
+// 			mesh->set_surface_material(surface_index, mat);
+// 
+// 			break;
+// 		}
 		}
 
 		if (!validate) {

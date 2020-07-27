@@ -30,7 +30,6 @@ public:
 		LOOP,
 		KEYBOARD,
 		MOUSE,
-		MAT_ALBEDO,
 	};
 
 private:
