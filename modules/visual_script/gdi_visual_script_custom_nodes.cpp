@@ -10,13 +10,28 @@
 #include "core/os/input.h"
 #include "core/bind/core_bind.h"
 
-// 修改点：
+// 增加点：
 #include "scene/3d/mesh_instance.h"
+#include "scene/3d/area.h"
 
 
 int GDIVisualScriptCustomNode::get_output_sequence_port_count() const {
 
-	return 1;
+	switch (custom_mode)
+	{
+	case GDIVisualScriptCustomNode::ACTIVE:
+	case GDIVisualScriptCustomNode::LOOP:
+	case GDIVisualScriptCustomNode::KEYBOARD:
+	case GDIVisualScriptCustomNode::MOUSE:
+	case GDIVisualScriptCustomNode::AREA_TIGGER:
+	case GDIVisualScriptCustomNode::COMBINATION:
+	case GDIVisualScriptCustomNode::INIT:
+		return 1;
+	case GDIVisualScriptCustomNode::TIMER:
+		return 2;
+	default:
+		return 1;
+	}
 }
 
 bool GDIVisualScriptCustomNode::has_input_sequence_port() const {
@@ -28,6 +43,10 @@ bool GDIVisualScriptCustomNode::has_input_sequence_port() const {
 		return false;
 	case GDIVisualScriptCustomNode::KEYBOARD:
 	case GDIVisualScriptCustomNode::MOUSE:
+	case GDIVisualScriptCustomNode::AREA_TIGGER:
+	case GDIVisualScriptCustomNode::TIMER:
+	case GDIVisualScriptCustomNode::COMBINATION:
+	case GDIVisualScriptCustomNode::INIT:
 		return true;
 	default:
 		return false;
@@ -109,6 +128,12 @@ int GDIVisualScriptCustomNode::get_input_value_port_count() const {
 	else if (custom_mode == MOUSE) {
 		return 0;
 	}
+	else if (custom_mode == AREA_TIGGER) {
+		return 1;
+	}
+	else if (custom_mode == TIMER) {
+		return 3;
+	}
 // 	else if (custom_mode == MAT_ALBEDO) {
 // 		return 3;
 // 	}
@@ -130,6 +155,12 @@ int GDIVisualScriptCustomNode::get_output_value_port_count() const {
 	else if (custom_mode == MOUSE) {
 		return 3;
 	}
+	else if (custom_mode == AREA_TIGGER) {
+		return 1;
+	}
+	else if (custom_mode == TIMER) {
+		return 1;
+	}
 // 	else if (custom_mode == MAT_ALBEDO) {
 // 		return 0;
 // 	}
@@ -140,30 +171,96 @@ int GDIVisualScriptCustomNode::get_output_value_port_count() const {
 
 String GDIVisualScriptCustomNode::get_output_sequence_port_text(int p_port) const {
 
-	return String();
+	switch (custom_mode)
+	{
+	case GDIVisualScriptCustomNode::ACTIVE:
+	case GDIVisualScriptCustomNode::LOOP:
+	case GDIVisualScriptCustomNode::KEYBOARD:
+	case GDIVisualScriptCustomNode::MOUSE:
+	case GDIVisualScriptCustomNode::AREA_TIGGER:
+	case GDIVisualScriptCustomNode::COMBINATION:
+	case GDIVisualScriptCustomNode::INIT:
+		return String();
+	case GDIVisualScriptCustomNode::TIMER: {
+		switch (p_port)
+		{
+		case 0: {
+			return L"激活时";
+		}
+		case 1: {
+			return L"未激活时";
+		}
+		default:
+			return String();
+		}
+		break;
+	}
+	default:
+		return String();
+	}
 }
 
 PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) const {
 
 	PropertyInfo ret;
 	if (custom_mode == ACTIVE) {
+
 		ret.name = L"激活";
 		ret.type = Variant::NIL;
 	}
 	else if (custom_mode == LOOP) {
+
 		ret.name = L"循环";
 		ret.type = Variant::NIL;
 	}
 	else if (custom_mode == KEYBOARD) {
+
 		ret.name = L"键值";
 		ret.type = Variant::STRING;
 		ret.hint = PROPERTY_HINT_TYPE_STRING_CHAR;
 	}
 	else if (custom_mode == MOUSE) {
+
 		ret.name = L"鼠标";
 		ret.type = Variant::NIL;
 	}
+	else if (custom_mode == AREA_TIGGER) {
+
+		ret.name = L"被触发空间";
+		ret.type = Variant::NODE_PATH;
+	}
+	else if (custom_mode == TIMER) {
+
+		switch (p_idx)
+		{
+		case 0: {
+
+			ret.name = L"分";
+			ret.type = Variant::INT;
+			break;
+		}
+		case 1: {
+
+			ret.name = L"秒";
+			ret.type = Variant::INT;
+			break;
+		}
+		case 2: {
+
+			ret.name = L"毫秒";
+			ret.type = Variant::INT;
+			break;
+		}
+		default: {
+			
+			ret.name = L"未处理类型";
+			ret.type = Variant::INT;
+			break;
+		}
+		}
+	}
 // 	else if (custom_mode == MAT_ALBEDO) {
+// 
 // 		switch (p_idx)
 // 		{
 // 		case 0: {
@@ -186,6 +283,7 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 // 		}
 // 	}
 	else {
+
 		ret.name = L"未处理类型";
 		ret.type = Variant::NIL;
 	}
@@ -197,14 +295,17 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 
 	PropertyInfo ret;
 	if (custom_mode == ACTIVE) {
+
 		ret.name = L"激活";
 		ret.type = Variant::BOOL;
 	}
 	else if (custom_mode == LOOP) {
+
 		ret.name = L"循环";
 		ret.type = Variant::BOOL;
 	}
 	else if (custom_mode == KEYBOARD) {
+
 		switch (p_idx)
 		{
 		case 0: {
@@ -225,24 +326,54 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 		}
 	}
 	else if (custom_mode == MOUSE) {
+
 		switch (p_idx)
 		{
 		case 0: {
 			ret.name = L"左键";
 			ret.type = Variant::BOOL;
-// 			OS::get_singleton()->print("test1");
 			break;
 		}
 		case 1: {
 			ret.name = L"右键";
 			ret.type = Variant::BOOL;
-// 			OS::get_singleton()->print("test2");
 			break;
 		}
 		case 2: {
 			ret.name = L"双击";
 			ret.type = Variant::BOOL;
-// 			OS::get_singleton()->print("test3");
+			break;
+		}
+		default: {
+			ret.name = L"未处理类型";
+			ret.type = Variant::BOOL;
+			break;
+		}
+		}
+	}
+	else if (custom_mode == AREA_TIGGER) {
+
+		switch (p_idx)
+		{
+		case 0: {
+			ret.name = L"触发";
+			ret.type = Variant::BOOL;
+			break;
+		}
+		default: {
+			ret.name = L"未处理类型";
+			ret.type = Variant::BOOL;
+			break;
+		}
+		}
+	}
+	else if (custom_mode == TIMER) {
+
+		switch (p_idx)
+		{
+		case 0: {
+			ret.name = L"已触发";
+			ret.type = Variant::BOOL;
 			break;
 		}
 		default: {
@@ -265,6 +396,10 @@ String GDIVisualScriptCustomNode::get_caption() const {
 		return L"键盘";
 	else if (custom_mode == MOUSE)
 		return L"鼠标";
+	else if (custom_mode == AREA_TIGGER)
+		return L"空间触发器";
+	else if (custom_mode == TIMER)
+		return L"计时器";
 // 	else if (custom_mode == MAT_ALBEDO)
 // 		return L"颜色";
 	else
@@ -281,6 +416,10 @@ String GDIVisualScriptCustomNode::get_text() const {
 		return L"在下方填入键值（如：a）";
 	else if (custom_mode == MOUSE)
 		return L"鼠标按键处理";
+	else if (custom_mode == AREA_TIGGER)
+		return L"其他空间进入时触发";
+	else if (custom_mode == TIMER)
+		return L"到设定时间后触发";
 // 	else if (custom_mode == MAT_ALBEDO)
 // 		return L"改变材质颜色";
 	else
@@ -390,85 +529,7 @@ StringName GDIVisualScriptCustomNode::get_singleton() const {
 }
 
 void GDIVisualScriptCustomNode::_update_method_cache() {
-	StringName type;
-	Ref<Script> script;
 
-// 	if (call_mode == CALL_MODE_NODE_PATH) {
-// 
-// 		Node *node = _get_base_node();
-// 		if (node) {
-// 			type = node->get_class();
-// 			base_type = type; //cache, too
-// 			script = node->get_script();
-// 		}
-// 	} else if (call_mode == CALL_MODE_SELF) {
-// 
-// 		if (get_visual_script().is_valid()) {
-// 			type = get_visual_script()->get_instance_base_type();
-// 			base_type = type; //cache, too
-// 			script = get_visual_script();
-// 		}
-// 
-// 	} else if (call_mode == CALL_MODE_SINGLETON) {
-// 
-// 		Object *obj = Engine::get_singleton()->get_singleton_object(singleton);
-// 		if (obj) {
-// 			type = obj->get_class();
-// 			script = obj->get_script();
-// 		}
-// 
-// 	} else if (call_mode == CALL_MODE_INSTANCE) {
-// 
-// 		type = base_type;
-// 		if (base_script != String()) {
-// 
-// 			if (!ResourceCache::has(base_script) && ScriptServer::edit_request_func) {
-// 
-// 				ScriptServer::edit_request_func(base_script); //make sure it's loaded
-// 			}
-// 
-// 			if (ResourceCache::has(base_script)) {
-// 
-// 				script = Ref<Resource>(ResourceCache::get(base_script));
-// 			} else {
-// 				return;
-// 			}
-// 		}
-// 	}
-// 
-// 	MethodBind *mb = ClassDB::get_method(type, function);
-// 	if (mb) {
-// 		use_default_args = mb->get_default_argument_count();
-// 		method_cache = MethodInfo();
-// 		for (int i = 0; i < mb->get_argument_count(); i++) {
-// #ifdef DEBUG_METHODS_ENABLED
-// 			method_cache.arguments.push_back(mb->get_argument_info(i));
-// #else
-// 			method_cache.arguments.push_back(PropertyInfo());
-// #endif
-// 		}
-// 
-// 		if (mb->is_const()) {
-// 			method_cache.flags |= METHOD_FLAG_CONST;
-// 		}
-// 
-// #ifdef DEBUG_METHODS_ENABLED
-// 
-// 		method_cache.return_val = mb->get_return_info();
-// #endif
-// 
-// 		if (mb->is_vararg()) {
-// 			//for vararg just give it 10 arguments (should be enough for most use cases)
-// 			for (int i = 0; i < 10; i++) {
-// 				method_cache.arguments.push_back(PropertyInfo(Variant::NIL, "arg" + itos(i)));
-// 				use_default_args++;
-// 			}
-// 		}
-// 	} else if (script.is_valid() && script->has_method(function)) {
-// 
-// 		method_cache = script->get_method_info(function);
-// 		use_default_args = method_cache.default_arguments.size();
-// 	}
 }
 
 void GDIVisualScriptCustomNode::set_function(const StringName &p_type) {
@@ -533,6 +594,31 @@ bool GDIVisualScriptCustomNode::get_validate() const {
 	return validate;
 }
 
+void GDIVisualScriptCustomNode::area_trigger_entered_signal_callback(Node *area) {
+
+	int res = area_trigger_entered_area_vec.find(area);
+	if (res >= 0) {
+		return;
+	}
+
+// 	printf("area enter...\n");
+	area_trigger_entered_area_vec.push_back(area);
+}
+
+void GDIVisualScriptCustomNode::area_trigger_exited_signal_callback(Node *area) {
+
+	int res = area_trigger_entered_area_vec.find(area);
+	if (res >= 0) {
+// 		printf("area exit...\n");
+		area_trigger_entered_area_vec.erase(area);
+	}
+}
+
+int GDIVisualScriptCustomNode::get_area_trigger_entered_area_num() const
+{
+	return area_trigger_entered_area_vec.size();
+}
+
 void GDIVisualScriptCustomNode::_set_argument_cache(const Dictionary &p_cache) {
 	//so everything works in case all else fails
 	method_cache = MethodInfo::from_dict(p_cache);
@@ -549,8 +635,12 @@ void GDIVisualScriptCustomNode::_validate_property(PropertyInfo &property) const
 
 void GDIVisualScriptCustomNode::_bind_methods() {
 
+	// 修改点：增加需要的函数和属性绑定
 	ClassDB::bind_method(D_METHOD("set_custom_mode", "custom_mode"), &GDIVisualScriptCustomNode::set_custom_mode);
 	ClassDB::bind_method(D_METHOD("get_custom_mode"), &GDIVisualScriptCustomNode::get_custom_mode);
+
+	ClassDB::bind_method(D_METHOD("area_trigger_entered_signal_callback", "area"), &GDIVisualScriptCustomNode::area_trigger_entered_signal_callback);
+	ClassDB::bind_method(D_METHOD("area_trigger_exited_signal_callback", "area"), &GDIVisualScriptCustomNode::area_trigger_exited_signal_callback);
 
 	ClassDB::bind_method(D_METHOD("set_call_mode", "mode"), &GDIVisualScriptCustomNode::set_call_mode);
 	ClassDB::bind_method(D_METHOD("get_call_mode"), &GDIVisualScriptCustomNode::get_call_mode);
@@ -645,44 +735,175 @@ public:
 	GDIVisualScriptCustomNode *node;
 	VisualScriptInstance *instance;
 
+	_OS *_os = nullptr;
+	OS *os = nullptr;
+	Input *input = nullptr;
+
+	GDIVisualScriptNodeInstanceCustom()
+		:_os(_OS::get_singleton())
+		, os(OS::get_singleton())
+		, input(Input::get_singleton())
+	{}
+
 	//virtual int get_working_memory_size() const { return 0; }
 	//virtual bool is_output_port_unsequenced(int p_idx) const { return false; }
 	//virtual bool get_output_port_unsequenced(int p_idx,Variant* r_value,Variant* p_working_mem,String &r_error) const { return true; }
 
+	void mouse_handle_func(const Variant **p_inputs, Variant **p_outputs) {
+
+		static Point2 mouse_point;
+		auto left_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_LEFT);
+		auto right_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_RIGHT);
+		*p_outputs[0] = left_button_pressed_flag;
+		*p_outputs[1] = right_button_pressed_flag;
+		*p_outputs[2] = false;
+
+// 		os->print("test output[%d], [%d], [%d]\n", b1, b2,*p_outputs[2]);
+
+		static uint64_t time = 0;
+		static bool first_click_pressed_flag = false;
+		static bool first_click_released_flag = false;
+		static bool second_click_pressed_flag = false;
+		static const unsigned int double_click_interval = 500;
+
+		// reset, if time alreay over
+		if (os->get_system_time_msecs() - time >= double_click_interval) {
+			time = 0;
+			second_click_pressed_flag = false;
+			first_click_pressed_flag = false;
+			first_click_released_flag = false;
+		}
+
+		if (!first_click_pressed_flag && left_button_pressed_flag) {
+			first_click_pressed_flag = true;
+			time = os->get_system_time_msecs();
+			// prevent drag double click
+			mouse_point = os->get_mouse_position();
+		}
+		else if (first_click_pressed_flag && !first_click_released_flag && !left_button_pressed_flag) {
+			first_click_released_flag = true;
+		}
+		else if (first_click_pressed_flag && first_click_released_flag && left_button_pressed_flag) {
+			second_click_pressed_flag = true;
+		}
+		else if (second_click_pressed_flag && !left_button_pressed_flag) {
+
+			auto diff_time = os->get_system_time_msecs() - time;
+			// 				os->print("enter second click, diff time[%d]\n", diff_time);
+			if (diff_time < double_click_interval && mouse_point == os->get_mouse_position()) {
+				*p_outputs[2] = true;
+			}
+
+			time = 0;
+			second_click_pressed_flag = false;
+			first_click_pressed_flag = false;
+			first_click_released_flag = false;
+		}
+	}
+
+	int area_trigger_handle_func(const Variant **p_inputs, Variant **p_outputs, Variant::CallError &r_error, String &r_error_str) {
+
+		Object *object = instance->get_owner_ptr();
+		Node *node = Object::cast_to<Node>(object);
+		if (nullptr == node) {
+			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+			r_error_str = "[GDI]area trigger, can not convert obj to node";
+			return 0;
+		}
+
+		Node *root = node->get_tree()->get_current_scene();
+// 		String str = node->get_name();
+// 		printf("root name:[%S]\n", str);
+		if (nullptr == root) {
+			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+			r_error_str = "[GDI]area trigger, can't find edit root node";
+			return 0;
+		}
+
+		NodePath path = *p_inputs[0];
+		Node *target_node = root->get_node(path);
+		if (nullptr == target_node) {
+			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+			r_error_str = "[GDI]area trigger, can't find target node";
+			return 0;
+		}
+
+		Area *area = Object::cast_to<Area>(target_node);
+		if (nullptr == area) {
+			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+			r_error_str = "[GDI]area trigger, can't convert node to area type";
+			return 0;
+		}
+
+		static bool first_flag = true;
+		if (first_flag) {
+			auto err = area->connect("area_entered", this->node, "area_trigger_entered_signal_callback");
+// 			os->print("connect res:[%d]\n", err);
+			if (OK != err) {
+				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+				r_error_str = "[GDI]area trigger, connect signal failed";
+			}
+			err = area->connect("area_exited", this->node, "area_trigger_exited_signal_callback");
+// 			os->print("connect res:[%d]\n", err);
+			if (OK != err) {
+				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+				r_error_str = "[GDI]area trigger, connect signal failed";
+			}
+			first_flag = false;
+		}
+
+		bool area_entered_flag = this->node->get_area_trigger_entered_area_num() > 0 ? true : false;
+		*p_outputs[0] = area_entered_flag;
+
+		return 1;
+	}
+
+	int timer_handle_func(const Variant **p_inputs, Variant **p_outputs) {
+
+// 		static int hour = *p_inputs[0];
+		static int minute = *p_inputs[0];
+		static int sec = *p_inputs[1];
+		static int msec = *p_inputs[2];
+
+		static uint64_t start_time = os->get_system_time_msecs();
+
+		bool reach_target_time_flag =
+			(os->get_system_time_msecs() - start_time > (msec + sec * 1000 + minute * 1000 * 60)) ? true : false;
+
+		*p_outputs[0] = reach_target_time_flag;
+		if (reach_target_time_flag) {
+			// reset the start time
+			start_time = os->get_system_time_msecs();
+
+			return 0;
+		}
+
+		return 1;
+	}
+
 	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
 
-		static _OS *_os = nullptr;
-		static OS *os = nullptr;
-		static Input *input = nullptr;
-		if (nullptr == _os) {
-			_os = _OS::get_singleton();
-		}
-		if (nullptr == os) {
-			os = OS::get_singleton();
-		}
-		if (nullptr == input) {
-			input = Input::get_singleton();
-		}
-		if (p_start_mode == VisualScriptCustomNode::START_MODE_BEGIN_SEQUENCE) {
+// 		if (p_start_mode == VisualScriptCustomNode::START_MODE_BEGIN_SEQUENCE) {
 // 			os->print("Test begin sequence....\n");
-		}
-		static Point2 mouse_point;
+// 		}
 
 		switch (custom_mode) {
+
 		case GDIVisualScriptCustomNode::ACTIVE: {
 
 			break;
 		}
 		case GDIVisualScriptCustomNode::LOOP: {
 
-// 			Object *object = instance->get_owner_ptr();
-// 			*p_outputs[0] = object->call("_process", p_inputs, input_args, r_error);
 			break;
 		}
 		case GDIVisualScriptCustomNode::KEYBOARD: {
+
 			String key = *p_inputs[0];
 			if (key.length() != 1) {
-				break;
+				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+				r_error_str = "[GDI]keyboard, key string length not 1";
+				return 0;
 			}
 
 			auto sc = _os->find_scancode_from_string(key);
@@ -694,55 +915,24 @@ public:
 			break;
 		}
 		case GDIVisualScriptCustomNode::MOUSE: {
-			auto left_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_LEFT);
-			auto right_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_RIGHT);
-			*p_outputs[0] = left_button_pressed_flag;
-			*p_outputs[1] = right_button_pressed_flag;
-			*p_outputs[2] = false;
 
-// 			os->print("test output[%d], [%d], [%d]\n", b1, b2,*p_outputs[2]);
+			mouse_handle_func(p_inputs, p_outputs);
 
-			static uint64_t time = 0;
-			static bool first_click_pressed_flag = false;
-			static bool first_click_released_flag = false;
-			static bool second_click_pressed_flag = false;
-			static const unsigned int double_click_interval = 500;
+			break;
+		}
+		case GDIVisualScriptCustomNode::AREA_TIGGER: {
 
-			// reset, if time alreay over
-			if (os->get_system_time_msecs() - time >= double_click_interval) {
-				time = 0;
-				second_click_pressed_flag = false;
-				first_click_pressed_flag = false;
-				first_click_released_flag = false;
-			}
-
-			if (!first_click_pressed_flag && left_button_pressed_flag) {
-				first_click_pressed_flag = true;
-				time = os->get_system_time_msecs();
-				// 防止拖动操作后点击误判为双击
-				mouse_point = os->get_mouse_position();
-			}
-			else if (first_click_pressed_flag && !first_click_released_flag && !left_button_pressed_flag) {
-				first_click_released_flag = true;
-			}
-			else if (first_click_pressed_flag && first_click_released_flag && left_button_pressed_flag) {
-				second_click_pressed_flag = true;
-			}
-			else if (second_click_pressed_flag && !left_button_pressed_flag) {
-
-				auto diff_time = os->get_system_time_msecs() - time;
-// 				os->print("enter second click, diff time[%d]\n", diff_time);
-				if (diff_time < double_click_interval && mouse_point == os->get_mouse_position()) {
-					*p_outputs[2] = true;
-				}
-
-				time = 0;
-				second_click_pressed_flag = false;
-				first_click_pressed_flag = false;
-				first_click_released_flag = false;
+			int ret = area_trigger_handle_func(p_inputs, p_outputs, r_error, r_error_str);
+			if (0 == ret) {
+				return 0;
 			}
 
 			break;
+		}
+		case GDIVisualScriptCustomNode::TIMER: {
+
+			int ret = timer_handle_func(p_inputs, p_outputs);
+			return ret;
 		}
 		// 先保留下，很有可能后面又会加入这种简化版的节点
 // 		case GDIVisualScriptCustomNode::MAT_ALBEDO: {

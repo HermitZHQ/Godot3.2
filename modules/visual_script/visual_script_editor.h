@@ -336,10 +336,13 @@ public:
 
 	VisualScriptEditor();
 	~VisualScriptEditor();
+
 	// 修改点：加入固定常量字符串，搭配gdi_visual_script_custom_nodes类的enum，可以取出固定的字符串
 	// 避免到处手动分散写常量
+	// 不能随意修改数组中的顺序，必须和enum匹配
 private:
-	const String gdi_str_custom_node_list[4] = { L"激活", L"循环", L"键盘", L"鼠标" };
+	const String gdi_str_custom_node_list[8] = { L"激活", L"循环", L"键盘", L"鼠标",
+												 L"空间触发器", L"定时器", L"组合", L"初始化" };
 };
 
 // Singleton

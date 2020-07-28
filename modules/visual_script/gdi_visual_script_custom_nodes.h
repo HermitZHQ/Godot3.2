@@ -30,6 +30,10 @@ public:
 		LOOP,
 		KEYBOARD,
 		MOUSE,
+		AREA_TIGGER,
+		TIMER,
+		COMBINATION,
+		INIT
 	};
 
 private:
@@ -108,11 +112,19 @@ public:
 	void set_validate(bool p_amount);
 	bool get_validate() const;
 
+	// 修改点：加入空间触发器signal回调
+	void area_trigger_entered_signal_callback(Node *area);
+	void area_trigger_exited_signal_callback(Node *area);
+	int get_area_trigger_entered_area_num() const;
+
 	virtual VisualScriptNodeInstance *instance(VisualScriptInstance *p_instance);
 
 	virtual TypeGuess guess_output_type(TypeGuess *p_inputs, int p_output) const;
 
 	GDIVisualScriptCustomNode();
+
+private:
+	Vector<Node*> area_trigger_entered_area_vec;
 };
 
 VARIANT_ENUM_CAST(GDIVisualScriptCustomNode::CallMode);

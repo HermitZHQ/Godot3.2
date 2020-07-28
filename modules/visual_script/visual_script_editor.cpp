@@ -2410,19 +2410,19 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 
 		bool already_create_function_node_flag = false;
 
-		if (d["custom"] == String(L"激活")) {
+		if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::ACTIVE]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::ACTIVE);
 
 			already_create_function_node_flag = true;
 			_gdi_create_ready_func_node();
 		}
-		else if (d["custom"] == String(L"循环")) {
+		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::LOOP]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::LOOP);
 
 			already_create_function_node_flag = true;
 			_gdi_create_process_func_node();
 		}
-		else if (d["custom"] == String(L"键盘")) {
+		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::KEYBOARD]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::KEYBOARD);
 
 			// 测试点：屏蔽C++内部实现，转而使用VisualScriptCustomNode动态绑定gd或者vs脚本的方式来实现节点
@@ -2454,12 +2454,21 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 // 				}
 			}
 		}
-		else if (d["custom"] == String(L"鼠标")) {
+		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::MOUSE]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::MOUSE);
 		}
-// 		else if (d["custom"] == String(L"材质颜色")) {
-// 			vnode->set_custom_mode(GDIVisualScriptCustomNode::MAT_ALBEDO);
-// 		}
+		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::AREA_TIGGER]) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::AREA_TIGGER);
+		}
+		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::TIMER]) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::TIMER);
+		}
+		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::COMBINATION]) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::COMBINATION);
+		}
+		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::INIT]) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::INIT);
+		}
 
 		if (!already_create_function_node_flag) {
 			int new_id = script->get_available_id();
