@@ -1037,7 +1037,7 @@ void VisualScriptEditor::_update_members() {
 
 	TreeItem *_customs = members->create_item(root);
 	_customs->set_selectable(0, false);
-	_customs->set_text(0, TTR("Customs:"));
+	_customs->set_text(0, TTR("Express:"));
 // 	_customs->add_button(0, Control::get_icon("Add", "EditorIcons"), -1, false, TTR("Create a new signal."));
 	_customs->set_custom_color(0, Control::get_color("mono_color", "Editor"));
 	auto custom_node_size = sizeof(gdi_str_custom_node_list) / sizeof(String);

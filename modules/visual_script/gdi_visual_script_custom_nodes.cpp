@@ -13,21 +13,26 @@
 // 增加点：
 #include "scene/3d/mesh_instance.h"
 #include "scene/3d/area.h"
+#include "scene/3d/collision_shape.h"
+#include "scene/3d/collision_polygon.h"
+#include "scene/resources/box_shape.h"
+#include "scene/resources/plane_shape.h"
 
 
 int GDIVisualScriptCustomNode::get_output_sequence_port_count() const {
 
+	static int i = 0;
 	switch (custom_mode)
 	{
 	case GDIVisualScriptCustomNode::ACTIVE:
 	case GDIVisualScriptCustomNode::LOOP:
 	case GDIVisualScriptCustomNode::KEYBOARD:
 	case GDIVisualScriptCustomNode::MOUSE:
-	case GDIVisualScriptCustomNode::AREA_TIGGER:
-	case GDIVisualScriptCustomNode::COMBINATION:
 	case GDIVisualScriptCustomNode::INIT:
 		return 1;
+	case GDIVisualScriptCustomNode::AREA_TIGGER:
 	case GDIVisualScriptCustomNode::TIMER:
+	case GDIVisualScriptCustomNode::COMBINATION:
 		return 2;
 	default:
 		return 1;
@@ -129,14 +134,17 @@ int GDIVisualScriptCustomNode::get_input_value_port_count() const {
 		return 0;
 	}
 	else if (custom_mode == AREA_TIGGER) {
-		return 1;
+		return 2;
 	}
 	else if (custom_mode == TIMER) {
 		return 3;
 	}
-// 	else if (custom_mode == MAT_ALBEDO) {
-// 		return 3;
-// 	}
+	else if (custom_mode == TIMER) {
+		return 3;
+	}
+	else if (custom_mode == COMBINATION) {
+		return use_default_args;
+	}
 	else {
 		return 0;
 	}
@@ -161,9 +169,9 @@ int GDIVisualScriptCustomNode::get_output_value_port_count() const {
 	else if (custom_mode == TIMER) {
 		return 1;
 	}
-// 	else if (custom_mode == MAT_ALBEDO) {
-// 		return 0;
-// 	}
+	else if (custom_mode == COMBINATION) {
+		return 1;
+	}
 	else {
 		return 0;
 	}
@@ -177,10 +185,10 @@ String GDIVisualScriptCustomNode::get_output_sequence_port_text(int p_port) cons
 	case GDIVisualScriptCustomNode::LOOP:
 	case GDIVisualScriptCustomNode::KEYBOARD:
 	case GDIVisualScriptCustomNode::MOUSE:
-	case GDIVisualScriptCustomNode::AREA_TIGGER:
-	case GDIVisualScriptCustomNode::COMBINATION:
 	case GDIVisualScriptCustomNode::INIT:
 		return String();
+	case GDIVisualScriptCustomNode::AREA_TIGGER:
+	case GDIVisualScriptCustomNode::COMBINATION:
 	case GDIVisualScriptCustomNode::TIMER: {
 		switch (p_port)
 		{
@@ -226,8 +234,27 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 	}
 	else if (custom_mode == AREA_TIGGER) {
 
-		ret.name = L"被触发空间";
-		ret.type = Variant::NODE_PATH;
+		switch (p_idx)
+		{
+		case 0: {
+
+			ret.name = L"Area节点（挂接BoxShape）";
+			ret.type = Variant::NODE_PATH;
+			break;
+		}
+		case 1: {
+
+			ret.name = L"触发节点";
+			ret.type = Variant::NODE_PATH;
+			break;
+		}
+		default: {
+
+			ret.name = L"未处理类型";
+			ret.type = Variant::NIL;
+			break;
+		}
+		}
 	}
 	else if (custom_mode == TIMER) {
 
@@ -254,10 +281,15 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 		default: {
 			
 			ret.name = L"未处理类型";
-			ret.type = Variant::INT;
+			ret.type = Variant::NIL;
 			break;
 		}
 		}
+	}
+	else if (custom_mode == COMBINATION) {
+
+		ret.name = L"任务";
+		ret.type = Variant::BOOL;
 	}
 // 	else if (custom_mode == MAT_ALBEDO) {
 // 
@@ -356,7 +388,7 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 		switch (p_idx)
 		{
 		case 0: {
-			ret.name = L"触发";
+			ret.name = L"已触发";
 			ret.type = Variant::BOOL;
 			break;
 		}
@@ -367,7 +399,7 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 		}
 		}
 	}
-	else if (custom_mode == TIMER) {
+	else if (custom_mode == TIMER || custom_mode == COMBINATION) {
 
 		switch (p_idx)
 		{
@@ -400,8 +432,8 @@ String GDIVisualScriptCustomNode::get_caption() const {
 		return L"空间触发器";
 	else if (custom_mode == TIMER)
 		return L"计时器";
-// 	else if (custom_mode == MAT_ALBEDO)
-// 		return L"颜色";
+	else if (custom_mode == COMBINATION)
+		return L"任务组合";
 	else
 		return L"未处理类型";
 }
@@ -417,11 +449,11 @@ String GDIVisualScriptCustomNode::get_text() const {
 	else if (custom_mode == MOUSE)
 		return L"鼠标按键处理";
 	else if (custom_mode == AREA_TIGGER)
-		return L"其他空间进入时触发";
+		return L"其他节点进入时触发";
 	else if (custom_mode == TIMER)
 		return L"到设定时间后触发";
-// 	else if (custom_mode == MAT_ALBEDO)
-// 		return L"改变材质颜色";
+	else if (custom_mode == COMBINATION)
+		return L"所有任务为真后触发";
 	else
 		return L"未处理类型";
 }
@@ -697,17 +729,17 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 
 	// 修改点：必须加入要保存的属性信息，否则这些属性在不同实例（比如从编辑器启动到真实场景后）中无法传导
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "custom_mode", PROPERTY_HINT_ENUM, "active,key,mouse"), "set_custom_mode", "get_custom_mode");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "call_mode", PROPERTY_HINT_ENUM, "Self,Node Path,Instance,Basic Type,Singleton"), "set_call_mode", "get_call_mode");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "base_type", PROPERTY_HINT_TYPE_STRING, "Object"), "set_base_type", "get_base_type");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "base_script", PROPERTY_HINT_FILE, script_ext_hint), "set_base_script", "get_base_script");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "singleton"), "set_singleton", "get_singleton");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "basic_type", PROPERTY_HINT_ENUM, bt), "set_basic_type", "get_basic_type");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_path", PROPERTY_HINT_NODE_PATH_TO_EDITED_NODE), "set_base_path", "get_base_path");
-	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "argument_cache", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "_set_argument_cache", "_get_argument_cache");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "function"), "set_function", "get_function"); //when set, if loaded properly, will override argument count.
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "use_default_args"), "set_use_default_args", "get_use_default_args");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "validate"), "set_validate", "get_validate");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "rpc_call_mode", PROPERTY_HINT_ENUM, "Disabled,Reliable,Unreliable,ReliableToID,UnreliableToID"), "set_rpc_call_mode", "get_rpc_call_mode"); //when set, if loaded properly, will override argument count.
+// 	ADD_PROPERTY(PropertyInfo(Variant::INT, "call_mode", PROPERTY_HINT_ENUM, "Self,Node Path,Instance,Basic Type,Singleton"), "set_call_mode", "get_call_mode");
+// 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "base_type", PROPERTY_HINT_TYPE_STRING, "Object"), "set_base_type", "get_base_type");
+// 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "base_script", PROPERTY_HINT_FILE, script_ext_hint), "set_base_script", "get_base_script");
+// 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "singleton"), "set_singleton", "get_singleton");
+// 	ADD_PROPERTY(PropertyInfo(Variant::INT, "basic_type", PROPERTY_HINT_ENUM, bt), "set_basic_type", "get_basic_type");
+// 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_path", PROPERTY_HINT_NODE_PATH_TO_EDITED_NODE), "set_base_path", "get_base_path");
+// 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "argument_cache", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "_set_argument_cache", "_get_argument_cache");
+// 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "function"), "set_function", "get_function"); //when set, if loaded properly, will override argument count.
+	ADD_PROPERTY(PropertyInfo(Variant::INT, L"组合任务参数"), "set_use_default_args", "get_use_default_args");
+// 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "validate"), "set_validate", "get_validate");
+// 	ADD_PROPERTY(PropertyInfo(Variant::INT, "rpc_call_mode", PROPERTY_HINT_ENUM, "Disabled,Reliable,Unreliable,ReliableToID,UnreliableToID"), "set_rpc_call_mode", "get_rpc_call_mode"); //when set, if loaded properly, will override argument count.
 
 	BIND_ENUM_CONSTANT(CALL_MODE_SELF);
 	BIND_ENUM_CONSTANT(CALL_MODE_NODE_PATH);
@@ -801,6 +833,28 @@ public:
 		}
 	}
 
+	void _check_target_in_collision_shape(const Vector3 &area_pos, const Vector3 &target_pos, Shape *shape, Variant **p_outputs) {
+
+		BoxShape *box_shape = Object::cast_to<BoxShape>(shape);
+	
+		if (box_shape) {
+
+			Vector3 extents = box_shape->get_extents();
+			if (target_pos.x < area_pos.x + extents.x / 2.0 && target_pos.x > area_pos.x - extents.x / 2.0 &&
+				target_pos.y < area_pos.y + extents.y / 2.0 && target_pos.y > area_pos.y - extents.y / 2.0 &&
+				target_pos.z < area_pos.z + extents.z / 2.0 && target_pos.z > area_pos.z - extents.z / 2.0) {
+
+				*p_outputs[0] = true;
+				return;
+			}
+
+			*p_outputs[0] = false;
+			return;
+		}
+
+		// 非box shape的话，都无法触发
+		*p_outputs[0] = false;
+	}
 	int area_trigger_handle_func(const Variant **p_inputs, Variant **p_outputs, Variant::CallError &r_error, String &r_error_str) {
 
 		Object *object = instance->get_owner_ptr();
@@ -808,43 +862,114 @@ public:
 		if (nullptr == node) {
 			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
 			r_error_str = "[GDI]area trigger, can not convert obj to node";
-			return 0;
+			return 1;
 		}
 
 		Node *root = node->get_tree()->get_current_scene();
-// 		String str = node->get_name();
-// 		printf("root name:[%S]\n", str);
 		if (nullptr == root) {
 			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
 			r_error_str = "[GDI]area trigger, can't find edit root node";
-			return 0;
+			return 1;
 		}
 
-		NodePath path = *p_inputs[0];
-		Node *target_node = root->get_node(path);
-		if (nullptr == target_node) {
-			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-			r_error_str = "[GDI]area trigger, can't find target node";
-			return 0;
-		}
-
-		Area *area = Object::cast_to<Area>(target_node);
+		NodePath path;
+		path = *p_inputs[0];
+		Area *area = Object::cast_to<Area>(node->get_node(path));
 		if (nullptr == area) {
 			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-			r_error_str = "[GDI]area trigger, can't convert node to area type";
-			return 0;
+			r_error_str = "[GDI]area trigger, can't find area";
+			return 1;
 		}
+
+		path = *p_inputs[1];
+		Node *target = node->get_node(path);
+		if (nullptr == target) {
+			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+			r_error_str = "[GDI]area trigger, can't find target";
+			return 1;
+		}
+
+		// calculate the comb aabb manual
+		int child_num = target->get_child_count();
+		Vector3 min_pos, max_pos;
+		bool dirty_flag = false;
+		for (int i = 0; i < child_num; ++i) {
+			MeshInstance *mesh = Object::cast_to<MeshInstance>(target->get_child(i));
+			if (nullptr != mesh) {
+				auto aabb = mesh->get_transformed_aabb();
+				auto tmp_max_pos = aabb.position + aabb.size;
+				auto tmp_min_pos = aabb.position - aabb.size;
+
+				if (!dirty_flag) {
+					min_pos = tmp_min_pos;
+					max_pos = tmp_max_pos;
+					dirty_flag = true;
+				}
+				else {
+					min_pos = (tmp_min_pos < min_pos ? tmp_min_pos : min_pos);
+					max_pos = (tmp_max_pos > max_pos ? tmp_max_pos : max_pos);
+				}
+			}
+		}
+		Vector3 center_pos = (max_pos + min_pos) / 2.0;
+		Vector3 extents = (max_pos - center_pos) + Vector3(1, 1, 1);
+
+		// add the Area node with collision shape dynamicly
+		Area *new_area = memnew(Area);
+		CollisionShape *cs = memnew(CollisionShape);
+		BoxShape *bs = memnew(BoxShape);
+		bs->set_extents(extents);
+
+		new_area->add_child(cs);
+		target->add_child(new_area);
+		cs->set_shape(bs);
+
+		//CollisionShape *colli_shape = nullptr;
+		//CollisionPolygon *colli_polygon = nullptr;
+		//auto child_num = area->get_child_count();
+		//for (auto i = 0; i < child_num; ++i) {
+		//	colli_shape = Object::cast_to<CollisionShape>(area->get_child(i));
+		//	if (nullptr != colli_shape) {
+		//		break;
+		//	}
+
+		//	colli_polygon = Object::cast_to<CollisionPolygon>(area->get_child(i));
+		//	if (nullptr != colli_polygon) {
+		//		break;
+		//	}
+		//}
+		//if (nullptr == colli_shape && nullptr == colli_polygon) {
+		//	r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+		//	r_error_str = "[GDI]area trigger, can't find collision node with area";
+		//	return 0;
+		//}
+		//Transform trans = (nullptr != colli_shape ?
+		//	(colli_shape->get_global_transform()) : (colli_polygon->get_global_transform()));
+
+		//Transform target_trans = spa->get_global_transform();
+
+// 		bool is_collision_shape_flag = colli_shape ? true : false;
+// 		if (is_collision_shape_flag) {
+// 			auto shape = colli_shape->get_shape();
+// 			if (nullptr == Object::cast_to<BoxShape>(*shape)) {
+// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+// 				r_error_str = "[GDI]area trigger, you muse use the [BoxShape]";
+// 				return 0;
+// 			}
+// 			_check_target_in_collision_shape(trans.origin, target_trans.origin, *shape, p_outputs);
+// 		}
+// 		else {
+// 
+// 		}
 
 		static bool first_flag = true;
 		if (first_flag) {
 			auto err = area->connect("area_entered", this->node, "area_trigger_entered_signal_callback");
-// 			os->print("connect res:[%d]\n", err);
 			if (OK != err) {
 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
 				r_error_str = "[GDI]area trigger, connect signal failed";
 			}
 			err = area->connect("area_exited", this->node, "area_trigger_exited_signal_callback");
-// 			os->print("connect res:[%d]\n", err);
 			if (OK != err) {
 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
 				r_error_str = "[GDI]area trigger, connect signal failed";
@@ -852,10 +977,10 @@ public:
 			first_flag = false;
 		}
 
-		bool area_entered_flag = this->node->get_area_trigger_entered_area_num() > 0 ? true : false;
-		*p_outputs[0] = area_entered_flag;
+// 		bool area_entered_flag = this->node->get_area_trigger_entered_area_num() > 0 ? true : false;
+// 		*p_outputs[0] = area_entered_flag;
 
-		return 1;
+		return ((bool)p_outputs[0] ? 0 : 1);
 	}
 
 	int timer_handle_func(const Variant **p_inputs, Variant **p_outputs) {
@@ -879,6 +1004,26 @@ public:
 		}
 
 		return 1;
+	}
+
+	int combination_handle_func(const Variant **p_inputs, Variant **p_outputs) {
+
+		int arg_num = node->get_use_default_args();
+		bool all_pass_flag = true;
+		for (int i = 0; i < arg_num; ++i) {
+			if (!(bool(*p_inputs[i]))) {
+				all_pass_flag = false;
+				break;
+			}
+		}
+
+		*p_outputs[0] = all_pass_flag;
+		if (all_pass_flag) {
+			return 0;
+		}
+		else {
+			return 1;
+		}
 	}
 
 	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
@@ -932,6 +1077,11 @@ public:
 		case GDIVisualScriptCustomNode::TIMER: {
 
 			int ret = timer_handle_func(p_inputs, p_outputs);
+			return ret;
+		}
+		case GDIVisualScriptCustomNode::COMBINATION: {
+
+			int ret = combination_handle_func(p_inputs, p_outputs);
 			return ret;
 		}
 		// 先保留下，很有可能后面又会加入这种简化版的节点
