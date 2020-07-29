@@ -833,28 +833,6 @@ public:
 		}
 	}
 
-	void _check_target_in_collision_shape(const Vector3 &area_pos, const Vector3 &target_pos, Shape *shape, Variant **p_outputs) {
-
-		BoxShape *box_shape = Object::cast_to<BoxShape>(shape);
-	
-		if (box_shape) {
-
-			Vector3 extents = box_shape->get_extents();
-			if (target_pos.x < area_pos.x + extents.x / 2.0 && target_pos.x > area_pos.x - extents.x / 2.0 &&
-				target_pos.y < area_pos.y + extents.y / 2.0 && target_pos.y > area_pos.y - extents.y / 2.0 &&
-				target_pos.z < area_pos.z + extents.z / 2.0 && target_pos.z > area_pos.z - extents.z / 2.0) {
-
-				*p_outputs[0] = true;
-				return;
-			}
-
-			*p_outputs[0] = false;
-			return;
-		}
-
-		// 非box shape的话，都无法触发
-		*p_outputs[0] = false;
-	}
 	int area_trigger_handle_func(const Variant **p_inputs, Variant **p_outputs, Variant::CallError &r_error, String &r_error_str) {
 
 		Object *object = instance->get_owner_ptr();
@@ -882,10 +860,10 @@ public:
 		}
 
 		path = *p_inputs[1];
-		Node *target = node->get_node(path);
+		Spatial *target = Object::cast_to<Spatial>(node->get_node(path));
 		if (nullptr == target) {
 			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-			r_error_str = "[GDI]area trigger, can't find target";
+			r_error_str = "[GDI]area trigger, can't find target(spatial)";
 			return 1;
 		}
 
@@ -893,12 +871,43 @@ public:
 		int child_num = target->get_child_count();
 		Vector3 min_pos, max_pos;
 		bool dirty_flag = false;
+		bool has_area_flag = false;
+
+		// check self first
+		MeshInstance *self_mesh = Object::cast_to<MeshInstance>(target);
+		if (nullptr != self_mesh) {
+			auto aabb = self_mesh->get_transformed_aabb();
+			auto tmp_max_pos = aabb.position + aabb.size;
+			auto tmp_min_pos = aabb.position;
+
+			if (!dirty_flag) {
+				min_pos = tmp_min_pos;
+				max_pos = tmp_max_pos;
+				dirty_flag = true;
+			}
+		}
+
+		// check self area
+		Area *self_area = Object::cast_to<Area>(target);
+		if (nullptr != self_area) {
+			CollisionShape *cs = nullptr;
+			int child_num = self_area->get_child_count();
+			for (int i = 0; i < child_num; ++i) {
+				cs = Object::cast_to<CollisionShape>(self_area->get_child(i));
+				if (nullptr != cs) {
+					has_area_flag = true;
+					break;
+				}
+			}
+		}
+
 		for (int i = 0; i < child_num; ++i) {
 			MeshInstance *mesh = Object::cast_to<MeshInstance>(target->get_child(i));
+			Area *area = Object::cast_to<Area>(target->get_child(i));
 			if (nullptr != mesh) {
 				auto aabb = mesh->get_transformed_aabb();
 				auto tmp_max_pos = aabb.position + aabb.size;
-				auto tmp_min_pos = aabb.position - aabb.size;
+				auto tmp_min_pos = aabb.position;
 
 				if (!dirty_flag) {
 					min_pos = tmp_min_pos;
@@ -906,64 +915,50 @@ public:
 					dirty_flag = true;
 				}
 				else {
-					min_pos = (tmp_min_pos < min_pos ? tmp_min_pos : min_pos);
-					max_pos = (tmp_max_pos > max_pos ? tmp_max_pos : max_pos);
+					min_pos.x = (tmp_min_pos.x < min_pos.x ? tmp_min_pos.x : min_pos.x);
+					min_pos.y = (tmp_min_pos.y < min_pos.y ? tmp_min_pos.y : min_pos.y);
+					min_pos.z = (tmp_min_pos.z < min_pos.z ? tmp_min_pos.z : min_pos.z);
+
+					max_pos.x = (tmp_max_pos.x > max_pos.x ? tmp_max_pos.x : max_pos.x);
+					max_pos.y = (tmp_max_pos.y > max_pos.y ? tmp_max_pos.y : max_pos.y);
+					max_pos.z = (tmp_max_pos.z > max_pos.z ? tmp_max_pos.z : max_pos.z);
+				}
+			}
+			else if (nullptr != area) {
+				CollisionShape *cs = nullptr;
+				int child_num = area->get_child_count();
+				for (int i = 0; i < child_num; ++i) {
+					cs = Object::cast_to<CollisionShape>(area->get_child(i));
+					if (nullptr != cs) {
+						has_area_flag = true;
+						break;
+					}
 				}
 			}
 		}
+		Vector3 target_pos = target->get_global_transform().origin;
 		Vector3 center_pos = (max_pos + min_pos) / 2.0;
-		Vector3 extents = (max_pos - center_pos) + Vector3(1, 1, 1);
-
-		// add the Area node with collision shape dynamicly
-		Area *new_area = memnew(Area);
-		CollisionShape *cs = memnew(CollisionShape);
-		BoxShape *bs = memnew(BoxShape);
-		bs->set_extents(extents);
-
-		new_area->add_child(cs);
-		target->add_child(new_area);
-		cs->set_shape(bs);
-
-		//CollisionShape *colli_shape = nullptr;
-		//CollisionPolygon *colli_polygon = nullptr;
-		//auto child_num = area->get_child_count();
-		//for (auto i = 0; i < child_num; ++i) {
-		//	colli_shape = Object::cast_to<CollisionShape>(area->get_child(i));
-		//	if (nullptr != colli_shape) {
-		//		break;
-		//	}
-
-		//	colli_polygon = Object::cast_to<CollisionPolygon>(area->get_child(i));
-		//	if (nullptr != colli_polygon) {
-		//		break;
-		//	}
-		//}
-		//if (nullptr == colli_shape && nullptr == colli_polygon) {
-		//	r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-		//	r_error_str = "[GDI]area trigger, can't find collision node with area";
-		//	return 0;
-		//}
-		//Transform trans = (nullptr != colli_shape ?
-		//	(colli_shape->get_global_transform()) : (colli_polygon->get_global_transform()));
-
-		//Transform target_trans = spa->get_global_transform();
-
-// 		bool is_collision_shape_flag = colli_shape ? true : false;
-// 		if (is_collision_shape_flag) {
-// 			auto shape = colli_shape->get_shape();
-// 			if (nullptr == Object::cast_to<BoxShape>(*shape)) {
-// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-// 				r_error_str = "[GDI]area trigger, you muse use the [BoxShape]";
-// 				return 0;
-// 			}
-// 			_check_target_in_collision_shape(trans.origin, target_trans.origin, *shape, p_outputs);
-// 		}
-// 		else {
-// 
-// 		}
+		Vector3 dir = center_pos - target_pos;
+		float diff_len = dir.length();
+		dir.normalize();
+		Vector3 extents = (max_pos - center_pos) + Vector3(0.1, 0.1, 0.1);
 
 		static bool first_flag = true;
 		if (first_flag) {
+			// add the Area node with collision shape dynamicly
+			if (!has_area_flag) {
+				Area *new_area = memnew(Area);
+				CollisionShape *cs = memnew(CollisionShape);
+				BoxShape *bs = memnew(BoxShape);
+				bs->set_extents(extents);
+	
+				new_area->add_child(cs);
+				target->add_child(new_area);
+				cs->set_shape(bs);
+	
+				new_area->translate(dir * diff_len);
+			}
+
 			auto err = area->connect("area_entered", this->node, "area_trigger_entered_signal_callback");
 			if (OK != err) {
 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
@@ -977,10 +972,10 @@ public:
 			first_flag = false;
 		}
 
-// 		bool area_entered_flag = this->node->get_area_trigger_entered_area_num() > 0 ? true : false;
-// 		*p_outputs[0] = area_entered_flag;
+		bool area_entered_flag = this->node->get_area_trigger_entered_area_num() > 0 ? true : false;
+		*p_outputs[0] = area_entered_flag;
 
-		return ((bool)p_outputs[0] ? 0 : 1);
+		return (area_entered_flag ? 0 : 1);
 	}
 
 	int timer_handle_func(const Variant **p_inputs, Variant **p_outputs) {
@@ -1068,11 +1063,7 @@ public:
 		case GDIVisualScriptCustomNode::AREA_TIGGER: {
 
 			int ret = area_trigger_handle_func(p_inputs, p_outputs, r_error, r_error_str);
-			if (0 == ret) {
-				return 0;
-			}
-
-			break;
+			return ret;
 		}
 		case GDIVisualScriptCustomNode::TIMER: {
 
