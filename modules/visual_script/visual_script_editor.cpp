@@ -2422,6 +2422,12 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 			already_create_function_node_flag = true;
 			_gdi_create_process_func_node();
 		}
+		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::TASK_CONTROL]) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::TASK_CONTROL);
+		}
+		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::TASK_SPLIT]) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::TASK_SPLIT);
+		}
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::KEYBOARD]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::KEYBOARD);
 
@@ -2500,7 +2506,7 @@ void VisualScriptEditor::_gdi_create_process_func_node()
 {
 	String name = "_process";
 	if (script->has_function(name)) {
-// 		EditorNode::get_singleton()->show_warning(L"该任务模块已存在，且只能存在一个");
+		EditorNode::get_singleton()->show_warning(L"该任务模块已存在，且只能存在一个");
 		return;
 	}
 

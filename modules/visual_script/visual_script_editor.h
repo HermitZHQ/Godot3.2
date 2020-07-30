@@ -341,7 +341,7 @@ public:
 	// 避免到处手动分散写常量
 	// 不能随意修改数组中的顺序，必须和enum匹配
 private:
-	const String gdi_str_custom_node_list[8] = { L"激活", L"循环", L"键盘", L"鼠标",
+	const String gdi_str_custom_node_list[10] = { L"激活", L"循环", L"任务拆分", L"任务控制", L"键盘", L"鼠标",
 												 L"空间触发器", L"定时器", L"组合", L"初始化" };
 };
 

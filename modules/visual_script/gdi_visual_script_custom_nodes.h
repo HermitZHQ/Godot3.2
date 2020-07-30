@@ -28,6 +28,8 @@ public:
 	{
 		ACTIVE,
 		LOOP,
+		TASK_SPLIT,
+		TASK_CONTROL,
 		KEYBOARD,
 		MOUSE,
 		AREA_TIGGER,
@@ -117,14 +119,24 @@ public:
 	void area_trigger_exited_signal_callback(Node *area);
 	int get_area_trigger_entered_area_num() const;
 
+	void set_task_id(unsigned int id);
+	unsigned int get_task_id() const;
+
+	void set_task_split_num(unsigned int num);
+	unsigned int get_task_split_num() const;
+
 	virtual VisualScriptNodeInstance *instance(VisualScriptInstance *p_instance);
 
 	virtual TypeGuess guess_output_type(TypeGuess *p_inputs, int p_output) const;
 
 	GDIVisualScriptCustomNode();
+	~GDIVisualScriptCustomNode();
 
 private:
 	Vector<Node*> area_trigger_entered_area_vec;
+	unsigned int task_id;
+	unsigned int task_split_num;
+	static unsigned int global_task_id;
 };
 
 VARIANT_ENUM_CAST(GDIVisualScriptCustomNode::CallMode);

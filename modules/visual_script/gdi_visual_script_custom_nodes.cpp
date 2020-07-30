@@ -26,16 +26,19 @@ int GDIVisualScriptCustomNode::get_output_sequence_port_count() const {
 	{
 	case GDIVisualScriptCustomNode::ACTIVE:
 	case GDIVisualScriptCustomNode::LOOP:
+	case GDIVisualScriptCustomNode::TASK_CONTROL:
 	case GDIVisualScriptCustomNode::KEYBOARD:
 	case GDIVisualScriptCustomNode::MOUSE:
-	case GDIVisualScriptCustomNode::INIT:
 		return 1;
 	case GDIVisualScriptCustomNode::AREA_TIGGER:
 	case GDIVisualScriptCustomNode::TIMER:
 	case GDIVisualScriptCustomNode::COMBINATION:
 		return 2;
+	case GDIVisualScriptCustomNode::TASK_SPLIT:
+		return task_split_num;
+	case GDIVisualScriptCustomNode::INIT:
 	default:
-		return 1;
+		return 0;
 	}
 }
 
@@ -46,6 +49,8 @@ bool GDIVisualScriptCustomNode::has_input_sequence_port() const {
 	case GDIVisualScriptCustomNode::ACTIVE:
 	case GDIVisualScriptCustomNode::LOOP:
 		return false;
+	case GDIVisualScriptCustomNode::TASK_SPLIT:
+	case GDIVisualScriptCustomNode::TASK_CONTROL:
 	case GDIVisualScriptCustomNode::KEYBOARD:
 	case GDIVisualScriptCustomNode::MOUSE:
 	case GDIVisualScriptCustomNode::AREA_TIGGER:
@@ -127,6 +132,9 @@ int GDIVisualScriptCustomNode::get_input_value_port_count() const {
 	else if (custom_mode == LOOP) {
 		return 0;
 	}
+	else if (custom_mode == TASK_CONTROL) {
+		return 2;
+	}
 	else if (custom_mode == KEYBOARD) {
 		return 1;
 	}
@@ -145,6 +153,9 @@ int GDIVisualScriptCustomNode::get_input_value_port_count() const {
 	else if (custom_mode == COMBINATION) {
 		return use_default_args;
 	}
+	else if (custom_mode == INIT) {
+		return 0;
+	}
 	else {
 		return 0;
 	}
@@ -155,6 +166,9 @@ int GDIVisualScriptCustomNode::get_output_value_port_count() const {
 		return 0;
 	}
 	else if (custom_mode == LOOP) {
+		return 0;
+	}
+	else if (custom_mode == TASK_CONTROL) {
 		return 0;
 	}
 	else if (custom_mode == KEYBOARD) {
@@ -172,6 +186,9 @@ int GDIVisualScriptCustomNode::get_output_value_port_count() const {
 	else if (custom_mode == COMBINATION) {
 		return 1;
 	}
+	else if (custom_mode == INIT) {
+		return 0;
+	}
 	else {
 		return 0;
 	}
@@ -183,6 +200,7 @@ String GDIVisualScriptCustomNode::get_output_sequence_port_text(int p_port) cons
 	{
 	case GDIVisualScriptCustomNode::ACTIVE:
 	case GDIVisualScriptCustomNode::LOOP:
+	case GDIVisualScriptCustomNode::TASK_CONTROL:
 	case GDIVisualScriptCustomNode::KEYBOARD:
 	case GDIVisualScriptCustomNode::MOUSE:
 	case GDIVisualScriptCustomNode::INIT:
@@ -203,6 +221,10 @@ String GDIVisualScriptCustomNode::get_output_sequence_port_text(int p_port) cons
 		}
 		break;
 	}
+	case GDIVisualScriptCustomNode::TASK_SPLIT: {
+		return String(L"子任务-") + itos(p_port);
+		break;
+	}
 	default:
 		return String();
 	}
@@ -221,6 +243,26 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 		ret.name = L"循环";
 		ret.type = Variant::NIL;
 	}
+	else if (custom_mode == TASK_CONTROL) {
+
+		switch (p_idx)
+		{
+		case 0: {
+
+			ret.name = L"激活";
+			ret.type = Variant::BOOL;
+			break;
+		}
+		case 1: {
+
+			ret.name = L"只执行一次";
+			ret.type = Variant::BOOL;
+			break;
+		}
+		default:
+			break;
+		}
+	}
 	else if (custom_mode == KEYBOARD) {
 
 		ret.name = L"键值";
@@ -238,7 +280,7 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 		{
 		case 0: {
 
-			ret.name = L"Area节点（挂接BoxShape）";
+			ret.name = L"Area节点";
 			ret.type = Variant::NODE_PATH;
 			break;
 		}
@@ -424,6 +466,10 @@ String GDIVisualScriptCustomNode::get_caption() const {
 		return L"激活";
 	else if (custom_mode == LOOP)
 		return L"循环";
+	else if (custom_mode == TASK_SPLIT)
+		return L"任务拆分";
+	else if (custom_mode == TASK_CONTROL)
+		return L"任务控制";
 	else if (custom_mode == KEYBOARD)
 		return L"键盘";
 	else if (custom_mode == MOUSE)
@@ -434,6 +480,8 @@ String GDIVisualScriptCustomNode::get_caption() const {
 		return L"计时器";
 	else if (custom_mode == COMBINATION)
 		return L"任务组合";
+	else if (custom_mode == INIT)
+		return L"初始化";
 	else
 		return L"未处理类型";
 }
@@ -444,6 +492,10 @@ String GDIVisualScriptCustomNode::get_text() const {
 		return L"初始化时调用";
 	else if (custom_mode == LOOP)
 		return L"循环调用";
+	else if (custom_mode == TASK_SPLIT)
+		return String(L"子任务：") + itos(task_id);
+	else if (custom_mode == TASK_CONTROL)
+		return L"可单独屏蔽部分流程";
 	else if (custom_mode == KEYBOARD)
 		return L"在下方填入键值（如：a）";
 	else if (custom_mode == MOUSE)
@@ -454,6 +506,8 @@ String GDIVisualScriptCustomNode::get_text() const {
 		return L"到设定时间后触发";
 	else if (custom_mode == COMBINATION)
 		return L"所有任务为真后触发";
+	else if (custom_mode == INIT)
+		return L"恢复场景到初始状态";
 	else
 		return L"未处理类型";
 }
@@ -461,6 +515,9 @@ String GDIVisualScriptCustomNode::get_text() const {
 void GDIVisualScriptCustomNode::set_custom_mode(CustomMode p_mode) {
 	
 	custom_mode = p_mode;
+	if (TASK_CONTROL == p_mode) {
+		set_task_id(global_task_id++);
+	}
 // 	OS::get_singleton()->print("set custom mode: [%d], this[%x]\n", custom_mode, this);
 }
 
@@ -646,9 +703,29 @@ void GDIVisualScriptCustomNode::area_trigger_exited_signal_callback(Node *area) 
 	}
 }
 
-int GDIVisualScriptCustomNode::get_area_trigger_entered_area_num() const
-{
+int GDIVisualScriptCustomNode::get_area_trigger_entered_area_num() const {
 	return area_trigger_entered_area_vec.size();
+}
+
+void GDIVisualScriptCustomNode::set_task_id(unsigned int id) {
+
+	task_id = id;
+}
+
+unsigned int GDIVisualScriptCustomNode::get_task_id() const {
+
+	return task_id;
+}
+
+void GDIVisualScriptCustomNode::set_task_split_num(unsigned int num) {
+
+	task_split_num = num;
+	ports_changed_notify();
+}
+
+unsigned int GDIVisualScriptCustomNode::get_task_split_num() const {
+
+	return task_split_num;
 }
 
 void GDIVisualScriptCustomNode::_set_argument_cache(const Dictionary &p_cache) {
@@ -673,6 +750,9 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("area_trigger_entered_signal_callback", "area"), &GDIVisualScriptCustomNode::area_trigger_entered_signal_callback);
 	ClassDB::bind_method(D_METHOD("area_trigger_exited_signal_callback", "area"), &GDIVisualScriptCustomNode::area_trigger_exited_signal_callback);
+
+	ClassDB::bind_method(D_METHOD("set_task_split_num", "num"), &GDIVisualScriptCustomNode::set_task_split_num);
+	ClassDB::bind_method(D_METHOD("get_task_split_num"), &GDIVisualScriptCustomNode::get_task_split_num);
 
 	ClassDB::bind_method(D_METHOD("set_call_mode", "mode"), &GDIVisualScriptCustomNode::set_call_mode);
 	ClassDB::bind_method(D_METHOD("get_call_mode"), &GDIVisualScriptCustomNode::get_call_mode);
@@ -737,7 +817,8 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 // 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_path", PROPERTY_HINT_NODE_PATH_TO_EDITED_NODE), "set_base_path", "get_base_path");
 // 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "argument_cache", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "_set_argument_cache", "_get_argument_cache");
 // 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "function"), "set_function", "get_function"); //when set, if loaded properly, will override argument count.
-	ADD_PROPERTY(PropertyInfo(Variant::INT, L"组合任务参数"), "set_use_default_args", "get_use_default_args");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, L"组合任务数量"), "set_use_default_args", "get_use_default_args");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, L"任务拆分数量"), "set_task_split_num", "get_task_split_num");
 // 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "validate"), "set_validate", "get_validate");
 // 	ADD_PROPERTY(PropertyInfo(Variant::INT, "rpc_call_mode", PROPERTY_HINT_ENUM, "Disabled,Reliable,Unreliable,ReliableToID,UnreliableToID"), "set_rpc_call_mode", "get_rpc_call_mode"); //when set, if loaded properly, will override argument count.
 
@@ -767,6 +848,7 @@ public:
 	GDIVisualScriptCustomNode *node;
 	VisualScriptInstance *instance;
 
+	// record singleton to increase the invoke efficiency
 	_OS *_os = nullptr;
 	OS *os = nullptr;
 	Input *input = nullptr;
@@ -777,7 +859,7 @@ public:
 		, input(Input::get_singleton())
 	{}
 
-	//virtual int get_working_memory_size() const { return 0; }
+	virtual int get_working_memory_size() const { return 1; }
 	//virtual bool is_output_port_unsequenced(int p_idx) const { return false; }
 	//virtual bool get_output_port_unsequenced(int p_idx,Variant* r_value,Variant* p_working_mem,String &r_error) const { return true; }
 
@@ -833,6 +915,51 @@ public:
 		}
 	}
 
+	void check_child_mesh_area_func(Node *node, bool &dirty_flag, bool &has_area_flag, Vector3 &min_pos, Vector3 &max_pos) {
+
+		int child_num = node->get_child_count();
+		for (int i = 0; i < child_num; ++i) {
+			Node *child = node->get_child(i);
+			int child_chlid_num = child->get_child_count();
+			if (child_chlid_num > 0) {
+				check_child_mesh_area_func(child, dirty_flag, has_area_flag, min_pos, max_pos);
+			}
+
+			MeshInstance *mesh = Object::cast_to<MeshInstance>(child);
+			Area *area = Object::cast_to<Area>(child);
+			if (nullptr != mesh) {
+				auto aabb = mesh->get_transformed_aabb();
+				auto tmp_max_pos = aabb.position + aabb.size;
+				auto tmp_min_pos = aabb.position;
+
+				if (!dirty_flag) {
+					min_pos = tmp_min_pos;
+					max_pos = tmp_max_pos;
+					dirty_flag = true;
+				}
+				else {
+					min_pos.x = (tmp_min_pos.x < min_pos.x ? tmp_min_pos.x : min_pos.x);
+					min_pos.y = (tmp_min_pos.y < min_pos.y ? tmp_min_pos.y : min_pos.y);
+					min_pos.z = (tmp_min_pos.z < min_pos.z ? tmp_min_pos.z : min_pos.z);
+
+					max_pos.x = (tmp_max_pos.x > max_pos.x ? tmp_max_pos.x : max_pos.x);
+					max_pos.y = (tmp_max_pos.y > max_pos.y ? tmp_max_pos.y : max_pos.y);
+					max_pos.z = (tmp_max_pos.z > max_pos.z ? tmp_max_pos.z : max_pos.z);
+				}
+			}
+			else if (nullptr != area) {
+				CollisionShape *cs = nullptr;
+				int child_num = area->get_child_count();
+				for (int i = 0; i < child_num; ++i) {
+					cs = Object::cast_to<CollisionShape>(area->get_child(i));
+					if (nullptr != cs) {
+						has_area_flag = true;
+						break;
+					}
+				}
+			}
+		}
+	}
 	int area_trigger_handle_func(const Variant **p_inputs, Variant **p_outputs, Variant::CallError &r_error, String &r_error_str) {
 
 		Object *object = instance->get_owner_ptr();
@@ -873,7 +1000,7 @@ public:
 		bool dirty_flag = false;
 		bool has_area_flag = false;
 
-		// check self first
+		// check self mesh
 		MeshInstance *self_mesh = Object::cast_to<MeshInstance>(target);
 		if (nullptr != self_mesh) {
 			auto aabb = self_mesh->get_transformed_aabb();
@@ -901,41 +1028,9 @@ public:
 			}
 		}
 
-		for (int i = 0; i < child_num; ++i) {
-			MeshInstance *mesh = Object::cast_to<MeshInstance>(target->get_child(i));
-			Area *area = Object::cast_to<Area>(target->get_child(i));
-			if (nullptr != mesh) {
-				auto aabb = mesh->get_transformed_aabb();
-				auto tmp_max_pos = aabb.position + aabb.size;
-				auto tmp_min_pos = aabb.position;
+		// check child mesh and area situation
+		check_child_mesh_area_func(target, dirty_flag, has_area_flag, min_pos, max_pos);
 
-				if (!dirty_flag) {
-					min_pos = tmp_min_pos;
-					max_pos = tmp_max_pos;
-					dirty_flag = true;
-				}
-				else {
-					min_pos.x = (tmp_min_pos.x < min_pos.x ? tmp_min_pos.x : min_pos.x);
-					min_pos.y = (tmp_min_pos.y < min_pos.y ? tmp_min_pos.y : min_pos.y);
-					min_pos.z = (tmp_min_pos.z < min_pos.z ? tmp_min_pos.z : min_pos.z);
-
-					max_pos.x = (tmp_max_pos.x > max_pos.x ? tmp_max_pos.x : max_pos.x);
-					max_pos.y = (tmp_max_pos.y > max_pos.y ? tmp_max_pos.y : max_pos.y);
-					max_pos.z = (tmp_max_pos.z > max_pos.z ? tmp_max_pos.z : max_pos.z);
-				}
-			}
-			else if (nullptr != area) {
-				CollisionShape *cs = nullptr;
-				int child_num = area->get_child_count();
-				for (int i = 0; i < child_num; ++i) {
-					cs = Object::cast_to<CollisionShape>(area->get_child(i));
-					if (nullptr != cs) {
-						has_area_flag = true;
-						break;
-					}
-				}
-			}
-		}
 		Vector3 target_pos = target->get_global_transform().origin;
 		Vector3 center_pos = (max_pos + min_pos) / 2.0;
 		Vector3 dir = center_pos - target_pos;
@@ -957,6 +1052,7 @@ public:
 				cs->set_shape(bs);
 	
 				new_area->translate(dir * diff_len);
+// 				os->print("[GDI]attach the Area node manual\n");
 			}
 
 			auto err = area->connect("area_entered", this->node, "area_trigger_entered_signal_callback");
@@ -1021,11 +1117,64 @@ public:
 		}
 	}
 
+	void collect_init_info(Node *node, Map<Spatial*, Transform> &objs_init_trans_map) {
+
+		Spatial *spa = Object::cast_to<Spatial>(node);
+		if (nullptr != spa) {
+			objs_init_trans_map.insert(spa, spa->get_global_transform());
+			os->print("[GDI]insert init trans info, node name[%S], addr[%X]\n", String(spa->get_name()), spa);
+		}
+
+		int child_num = node->get_child_count();
+		for (int i = 0; i < child_num; ++i) {
+			Node *child = node->get_child(i);
+			int child_child_num = child->get_child_count();
+			if (child_child_num > 0) {
+				collect_init_info(child, objs_init_trans_map);
+			}
+			else {
+				spa = Object::cast_to<Spatial>(child);
+				if (nullptr != spa) {
+					objs_init_trans_map.insert(spa, spa->get_global_transform());
+					os->print("[GDI]insert init trans info, node name[%S], addr[%X]\n", String(spa->get_name()), spa);
+				}
+			}
+		}
+	}
+
 	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
 
 // 		if (p_start_mode == VisualScriptCustomNode::START_MODE_BEGIN_SEQUENCE) {
 // 			os->print("Test begin sequence....\n");
 // 		}
+// 		else {
+// 			os->print("other start mode[%d]\n", p_start_mode);
+// 		}
+
+		// initialize relevant
+		static bool init_objs_info_flag = false;
+		static Map<Spatial*, Transform> objs_init_trans_map;
+		if (!init_objs_info_flag) {
+			Object *object = instance->get_owner_ptr();
+			Node *node = Object::cast_to<Node>(object);
+			if (nullptr == node) {
+				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+				r_error_str = "[GDI]collect init info failed, can't get node";
+				return 0;
+			}
+
+			Node *root = node->get_tree()->get_current_scene();
+			if (nullptr == root) {
+				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+				r_error_str = "[GDI]collect init info failed, can't get root";
+				return 0;
+			}
+
+			os->print("start collect init info, addr[%x]\n", this);
+			collect_init_info(root, objs_init_trans_map);
+			os->print("end collect init info\n");
+			init_objs_info_flag = true;
+		}
 
 		switch (custom_mode) {
 
@@ -1036,6 +1185,40 @@ public:
 		case GDIVisualScriptCustomNode::LOOP: {
 
 			break;
+		}
+		case GDIVisualScriptCustomNode::TASK_SPLIT: {
+
+			
+			break;
+		}
+		case GDIVisualScriptCustomNode::TASK_CONTROL: {
+
+			bool active_flag = *p_inputs[0];
+			bool only_execute_once_flag = *p_inputs[1];
+
+			if (!active_flag) {
+				if (nullptr != p_working_mem) {
+					p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
+				}
+				return STEP_EXIT_FUNCTION_BIT;
+// 				return 0 | STEP_FLAG_PUSH_STACK_BIT;
+			}
+			else {
+				static bool already_execute_once_flag = false;
+				if (only_execute_once_flag && !already_execute_once_flag) {
+					already_execute_once_flag = true;
+					return 0;
+				}
+				else if (only_execute_once_flag && already_execute_once_flag) {
+					if (nullptr != p_working_mem) {
+						p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
+					}
+					return STEP_EXIT_FUNCTION_BIT;
+				}
+				else {
+					return 0;
+				}
+			}
 		}
 		case GDIVisualScriptCustomNode::KEYBOARD: {
 
@@ -1052,12 +1235,11 @@ public:
 			*p_outputs[0] = pressedFlag;
 			*p_outputs[1] = !pressedFlag;
 
-			break;
+			return 0;
 		}
 		case GDIVisualScriptCustomNode::MOUSE: {
 
 			mouse_handle_func(p_inputs, p_outputs);
-
 			break;
 		}
 		case GDIVisualScriptCustomNode::AREA_TIGGER: {
@@ -1074,6 +1256,13 @@ public:
 
 			int ret = combination_handle_func(p_inputs, p_outputs);
 			return ret;
+		}
+		case GDIVisualScriptCustomNode::INIT: {
+
+			for (auto e = objs_init_trans_map.front(); e; e = e->next()) {
+				e->key()->set_global_transform(e->value());
+			}
+			break;
 		}
 		// 先保留下，很有可能后面又会加入这种简化版的节点
 // 		case GDIVisualScriptCustomNode::MAT_ALBEDO: {
@@ -1175,4 +1364,15 @@ GDIVisualScriptCustomNode::GDIVisualScriptCustomNode() {
 	basic_type = Variant::NIL;
 	use_default_args = 0;
 	base_type = "Object";
+	task_id = 0;
+	task_split_num = 1;
 }
+
+GDIVisualScriptCustomNode::~GDIVisualScriptCustomNode() {
+
+	if (TASK_CONTROL == custom_mode) {
+		--global_task_id;
+	}
+}
+
+unsigned int GDIVisualScriptCustomNode::global_task_id = 1;
