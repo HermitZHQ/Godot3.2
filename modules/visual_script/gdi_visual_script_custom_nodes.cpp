@@ -493,7 +493,7 @@ String GDIVisualScriptCustomNode::get_text() const {
 	else if (custom_mode == LOOP)
 		return L"循环调用";
 	else if (custom_mode == TASK_SPLIT)
-		return String(L"子任务：") + itos(task_id);
+		return String(L"将主任务拆分");
 	else if (custom_mode == TASK_CONTROL)
 		return L"可单独屏蔽部分流程";
 	else if (custom_mode == KEYBOARD)
@@ -848,6 +848,8 @@ public:
 	GDIVisualScriptCustomNode *node;
 	VisualScriptInstance *instance;
 
+	bool task_ctrl_already_execute_once_flag = false;
+
 	// record singleton to increase the invoke efficiency
 	_OS *_os = nullptr;
 	OS *os = nullptr;
@@ -1188,8 +1190,18 @@ public:
 		}
 		case GDIVisualScriptCustomNode::TASK_SPLIT: {
 
-			
-			break;
+			static unsigned int cur_execute_index = 0;
+
+			bool execute_last_flag = false;
+			if (cur_execute_index == node->get_task_split_num() - 1) {
+				execute_last_flag = true;
+			}
+			unsigned int tmp_index = cur_execute_index++;
+			if (cur_execute_index == node->get_task_split_num()) {
+				cur_execute_index = 0;
+			}
+
+			return execute_last_flag ? tmp_index : (tmp_index | STEP_FLAG_PUSH_STACK_BIT);
 		}
 		case GDIVisualScriptCustomNode::TASK_CONTROL: {
 
@@ -1204,12 +1216,11 @@ public:
 // 				return 0 | STEP_FLAG_PUSH_STACK_BIT;
 			}
 			else {
-				static bool already_execute_once_flag = false;
-				if (only_execute_once_flag && !already_execute_once_flag) {
-					already_execute_once_flag = true;
+				if (only_execute_once_flag && !task_ctrl_already_execute_once_flag) {
+					task_ctrl_already_execute_once_flag = true;
 					return 0;
 				}
-				else if (only_execute_once_flag && already_execute_once_flag) {
+				else if (only_execute_once_flag && task_ctrl_already_execute_once_flag) {
 					if (nullptr != p_working_mem) {
 						p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
 					}

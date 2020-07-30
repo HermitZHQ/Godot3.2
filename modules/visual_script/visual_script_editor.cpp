@@ -1044,14 +1044,17 @@ void VisualScriptEditor::_update_members() {
 	for (int i = 0; i < custom_node_size; i++) {
 		TreeItem *ti = members->create_item(_customs);
 
-		ti->set_text(0, gdi_str_custom_node_list[i]);
-		ti->set_selectable(0, true);
-		ti->set_editable(0, true);
-		ti->set_metadata(0, gdi_str_custom_node_list[i]);
 		if (i == GDIVisualScriptCustomNode::CustomMode::ACTIVE ||
 			i == GDIVisualScriptCustomNode::CustomMode::LOOP) {
 			ti->add_button(0, Control::get_icon("Remove", "EditorIcons"), 0);
+			ti->set_text(0, gdi_str_custom_node_list[i] + L"(主任务)");
 		}
+		else {
+			ti->set_text(0, gdi_str_custom_node_list[i]);
+		}
+		ti->set_selectable(0, true);
+		ti->set_editable(0, true);
+		ti->set_metadata(0, gdi_str_custom_node_list[i]);
 	}
 
 	updating_members = false;
