@@ -10,13 +10,12 @@
 #include "core/os/input.h"
 #include "core/bind/core_bind.h"
 
-// 增加点：
 #include "scene/3d/mesh_instance.h"
 #include "scene/3d/area.h"
 #include "scene/3d/collision_shape.h"
-#include "scene/3d/collision_polygon.h"
 #include "scene/resources/box_shape.h"
-#include "scene/resources/plane_shape.h"
+//#include "scene/3d/collision_polygon.h"
+//#include "scene/resources/plane_shape.h"
 
 
 int GDIVisualScriptCustomNode::get_output_sequence_port_count() const {
@@ -57,6 +56,7 @@ bool GDIVisualScriptCustomNode::has_input_sequence_port() const {
 	case GDIVisualScriptCustomNode::TIMER:
 	case GDIVisualScriptCustomNode::COMBINATION:
 	case GDIVisualScriptCustomNode::INIT:
+	case GDIVisualScriptCustomNode::INIT_PARTIAL:
 		return true;
 	default:
 		return false;
@@ -156,6 +156,9 @@ int GDIVisualScriptCustomNode::get_input_value_port_count() const {
 	else if (custom_mode == INIT) {
 		return 0;
 	}
+	else if (custom_mode == INIT_PARTIAL) {
+		return 1;
+	}
 	else {
 		return 0;
 	}
@@ -167,6 +170,9 @@ int GDIVisualScriptCustomNode::get_output_value_port_count() const {
 	}
 	else if (custom_mode == LOOP) {
 		return 0;
+	}
+	else if (custom_mode == TASK_SPLIT) {
+		return 1;
 	}
 	else if (custom_mode == TASK_CONTROL) {
 		return 0;
@@ -333,6 +339,11 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 		ret.name = L"任务";
 		ret.type = Variant::BOOL;
 	}
+	else if (custom_mode == INIT_PARTIAL) {
+
+		ret.name = L"任务拆分实例";
+		ret.type = Variant::OBJECT;
+	}
 // 	else if (custom_mode == MAT_ALBEDO) {
 // 
 // 		switch (p_idx)
@@ -377,6 +388,12 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 
 		ret.name = L"循环";
 		ret.type = Variant::BOOL;
+	}
+	else if (custom_mode == TASK_SPLIT) {
+
+		ret.name = L"实例";
+		ret.type = Variant::OBJECT;
+// 		ret.hint = PROPERTY_HINT_OBJECT_ID;
 	}
 	else if (custom_mode == KEYBOARD) {
 
@@ -462,6 +479,7 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 }
 
 String GDIVisualScriptCustomNode::get_caption() const {
+
 	if (custom_mode == ACTIVE)
 		return L"激活";
 	else if (custom_mode == LOOP)
@@ -482,6 +500,8 @@ String GDIVisualScriptCustomNode::get_caption() const {
 		return L"任务组合";
 	else if (custom_mode == INIT)
 		return L"初始化";
+	else if (custom_mode == INIT_PARTIAL)
+		return L"部分初始化";
 	else
 		return L"未处理类型";
 }
@@ -493,7 +513,7 @@ String GDIVisualScriptCustomNode::get_text() const {
 	else if (custom_mode == LOOP)
 		return L"循环调用";
 	else if (custom_mode == TASK_SPLIT)
-		return String(L"将主任务拆分");
+		return String(L"拆分原有任务线");
 	else if (custom_mode == TASK_CONTROL)
 		return L"可单独屏蔽部分流程";
 	else if (custom_mode == KEYBOARD)
@@ -508,6 +528,8 @@ String GDIVisualScriptCustomNode::get_text() const {
 		return L"所有任务为真后触发";
 	else if (custom_mode == INIT)
 		return L"恢复场景到初始状态";
+	else if (custom_mode == INIT_PARTIAL)
+		return L"恢复场景到子任务分支";
 	else
 		return L"未处理类型";
 }
@@ -528,6 +550,7 @@ GDIVisualScriptCustomNode::CustomMode GDIVisualScriptCustomNode::get_custom_mode
 }
 
 void GDIVisualScriptCustomNode::set_rpc_call_mode(RPCCallMode p_mode) {
+
 	if (rpc_call_mode == p_mode)
 		return;
 	rpc_call_mode = p_mode;
@@ -536,10 +559,12 @@ void GDIVisualScriptCustomNode::set_rpc_call_mode(RPCCallMode p_mode) {
 }
 
 GDIVisualScriptCustomNode::RPCCallMode GDIVisualScriptCustomNode::get_rpc_call_mode() const {
+
 	return rpc_call_mode;
 }
 
 void GDIVisualScriptCustomNode::set_call_mode(CallMode p_mode) {
+
 	if (call_mode == p_mode)
 		return;
 
@@ -549,6 +574,7 @@ void GDIVisualScriptCustomNode::set_call_mode(CallMode p_mode) {
 }
 
 GDIVisualScriptCustomNode::CallMode GDIVisualScriptCustomNode::get_call_mode() const {
+
 	return call_mode;
 }
 
@@ -704,6 +730,7 @@ void GDIVisualScriptCustomNode::area_trigger_exited_signal_callback(Node *area) 
 }
 
 int GDIVisualScriptCustomNode::get_area_trigger_entered_area_num() const {
+
 	return area_trigger_entered_area_vec.size();
 }
 
@@ -808,7 +835,7 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 	}
 
 	// 修改点：必须加入要保存的属性信息，否则这些属性在不同实例（比如从编辑器启动到真实场景后）中无法传导
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "custom_mode", PROPERTY_HINT_ENUM, "active,key,mouse"), "set_custom_mode", "get_custom_mode");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "custom_mode", PROPERTY_HINT_NONE, "active,key,mouse", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_STORAGE), "set_custom_mode", "get_custom_mode");
 // 	ADD_PROPERTY(PropertyInfo(Variant::INT, "call_mode", PROPERTY_HINT_ENUM, "Self,Node Path,Instance,Basic Type,Singleton"), "set_call_mode", "get_call_mode");
 // 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "base_type", PROPERTY_HINT_TYPE_STRING, "Object"), "set_base_type", "get_base_type");
 // 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "base_script", PROPERTY_HINT_FILE, script_ext_hint), "set_base_script", "get_base_script");
@@ -817,8 +844,8 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 // 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_path", PROPERTY_HINT_NODE_PATH_TO_EDITED_NODE), "set_base_path", "get_base_path");
 // 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "argument_cache", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "_set_argument_cache", "_get_argument_cache");
 // 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "function"), "set_function", "get_function"); //when set, if loaded properly, will override argument count.
-	ADD_PROPERTY(PropertyInfo(Variant::INT, L"组合任务数量"), "set_use_default_args", "get_use_default_args");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, L"任务拆分数量"), "set_task_split_num", "get_task_split_num");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, L"(组合)任务数量"), "set_use_default_args", "get_use_default_args");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, L"(任务拆分)数量"), "set_task_split_num", "get_task_split_num");
 // 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "validate"), "set_validate", "get_validate");
 // 	ADD_PROPERTY(PropertyInfo(Variant::INT, "rpc_call_mode", PROPERTY_HINT_ENUM, "Disabled,Reliable,Unreliable,ReliableToID,UnreliableToID"), "set_rpc_call_mode", "get_rpc_call_mode"); //when set, if loaded properly, will override argument count.
 
@@ -1038,6 +1065,7 @@ public:
 		Vector3 dir = center_pos - target_pos;
 		float diff_len = dir.length();
 		dir.normalize();
+		// the 0.1 extents prevents the null area, if no valid mesh under the node
 		Vector3 extents = (max_pos - center_pos) + Vector3(0.1, 0.1, 0.1);
 
 		static bool first_flag = true;
@@ -1190,6 +1218,7 @@ public:
 		}
 		case GDIVisualScriptCustomNode::TASK_SPLIT: {
 
+			*p_outputs[0] = node;
 			static unsigned int cur_execute_index = 0;
 
 			bool execute_last_flag = false;
@@ -1376,7 +1405,7 @@ GDIVisualScriptCustomNode::GDIVisualScriptCustomNode() {
 	use_default_args = 0;
 	base_type = "Object";
 	task_id = 0;
-	task_split_num = 1;
+	task_split_num = 2;
 }
 
 GDIVisualScriptCustomNode::~GDIVisualScriptCustomNode() {

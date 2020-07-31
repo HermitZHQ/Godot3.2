@@ -35,7 +35,10 @@ public:
 		AREA_TIGGER,
 		TIMER,
 		COMBINATION,
-		INIT
+		INIT,
+		INIT_PARTIAL,
+
+		MAX_COUNT
 	};
 
 private:

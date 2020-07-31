@@ -1047,11 +1047,9 @@ void VisualScriptEditor::_update_members() {
 		if (i == GDIVisualScriptCustomNode::CustomMode::ACTIVE ||
 			i == GDIVisualScriptCustomNode::CustomMode::LOOP) {
 			ti->add_button(0, Control::get_icon("Remove", "EditorIcons"), 0);
-			ti->set_text(0, gdi_str_custom_node_list[i] + L"(主任务)");
 		}
-		else {
-			ti->set_text(0, gdi_str_custom_node_list[i]);
-		}
+
+		ti->set_text(0, gdi_str_custom_node_list[i]);
 		ti->set_selectable(0, true);
 		ti->set_editable(0, true);
 		ti->set_metadata(0, gdi_str_custom_node_list[i]);
@@ -2478,6 +2476,9 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::INIT]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::INIT);
 		}
+		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::INIT_PARTIAL]) {
+			vnode->set_custom_mode(GDIVisualScriptCustomNode::INIT_PARTIAL);
+		}
 
 		if (!already_create_function_node_flag) {
 			int new_id = script->get_available_id();
@@ -2497,10 +2498,10 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 				graph->set_selected(node);
 				_node_selected(node);
 			}
-			GraphNode *gn = Object::cast_to<GraphNode>(node);
-			if (gn) {
+// 			GraphNode *gn = Object::cast_to<GraphNode>(node);
+// 			if (gn) {
 // 				gn->set_show_close_button(true);
-			}
+// 			}
 		}
 	}
 }
