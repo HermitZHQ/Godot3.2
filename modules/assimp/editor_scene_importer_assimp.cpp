@@ -1004,9 +1004,12 @@ EditorSceneImporterAssimp::_generate_mesh_from_surface_indices(ImportState &stat
 	//
 	// Process Vertex Weights
 	//
+	// 修改点：记录多surface的组合name
+	String multi_surf_name;
 	for (int i = 0; i < p_surface_indices.size(); i++) {
 		const unsigned int mesh_idx = p_surface_indices[i];
 		const aiMesh *ai_mesh = state.assimp_scene->mMeshes[mesh_idx];
+		multi_surf_name += ai_mesh->mName.data;
 
 		Map<uint32_t, Vector<BoneInfo> > vertex_weights;
 
@@ -1439,6 +1442,8 @@ EditorSceneImporterAssimp::_generate_mesh_from_surface_indices(ImportState &stat
 		mesh->surface_set_name(i, AssimpUtils::get_assimp_string(ai_mesh->mName));
 	}
 
+	// 修改点：必须设置mesh的resource name，否则无法正常reimport
+	mesh->set_name(multi_surf_name);
 	return mesh;
 }
 
