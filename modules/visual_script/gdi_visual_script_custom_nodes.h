@@ -3,6 +3,8 @@
 
 #include "visual_script.h"
 
+class Spatial;
+class Transfrom;
 class GDIVisualScriptCustomNode : public VisualScriptNode {
 
 	GDCLASS(GDIVisualScriptCustomNode, VisualScriptNode);
@@ -121,12 +123,18 @@ public:
 	void area_trigger_entered_signal_callback(Node *area);
 	void area_trigger_exited_signal_callback(Node *area);
 	int get_area_trigger_entered_area_num() const;
+	bool check_node_in_entered_areas(Node *node);
 
 	void set_task_id(unsigned int id);
 	unsigned int get_task_id() const;
 
 	void set_task_split_num(unsigned int num);
 	unsigned int get_task_split_num() const;
+
+	void set_sub_task_index_and_objs_state(unsigned int index, Map<Spatial*, Transform> &state_map);
+	void set_sub_task_cur_index(unsigned int index);
+	unsigned int get_sub_task_cur_index() const;
+	void restore_sub_task_state(unsigned int index);
 
 	virtual VisualScriptNodeInstance *instance(VisualScriptInstance *p_instance);
 
@@ -138,7 +146,11 @@ public:
 private:
 	Vector<Node*> area_trigger_entered_area_vec;
 	unsigned int task_id;
+
 	unsigned int task_split_num;
+	unsigned int sub_task_cur_index;
+	Map<unsigned int, Map<Spatial*, Transform>> sub_tasks_objs_state_map;
+
 	static unsigned int global_task_id;
 };
 

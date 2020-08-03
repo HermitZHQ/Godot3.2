@@ -26,13 +26,14 @@ int GDIVisualScriptCustomNode::get_output_sequence_port_count() const {
 	case GDIVisualScriptCustomNode::ACTIVE:
 	case GDIVisualScriptCustomNode::LOOP:
 	case GDIVisualScriptCustomNode::TASK_CONTROL:
-	case GDIVisualScriptCustomNode::KEYBOARD:
-	case GDIVisualScriptCustomNode::MOUSE:
 		return 1;
+	case GDIVisualScriptCustomNode::KEYBOARD:
 	case GDIVisualScriptCustomNode::AREA_TIGGER:
 	case GDIVisualScriptCustomNode::TIMER:
 	case GDIVisualScriptCustomNode::COMBINATION:
 		return 2;
+	case GDIVisualScriptCustomNode::MOUSE:
+		return 3;
 	case GDIVisualScriptCustomNode::TASK_SPLIT:
 		return task_split_num;
 	case GDIVisualScriptCustomNode::INIT:
@@ -157,7 +158,7 @@ int GDIVisualScriptCustomNode::get_input_value_port_count() const {
 		return 0;
 	}
 	else if (custom_mode == INIT_PARTIAL) {
-		return 1;
+		return 2;
 	}
 	else {
 		return 0;
@@ -207,8 +208,37 @@ String GDIVisualScriptCustomNode::get_output_sequence_port_text(int p_port) cons
 	case GDIVisualScriptCustomNode::ACTIVE:
 	case GDIVisualScriptCustomNode::LOOP:
 	case GDIVisualScriptCustomNode::TASK_CONTROL:
-	case GDIVisualScriptCustomNode::KEYBOARD:
-	case GDIVisualScriptCustomNode::MOUSE:
+	case GDIVisualScriptCustomNode::KEYBOARD: {
+		switch (p_port)
+		{
+		case 0: {
+			return L"按下时";
+		}
+		case 1: {
+			return L"释放时";
+		}
+		default:
+			return String();
+		}
+		break;
+	}
+	case GDIVisualScriptCustomNode::MOUSE: {
+		switch (p_port)
+		{
+		case 0: {
+			return L"左键按下时";
+		}
+		case 1: {
+			return L"右键按下时";
+		}
+		case 2: {
+			return L"双击时";
+		}
+		default:
+			return String();
+		}
+		break;
+	}
 	case GDIVisualScriptCustomNode::INIT:
 		return String();
 	case GDIVisualScriptCustomNode::AREA_TIGGER:
@@ -340,9 +370,28 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 		ret.type = Variant::BOOL;
 	}
 	else if (custom_mode == INIT_PARTIAL) {
+	
+		switch (p_idx)
+		{
+		case 0: {
 
-		ret.name = L"任务拆分实例";
-		ret.type = Variant::OBJECT;
+			ret.name = L"任务拆分实例";
+			ret.type = Variant::OBJECT;
+			break;
+		}
+		case 1: {
+
+			ret.name = L"分支任务索引";
+			ret.type = Variant::INT;
+			break;
+		}
+		default: {
+
+			ret.name = L"未处理类型";
+			ret.type = Variant::NIL;
+			break;
+		}
+		}
 	}
 // 	else if (custom_mode == MAT_ALBEDO) {
 // 
@@ -734,6 +783,21 @@ int GDIVisualScriptCustomNode::get_area_trigger_entered_area_num() const {
 	return area_trigger_entered_area_vec.size();
 }
 
+bool GDIVisualScriptCustomNode::check_node_in_entered_areas(Node *node) {
+
+	Node *parent = nullptr;
+	auto size = area_trigger_entered_area_vec.size();
+	for (int i = 0; i < size; ++i) {
+		parent = area_trigger_entered_area_vec[i]->get_parent();
+		if (area_trigger_entered_area_vec[i] == node ||
+			parent == node) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void GDIVisualScriptCustomNode::set_task_id(unsigned int id) {
 
 	task_id = id;
@@ -753,6 +817,37 @@ void GDIVisualScriptCustomNode::set_task_split_num(unsigned int num) {
 unsigned int GDIVisualScriptCustomNode::get_task_split_num() const {
 
 	return task_split_num;
+}
+
+void GDIVisualScriptCustomNode::set_sub_task_index_and_objs_state(unsigned int index, Map<Spatial*, Transform> &state_map) {
+
+	auto e = sub_tasks_objs_state_map.find(index);
+	if (nullptr == e) {
+		sub_tasks_objs_state_map.insert(index, state_map);
+	}
+}
+
+void GDIVisualScriptCustomNode::set_sub_task_cur_index(unsigned int index) {
+
+	sub_task_cur_index = index;
+}
+
+unsigned int GDIVisualScriptCustomNode::get_sub_task_cur_index() const {
+
+	return sub_task_cur_index;
+}
+
+void GDIVisualScriptCustomNode::restore_sub_task_state(unsigned int index) {
+
+// 	printf("try restore sub task index[%d], addr[%x]\n", index, this);
+	auto e = sub_tasks_objs_state_map.find(index);
+	if (nullptr != e) {
+// 		printf("restore sub task index[%d], addr[%x]\n", index, this);
+		auto objs_state = e->value();
+		for (auto obj = objs_state.front(); obj; obj = obj->next()) {
+			obj->key()->set_global_transform(obj->value());
+		}
+	}
 }
 
 void GDIVisualScriptCustomNode::_set_argument_cache(const Dictionary &p_cache) {
@@ -875,9 +970,21 @@ public:
 	GDIVisualScriptCustomNode *node;
 	VisualScriptInstance *instance;
 
+	// timer relevant----
+	uint64_t start_time = 0;
+	bool reach_target_time_flag = false;
+
+	// multi task split relevant----
+	unsigned int task_split_cur_execute_index = 0;
+	Map<unsigned int, Map<Spatial*, Transform>> sub_task_objs_state_map;
+
+	// task flow control relevant----
 	bool task_ctrl_already_execute_once_flag = false;
 
-	// record singleton to increase the invoke efficiency
+	// area trigger relevant----
+	bool first_create_manual_area_flag = false;
+
+	// record singleton to increase the invoke efficiency----
 	_OS *_os = nullptr;
 	OS *os = nullptr;
 	Input *input = nullptr;
@@ -892,7 +999,105 @@ public:
 	//virtual bool is_output_port_unsequenced(int p_idx) const { return false; }
 	//virtual bool get_output_port_unsequenced(int p_idx,Variant* r_value,Variant* p_working_mem,String &r_error) const { return true; }
 
-	void mouse_handle_func(const Variant **p_inputs, Variant **p_outputs) {
+	int multi_task_split_func(const Variant **p_inputs, Variant **p_outputs, Variant::CallError &r_error, String &r_error_str) {
+
+		// record the objs state
+		auto e = sub_task_objs_state_map.find(task_split_cur_execute_index);
+		if (nullptr == e) {
+			Object *object = instance->get_owner_ptr();
+			Node *node = Object::cast_to<Node>(object);
+			if (nullptr == node) {
+				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+				r_error_str = "[GDI]multi task, can't get node";
+				return 0;
+			}
+
+			Node *root = node->get_tree()->get_current_scene();
+			if (nullptr == root) {
+				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+				r_error_str = "[GDI]multi task, can't get root";
+				return 0;
+			}
+
+// 			os->print("--------start collect sub task init info\n");
+			Map<Spatial*, Transform> spatial_trans_map;
+			collect_init_info(root, spatial_trans_map);
+			sub_task_objs_state_map.insert(task_split_cur_execute_index, spatial_trans_map);
+
+			// store the info to node
+			GDIVisualScriptCustomNode *custom_node = Object::cast_to<GDIVisualScriptCustomNode>(this->node);
+			if (nullptr != custom_node) {
+// 				os->print("set sub task index and objs state, index[%d] addr[%x]\n", task_split_cur_execute_index, custom_node);
+				custom_node->set_sub_task_index_and_objs_state(task_split_cur_execute_index, spatial_trans_map);
+			}
+		}
+
+		*p_outputs[0] = node;
+
+		bool execute_last_flag = false;
+		if (task_split_cur_execute_index == node->get_task_split_num() - 1) {
+			execute_last_flag = true;
+		}
+		unsigned int tmp_index = task_split_cur_execute_index++;
+		if (task_split_cur_execute_index == node->get_task_split_num()) {
+			task_split_cur_execute_index = 0;
+		}
+
+		return execute_last_flag ? tmp_index : (tmp_index | STEP_FLAG_PUSH_STACK_BIT);
+	}
+
+	int task_flow_control_func(const Variant **p_inputs, Variant **p_outputs, Variant* p_working_mem) {
+		
+		bool active_flag = *p_inputs[0];
+		bool only_execute_once_flag = *p_inputs[1];
+
+		if (!active_flag) {
+			if (nullptr != p_working_mem) {
+				p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
+			}
+			return STEP_EXIT_FUNCTION_BIT;
+			//return 0 | STEP_FLAG_PUSH_STACK_BIT;
+		}
+		else {
+			if (only_execute_once_flag && !task_ctrl_already_execute_once_flag) {
+				task_ctrl_already_execute_once_flag = true;
+				return 0;
+			}
+			else if (only_execute_once_flag && task_ctrl_already_execute_once_flag) {
+				if (nullptr != p_working_mem) {
+					p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
+				}
+				return STEP_EXIT_FUNCTION_BIT;
+			}
+			else {
+				return 0;
+			}
+		}
+	}
+
+	int keyboard_handle_func(const Variant **p_inputs, Variant **p_outputs, Variant::CallError &r_error, String &r_error_str) {
+
+		String key = *p_inputs[0];
+		if (key.length() != 1) {
+			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+			r_error_str = "[GDI]keyboard, key string length not 1";
+			return 0;
+		}
+
+		auto sc = _os->find_scancode_from_string(key);
+		auto pressedFlag = input->is_key_pressed(sc);
+
+		*p_outputs[0] = pressedFlag;
+		*p_outputs[1] = !pressedFlag;
+
+		return pressedFlag ? 0 : 1;
+	}
+
+	int mouse_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode) {
+
+		if (START_MODE_CONTINUE_SEQUENCE == p_start_mode) {
+			return 1;
+		}
 
 		static Point2 mouse_point;
 		auto left_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_LEFT);
@@ -900,8 +1105,6 @@ public:
 		*p_outputs[0] = left_button_pressed_flag;
 		*p_outputs[1] = right_button_pressed_flag;
 		*p_outputs[2] = false;
-
-// 		os->print("test output[%d], [%d], [%d]\n", b1, b2,*p_outputs[2]);
 
 		static uint64_t time = 0;
 		static bool first_click_pressed_flag = false;
@@ -932,7 +1135,7 @@ public:
 		else if (second_click_pressed_flag && !left_button_pressed_flag) {
 
 			auto diff_time = os->get_system_time_msecs() - time;
-			// 				os->print("enter second click, diff time[%d]\n", diff_time);
+// 			os->print("enter second click, diff time[%d]\n", diff_time);
 			if (diff_time < double_click_interval && mouse_point == os->get_mouse_position()) {
 				*p_outputs[2] = true;
 			}
@@ -941,6 +1144,21 @@ public:
 			second_click_pressed_flag = false;
 			first_click_pressed_flag = false;
 			first_click_released_flag = false;
+		}
+
+		if ((bool)*p_outputs[2]) {
+			return 2;
+		}
+		else {
+			if (left_button_pressed_flag && !right_button_pressed_flag) {
+				return 0;
+			}
+			else if (right_button_pressed_flag && !left_button_pressed_flag) {
+				return 1;
+			}
+			else if (left_button_pressed_flag && right_button_pressed_flag) {
+				return 0 | STEP_FLAG_PUSH_STACK_BIT;
+			}
 		}
 	}
 
@@ -1057,21 +1275,20 @@ public:
 			}
 		}
 
-		// check child mesh and area situation
-		check_child_mesh_area_func(target, dirty_flag, has_area_flag, min_pos, max_pos);
-
-		Vector3 target_pos = target->get_global_transform().origin;
-		Vector3 center_pos = (max_pos + min_pos) / 2.0;
-		Vector3 dir = center_pos - target_pos;
-		float diff_len = dir.length();
-		dir.normalize();
-		// the 0.1 extents prevents the null area, if no valid mesh under the node
-		Vector3 extents = (max_pos - center_pos) + Vector3(0.1, 0.1, 0.1);
-
-		static bool first_flag = true;
-		if (first_flag) {
+		if (!first_create_manual_area_flag) {
 			// add the Area node with collision shape dynamicly
 			if (!has_area_flag) {
+				// check child mesh and area situation
+				check_child_mesh_area_func(target, dirty_flag, has_area_flag, min_pos, max_pos);
+
+				Vector3 target_pos = target->get_global_transform().origin;
+				Vector3 center_pos = (max_pos + min_pos) / 2.0;
+				Vector3 dir = center_pos - target_pos;
+				float diff_len = dir.length();
+				dir.normalize();
+				// the 0.1 extents prevents the null area, if no valid mesh under the node
+				Vector3 extents = (max_pos - center_pos) + Vector3(0.1, 0.1, 0.1);
+
 				Area *new_area = memnew(Area);
 				CollisionShape *cs = memnew(CollisionShape);
 				BoxShape *bs = memnew(BoxShape);
@@ -1095,10 +1312,12 @@ public:
 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
 				r_error_str = "[GDI]area trigger, connect signal failed";
 			}
-			first_flag = false;
+
+			first_create_manual_area_flag = true;
 		}
 
-		bool area_entered_flag = this->node->get_area_trigger_entered_area_num() > 0 ? true : false;
+// 		bool area_entered_flag = this->node->get_area_trigger_entered_area_num() > 0 ? true : false;
+		bool area_entered_flag = this->node->check_node_in_entered_areas(target);
 		*p_outputs[0] = area_entered_flag;
 
 		return (area_entered_flag ? 0 : 1);
@@ -1106,15 +1325,16 @@ public:
 
 	int timer_handle_func(const Variant **p_inputs, Variant **p_outputs) {
 
-// 		static int hour = *p_inputs[0];
-		static int minute = *p_inputs[0];
-		static int sec = *p_inputs[1];
-		static int msec = *p_inputs[2];
+		int minute = *p_inputs[0];
+		int sec = *p_inputs[1];
+		int msec = *p_inputs[2];
 
-		static uint64_t start_time = os->get_system_time_msecs();
+		if (0 == start_time) {
+			start_time = os->get_system_time_msecs();
+		}
 
-		bool reach_target_time_flag =
-			(os->get_system_time_msecs() - start_time > (msec + sec * 1000 + minute * 1000 * 60)) ? true : false;
+		reach_target_time_flag = 
+			(os->get_system_time_msecs() - start_time >= (msec + sec * 1000 + minute * 1000 * 60)) ? true : false;
 
 		*p_outputs[0] = reach_target_time_flag;
 		if (reach_target_time_flag) {
@@ -1152,7 +1372,7 @@ public:
 		Spatial *spa = Object::cast_to<Spatial>(node);
 		if (nullptr != spa) {
 			objs_init_trans_map.insert(spa, spa->get_global_transform());
-			os->print("[GDI]insert init trans info, node name[%S], addr[%X]\n", String(spa->get_name()), spa);
+// 			os->print("[GDI]insert init trans info, node name[%S], addr[%X]\n", String(spa->get_name()), spa);
 		}
 
 		int child_num = node->get_child_count();
@@ -1166,7 +1386,7 @@ public:
 				spa = Object::cast_to<Spatial>(child);
 				if (nullptr != spa) {
 					objs_init_trans_map.insert(spa, spa->get_global_transform());
-					os->print("[GDI]insert init trans info, node name[%S], addr[%X]\n", String(spa->get_name()), spa);
+// 					os->print("[GDI]insert init trans info, node name[%S], addr[%X]\n", String(spa->get_name()), spa);
 				}
 			}
 		}
@@ -1174,17 +1394,10 @@ public:
 
 	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
 
-// 		if (p_start_mode == VisualScriptCustomNode::START_MODE_BEGIN_SEQUENCE) {
-// 			os->print("Test begin sequence....\n");
-// 		}
-// 		else {
-// 			os->print("other start mode[%d]\n", p_start_mode);
-// 		}
-
-		// initialize relevant
+		// initialize relevant objs only once
 		static bool init_objs_info_flag = false;
 		static Map<Spatial*, Transform> objs_init_trans_map;
-		if (!init_objs_info_flag) {
+		if (!init_objs_info_flag || objs_init_trans_map.size() == 0) {
 			Object *object = instance->get_owner_ptr();
 			Node *node = Object::cast_to<Node>(object);
 			if (nullptr == node) {
@@ -1218,69 +1431,23 @@ public:
 		}
 		case GDIVisualScriptCustomNode::TASK_SPLIT: {
 
-			*p_outputs[0] = node;
-			static unsigned int cur_execute_index = 0;
-
-			bool execute_last_flag = false;
-			if (cur_execute_index == node->get_task_split_num() - 1) {
-				execute_last_flag = true;
-			}
-			unsigned int tmp_index = cur_execute_index++;
-			if (cur_execute_index == node->get_task_split_num()) {
-				cur_execute_index = 0;
-			}
-
-			return execute_last_flag ? tmp_index : (tmp_index | STEP_FLAG_PUSH_STACK_BIT);
+			int ret = multi_task_split_func(p_inputs, p_outputs, r_error, r_error_str);
+			return ret;
 		}
 		case GDIVisualScriptCustomNode::TASK_CONTROL: {
 
-			bool active_flag = *p_inputs[0];
-			bool only_execute_once_flag = *p_inputs[1];
-
-			if (!active_flag) {
-				if (nullptr != p_working_mem) {
-					p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
-				}
-				return STEP_EXIT_FUNCTION_BIT;
-// 				return 0 | STEP_FLAG_PUSH_STACK_BIT;
-			}
-			else {
-				if (only_execute_once_flag && !task_ctrl_already_execute_once_flag) {
-					task_ctrl_already_execute_once_flag = true;
-					return 0;
-				}
-				else if (only_execute_once_flag && task_ctrl_already_execute_once_flag) {
-					if (nullptr != p_working_mem) {
-						p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
-					}
-					return STEP_EXIT_FUNCTION_BIT;
-				}
-				else {
-					return 0;
-				}
-			}
+			int ret = task_flow_control_func(p_inputs, p_outputs, p_working_mem);
+			return ret;
 		}
 		case GDIVisualScriptCustomNode::KEYBOARD: {
 
-			String key = *p_inputs[0];
-			if (key.length() != 1) {
-				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-				r_error_str = "[GDI]keyboard, key string length not 1";
-				return 0;
-			}
-
-			auto sc = _os->find_scancode_from_string(key);
-			auto pressedFlag = input->is_key_pressed(sc);
-
-			*p_outputs[0] = pressedFlag;
-			*p_outputs[1] = !pressedFlag;
-
-			return 0;
+			int ret = keyboard_handle_func(p_inputs, p_outputs, r_error, r_error_str);
+			return ret;
 		}
 		case GDIVisualScriptCustomNode::MOUSE: {
 
-			mouse_handle_func(p_inputs, p_outputs);
-			break;
+			int ret = mouse_handle_func(p_inputs, p_outputs, p_start_mode);
+			return ret;
 		}
 		case GDIVisualScriptCustomNode::AREA_TIGGER: {
 
@@ -1304,6 +1471,21 @@ public:
 			}
 			break;
 		}
+		case GDIVisualScriptCustomNode::INIT_PARTIAL: {
+
+			GDIVisualScriptCustomNode *customNode = Object::cast_to<GDIVisualScriptCustomNode>(*p_inputs[0]);
+			if (nullptr == customNode) {
+				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+				r_error_str = "[GDI]init partial failed, can't convert node to custom node";
+				return 0;
+			}
+
+			unsigned int index = *p_inputs[1];
+			customNode->restore_sub_task_state(index);
+
+			break;
+		}
+
 		// 先保留下，很有可能后面又会加入这种简化版的节点
 // 		case GDIVisualScriptCustomNode::MAT_ALBEDO: {
 // 			Object *object = instance->get_owner_ptr();
@@ -1380,7 +1562,6 @@ VisualScriptNodeInstance *GDIVisualScriptCustomNode::instance(VisualScriptInstan
 	instance->singleton = singleton;
 	instance->function = function;
 	instance->custom_mode = get_custom_mode();
-// 	OS::get_singleton()->print("custom mode:[%d], this[%x]\n", instance->custom_mode, this);
 	instance->returns = get_output_value_port_count();
 	instance->node_path = base_path;
 	instance->input_args = get_input_value_port_count();
@@ -1406,6 +1587,7 @@ GDIVisualScriptCustomNode::GDIVisualScriptCustomNode() {
 	base_type = "Object";
 	task_id = 0;
 	task_split_num = 2;
+	sub_task_cur_index = 0;
 }
 
 GDIVisualScriptCustomNode::~GDIVisualScriptCustomNode() {
