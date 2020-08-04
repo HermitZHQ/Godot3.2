@@ -819,12 +819,9 @@ unsigned int GDIVisualScriptCustomNode::get_task_split_num() const {
 	return task_split_num;
 }
 
-void GDIVisualScriptCustomNode::set_sub_task_index_and_objs_state(unsigned int index, Map<Spatial*, Transform> &state_map) {
+void GDIVisualScriptCustomNode::add_sub_task_index_and_objs_state(Vector<GDIVisualScriptCustomNode::RestoreInfo> &state_vec) {
 
-	auto e = sub_tasks_objs_state_map.find(index);
-	if (nullptr == e) {
-		sub_tasks_objs_state_map.insert(index, state_map);
-	}
+	sub_tasks_objs_state_vec.push_back(state_vec);
 }
 
 void GDIVisualScriptCustomNode::set_sub_task_cur_index(unsigned int index) {
@@ -839,13 +836,25 @@ unsigned int GDIVisualScriptCustomNode::get_sub_task_cur_index() const {
 
 void GDIVisualScriptCustomNode::restore_sub_task_state(unsigned int index) {
 
-// 	printf("try restore sub task index[%d], addr[%x]\n", index, this);
-	auto e = sub_tasks_objs_state_map.find(index);
-	if (nullptr != e) {
+	if (sub_tasks_objs_state_vec.size() - 1 >= index) {
 // 		printf("restore sub task index[%d], addr[%x]\n", index, this);
-		auto objs_state = e->value();
-		for (auto obj = objs_state.front(); obj; obj = obj->next()) {
-			obj->key()->set_global_transform(obj->value());
+		auto objs_state = sub_tasks_objs_state_vec[index];
+		auto size = objs_state.size();
+		for (int i = 0; i < size; ++i) {
+// 			if (String(obj->key()->get_name()) == String("Spatial")) {
+// 				auto t = obj->key()->get_global_transform();
+// 				printf("--rest1 transform:\n x1:%f, y1:%f, z1:%f\n x2:%f, y2:%f, z2:%f\n x3:%f, y3:%f, z3:%f\n", t.basis[0].x, t.basis[0].y, t.basis[0].z, t.basis[1].x, t.basis[1].y, t.basis[1].z, t.basis[2].x, t.basis[2].y, t.basis[2].z);
+// 			}
+
+			auto restInfo = objs_state[i];
+			Spatial *spa = Object::cast_to<Spatial>(restInfo.node);
+			if (nullptr != spa) {
+				// must get transform once here, or the update will incorrect
+				spa->get_transform();
+
+				spa->set_global_transform(restInfo.trans);
+// 				spa->force_update_transform();
+			}
 		}
 	}
 }
@@ -976,7 +985,7 @@ public:
 
 	// multi task split relevant----
 	unsigned int task_split_cur_execute_index = 0;
-	Map<unsigned int, Map<Spatial*, Transform>> sub_task_objs_state_map;
+	Vector<Vector<GDIVisualScriptCustomNode::RestoreInfo>> sub_task_objs_state_vec;
 
 	// task flow control relevant----
 	bool task_ctrl_already_execute_once_flag = false;
@@ -1002,8 +1011,7 @@ public:
 	int multi_task_split_func(const Variant **p_inputs, Variant **p_outputs, Variant::CallError &r_error, String &r_error_str) {
 
 		// record the objs state
-		auto e = sub_task_objs_state_map.find(task_split_cur_execute_index);
-		if (nullptr == e) {
+		if (sub_task_objs_state_vec.size() < node->get_task_split_num()) {
 			Object *object = instance->get_owner_ptr();
 			Node *node = Object::cast_to<Node>(object);
 			if (nullptr == node) {
@@ -1019,16 +1027,16 @@ public:
 				return 0;
 			}
 
-// 			os->print("--------start collect sub task init info\n");
-			Map<Spatial*, Transform> spatial_trans_map;
-			collect_init_info(root, spatial_trans_map);
-			sub_task_objs_state_map.insert(task_split_cur_execute_index, spatial_trans_map);
+			os->print("--------start collect sub task init info, task index[%d]\n", task_split_cur_execute_index);
+			Vector<GDIVisualScriptCustomNode::RestoreInfo> spatial_trans_vec;
+			collect_init_info(root, spatial_trans_vec);
+			sub_task_objs_state_vec.push_back(spatial_trans_vec);
 
 			// store the info to node
 			GDIVisualScriptCustomNode *custom_node = Object::cast_to<GDIVisualScriptCustomNode>(this->node);
 			if (nullptr != custom_node) {
 // 				os->print("set sub task index and objs state, index[%d] addr[%x]\n", task_split_cur_execute_index, custom_node);
-				custom_node->set_sub_task_index_and_objs_state(task_split_cur_execute_index, spatial_trans_map);
+				custom_node->add_sub_task_index_and_objs_state(spatial_trans_vec);
 			}
 		}
 
@@ -1367,12 +1375,17 @@ public:
 		}
 	}
 
-	void collect_init_info(Node *node, Map<Spatial*, Transform> &objs_init_trans_map) {
+	void collect_init_info(Node *node, Vector<GDIVisualScriptCustomNode::RestoreInfo> &objs_init_trans_vec) {
 
 		Spatial *spa = Object::cast_to<Spatial>(node);
 		if (nullptr != spa) {
-			objs_init_trans_map.insert(spa, spa->get_global_transform());
-// 			os->print("[GDI]insert init trans info, node name[%S], addr[%X]\n", String(spa->get_name()), spa);
+			objs_init_trans_vec.push_back(GDIVisualScriptCustomNode::RestoreInfo(spa, spa->get_global_transform()));
+ 			os->print("[GDI]insert init trans info, node name[%S], addr[%X]\n", String(spa->get_name()), spa);
+
+// 			if (String(spa->get_name()) == String("Spatial")) {
+// 				auto t = spa->get_global_transform();
+// 				os->print("transform:\n x1:%f, y1:%f, z1:%f\n x2:%f, y2:%f, z2:%f\n x3:%f, y3:%f, z3:%f\n", t.basis[0].x, t.basis[0].y, t.basis[0].z, t.basis[1].x, t.basis[1].y, t.basis[1].z, t.basis[2].x, t.basis[2].y, t.basis[2].z);
+// 			}
 		}
 
 		int child_num = node->get_child_count();
@@ -1380,13 +1393,18 @@ public:
 			Node *child = node->get_child(i);
 			int child_child_num = child->get_child_count();
 			if (child_child_num > 0) {
-				collect_init_info(child, objs_init_trans_map);
+				collect_init_info(child, objs_init_trans_vec);
 			}
 			else {
 				spa = Object::cast_to<Spatial>(child);
 				if (nullptr != spa) {
-					objs_init_trans_map.insert(spa, spa->get_global_transform());
-// 					os->print("[GDI]insert init trans info, node name[%S], addr[%X]\n", String(spa->get_name()), spa);
+					objs_init_trans_vec.push_back(GDIVisualScriptCustomNode::RestoreInfo(spa, spa->get_global_transform()));
+					os->print("[GDI]insert init trans info, node name[%S], addr[%X]\n", String(spa->get_name()), spa);
+
+// 					if (String(spa->get_name()) == String("Spatial")) {
+// 						auto t = spa->get_global_transform();
+// 						os->print("transform:\n x1:%f, y1:%f, z1:%f\n x2:%f, y2:%f, z2:%f\n x3:%f, y3:%f, z3:%f\n", t.basis[0].x, t.basis[0].y, t.basis[0].z, t.basis[1].x, t.basis[1].y, t.basis[1].z, t.basis[2].x, t.basis[2].y, t.basis[2].z);
+// 					}
 				}
 			}
 		}
@@ -1396,8 +1414,8 @@ public:
 
 		// initialize relevant objs only once
 		static bool init_objs_info_flag = false;
-		static Map<Spatial*, Transform> objs_init_trans_map;
-		if (!init_objs_info_flag || objs_init_trans_map.size() == 0) {
+		static Vector<GDIVisualScriptCustomNode::RestoreInfo> objs_init_trans_vec;
+		if (!init_objs_info_flag || objs_init_trans_vec.size() == 0) {
 			Object *object = instance->get_owner_ptr();
 			Node *node = Object::cast_to<Node>(object);
 			if (nullptr == node) {
@@ -1414,7 +1432,7 @@ public:
 			}
 
 			os->print("start collect init info, addr[%x]\n", this);
-			collect_init_info(root, objs_init_trans_map);
+			collect_init_info(root, objs_init_trans_vec);
 			os->print("end collect init info\n");
 			init_objs_info_flag = true;
 		}
@@ -1466,8 +1484,13 @@ public:
 		}
 		case GDIVisualScriptCustomNode::INIT: {
 
-			for (auto e = objs_init_trans_map.front(); e; e = e->next()) {
-				e->key()->set_global_transform(e->value());
+			auto size = objs_init_trans_vec.size();
+			for (int i = 0; i < size; ++i) {
+				auto restInfo = objs_init_trans_vec[i];
+				Spatial *spa = Object::cast_to<Spatial>(restInfo.node);
+				if (nullptr != spa) {
+					spa->set_global_transform(restInfo.trans);
+				}
 			}
 			break;
 		}

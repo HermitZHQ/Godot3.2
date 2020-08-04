@@ -43,6 +43,20 @@ public:
 		MAX_COUNT
 	};
 
+	struct RestoreInfo
+	{
+		Node *node;
+		Transform trans;
+
+		RestoreInfo()
+			:node(nullptr)
+		{}
+
+		RestoreInfo(Node *n, const Transform &t)
+			:node(n), trans(t)
+		{}
+	};
+
 private:
 	CustomMode custom_mode;
 	CallMode call_mode;
@@ -131,7 +145,7 @@ public:
 	void set_task_split_num(unsigned int num);
 	unsigned int get_task_split_num() const;
 
-	void set_sub_task_index_and_objs_state(unsigned int index, Map<Spatial*, Transform> &state_map);
+	void add_sub_task_index_and_objs_state(Vector<RestoreInfo> &state_vec);
 	void set_sub_task_cur_index(unsigned int index);
 	unsigned int get_sub_task_cur_index() const;
 	void restore_sub_task_state(unsigned int index);
@@ -149,7 +163,7 @@ private:
 
 	unsigned int task_split_num;
 	unsigned int sub_task_cur_index;
-	Map<unsigned int, Map<Spatial*, Transform>> sub_tasks_objs_state_map;
+	Vector<Vector<RestoreInfo>> sub_tasks_objs_state_vec;
 
 	static unsigned int global_task_id;
 };
