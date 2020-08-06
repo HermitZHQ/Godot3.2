@@ -13,6 +13,7 @@ if True:  # env['builtin_assimp']:
     env_assimp.Prepend(CPPPATH=["#thirdparty/assimp"])
     env_assimp.Prepend(CPPPATH=["#thirdparty/assimp/code"])
     env_assimp.Prepend(CPPPATH=["#thirdparty/assimp/include"])
+    env_assimp.Prepend(CPPPATH=["#thirdparty/assimp/contrib/unzip"])
 
     # env_assimp.Append(CPPDEFINES=['ASSIMP_DOUBLE_PRECISION']) # TODO default to what godot is compiled with for future double support
     env_assimp.Append(CPPDEFINES=["ASSIMP_BUILD_SINGLETHREADED"])
