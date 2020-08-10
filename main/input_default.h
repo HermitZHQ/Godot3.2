@@ -39,6 +39,7 @@ class InputDefault : public Input {
 	_THREAD_SAFE_CLASS_
 
 	int mouse_button_mask;
+	int gdi_mouse_button_mask;
 
 	Set<int> keys_pressed;
 	Set<int> joy_buttons_pressed;
@@ -213,6 +214,8 @@ public:
 	virtual Point2 get_mouse_position() const;
 	virtual Point2 get_last_mouse_speed() const;
 	virtual int get_mouse_button_mask() const;
+	virtual int gdi_get_mouse_button_mask() const;
+	virtual void gdi_reset_mouse_button_mask();
 
 	virtual void warp_mouse_position(const Vector2 &p_to);
 	virtual Point2i warp_mouse_motion(const Ref<InputEventMouseMotion> &p_motion, const Rect2 &p_rect);

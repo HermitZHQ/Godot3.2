@@ -1152,7 +1152,13 @@ public:
 		static Point2 mouse_point_mid;
 		auto left_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_LEFT);
 		auto right_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_RIGHT);
-		auto mid_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_MIDDLE);
+// 		auto mid_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_MIDDLE); // preserve
+
+		if (input->gdi_get_mouse_button_mask() != 0) {
+			input->gdi_reset_mouse_button_mask();
+			return 4;
+		}		
+
 		*p_outputs[0] = left_button_pressed_flag;
 		*p_outputs[1] = right_button_pressed_flag;
 		*p_outputs[2] = os->get_mouse_position();
@@ -1201,14 +1207,14 @@ public:
 		bool double_click_flag = false;
 		left_drag_flag = false;
 
-		//----mid button relevant
-		if (!first_mid_pressed_flag && mid_button_pressed_flag) {
-			first_mid_pressed_flag = true;
-			mouse_point_mid = os->get_mouse_position();
-		}
-		else if (first_mid_pressed_flag && !first_mid_released_flag && !mid_button_pressed_flag) {
-			first_mid_released_flag = true;
-		}
+		//----mid button relevant(preserve)
+// 		if (!first_mid_pressed_flag && mid_button_pressed_flag) {
+// 			first_mid_pressed_flag = true;
+// 			mouse_point_mid = os->get_mouse_position();
+// 		}
+// 		else if (first_mid_pressed_flag && !first_mid_released_flag && !mid_button_pressed_flag) {
+// 			first_mid_released_flag = true;
+// 		}
 
 		//----right button relevant
 		if (!first_right_pressed_flag && right_button_pressed_flag) {
@@ -1285,14 +1291,14 @@ public:
 				return 3;
 			}
 		}
-		// mid click
-		else if (first_mid_pressed_flag && first_mid_released_flag) {
-			first_mid_pressed_flag = false;
-			first_mid_released_flag = false;
-			if (mouse_point_mid == os->get_mouse_position()) {
-				return 4;
-			}
-		}
+		// mid click(preserve)
+// 		else if (first_mid_pressed_flag && first_mid_released_flag) {
+// 			first_mid_pressed_flag = false;
+// 			first_mid_released_flag = false;
+// 			if (mouse_point_mid == os->get_mouse_position()) {
+// 				return 4;
+// 			}
+// 		}
 
 		p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
 		return STEP_EXIT_FUNCTION_BIT;

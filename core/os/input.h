@@ -106,6 +106,9 @@ public:
 	virtual Point2 get_last_mouse_speed() const = 0;
 	virtual int get_mouse_button_mask() const = 0;
 
+	virtual int gdi_get_mouse_button_mask() const = 0;
+	virtual void gdi_reset_mouse_button_mask() = 0;
+
 	virtual void warp_mouse_position(const Vector2 &p_to) = 0;
 	virtual Point2i warp_mouse_motion(const Ref<InputEventMouseMotion> &p_motion, const Rect2 &p_rect) = 0;
 

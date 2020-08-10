@@ -284,6 +284,7 @@ void InputDefault::_parse_input_event_impl(const Ref<InputEvent> &p_event, bool 
 
 		if (mb->is_pressed()) {
 			mouse_button_mask |= (1 << (mb->get_button_index() - 1));
+			gdi_mouse_button_mask |= (1 << (mb->get_button_index() - 1));
 		} else {
 			mouse_button_mask &= ~(1 << (mb->get_button_index() - 1));
 		}
@@ -528,6 +529,14 @@ int InputDefault::get_mouse_button_mask() const {
 	return mouse_button_mask; // do not trust OS implementation, should remove it - OS::get_singleton()->get_mouse_button_state();
 }
 
+int InputDefault::gdi_get_mouse_button_mask() const {
+	return gdi_mouse_button_mask;
+}
+
+void InputDefault::gdi_reset_mouse_button_mask() {
+	gdi_mouse_button_mask = 0;
+}
+
 void InputDefault::warp_mouse_position(const Vector2 &p_to) {
 
 	OS::get_singleton()->warp_mouse_position(p_to);
@@ -703,6 +712,7 @@ InputDefault::InputDefault() {
 
 	use_accumulated_input = true;
 	mouse_button_mask = 0;
+	gdi_mouse_button_mask = 0;
 	emulate_touch_from_mouse = false;
 	emulate_mouse_from_touch = false;
 	mouse_from_touch_index = -1;
