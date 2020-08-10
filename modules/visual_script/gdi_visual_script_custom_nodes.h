@@ -145,6 +145,9 @@ public:
 	void set_task_split_num(unsigned int num);
 	unsigned int get_task_split_num() const;
 
+	void set_mouse_pick_area_path(const NodePath &path);
+	NodePath get_mouse_pick_area_path() const;
+
 	void add_sub_task_index_and_objs_state(Vector<RestoreInfo> &state_vec);
 	void set_sub_task_cur_index(unsigned int index);
 	unsigned int get_sub_task_cur_index() const;
@@ -164,6 +167,8 @@ private:
 	unsigned int task_split_num;
 	unsigned int sub_task_cur_index;
 	Vector<Vector<RestoreInfo>> sub_tasks_objs_state_vec;
+
+	NodePath mouse_pick_area_path;
 
 	static unsigned int global_task_id;
 };

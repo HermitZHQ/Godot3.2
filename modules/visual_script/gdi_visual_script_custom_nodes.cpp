@@ -18,6 +18,7 @@
 //#include "scene/resources/plane_shape.h"
 #include "scene/main/viewport.h"
 #include "scene/3d/camera.h"
+#include "core/node_path.h"
 
 
 int GDIVisualScriptCustomNode::get_output_sequence_port_count() const {
@@ -143,7 +144,7 @@ int GDIVisualScriptCustomNode::get_input_value_port_count() const {
 		return 1;
 	}
 	else if (custom_mode == MOUSE) {
-		return 0;
+		return 1;
 	}
 	else if (custom_mode == AREA_TIGGER) {
 		return 2;
@@ -324,8 +325,8 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 	}
 	else if (custom_mode == MOUSE) {
 
-		ret.name = L"鼠标";
-		ret.type = Variant::NIL;
+		ret.name = L"拣选节点";
+		ret.type = Variant::OBJECT;
 	}
 	else if (custom_mode == AREA_TIGGER) {
 
@@ -842,6 +843,14 @@ unsigned int GDIVisualScriptCustomNode::get_task_split_num() const {
 	return task_split_num;
 }
 
+void GDIVisualScriptCustomNode::set_mouse_pick_area_path(const NodePath &path) {
+	mouse_pick_area_path = path;
+}
+
+NodePath GDIVisualScriptCustomNode::get_mouse_pick_area_path() const {
+	return mouse_pick_area_path;
+}
+
 void GDIVisualScriptCustomNode::add_sub_task_index_and_objs_state(Vector<GDIVisualScriptCustomNode::RestoreInfo> &state_vec) {
 
 	sub_tasks_objs_state_vec.push_back(state_vec);
@@ -904,6 +913,9 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("area_trigger_entered_signal_callback", "area"), &GDIVisualScriptCustomNode::area_trigger_entered_signal_callback);
 	ClassDB::bind_method(D_METHOD("area_trigger_exited_signal_callback", "area"), &GDIVisualScriptCustomNode::area_trigger_exited_signal_callback);
+
+	ClassDB::bind_method(D_METHOD("set_mouse_pick_area_path", "path"), &GDIVisualScriptCustomNode::set_mouse_pick_area_path);
+	ClassDB::bind_method(D_METHOD("get_mouse_pick_area_path"), &GDIVisualScriptCustomNode::get_mouse_pick_area_path);
 
 	ClassDB::bind_method(D_METHOD("set_task_split_num", "num"), &GDIVisualScriptCustomNode::set_task_split_num);
 	ClassDB::bind_method(D_METHOD("get_task_split_num"), &GDIVisualScriptCustomNode::get_task_split_num);
@@ -973,7 +985,7 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 	// 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "function"), "set_function", "get_function"); //when set, if loaded properly, will override argument count.
 	ADD_PROPERTY(PropertyInfo(Variant::INT, L"(组合)任务数量"), "set_use_default_args", "get_use_default_args");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, L"(任务拆分)数量"), "set_task_split_num", "get_task_split_num");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Area"), "", "");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "(鼠标)拣选Area", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Area"), "set_mouse_pick_area_path", "get_mouse_pick_area_path");
 	// 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "validate"), "set_validate", "get_validate");
 	// 	ADD_PROPERTY(PropertyInfo(Variant::INT, "rpc_call_mode", PROPERTY_HINT_ENUM, "Disabled,Reliable,Unreliable,ReliableToID,UnreliableToID"), "set_rpc_call_mode", "get_rpc_call_mode"); //when set, if loaded properly, will override argument count.
 
@@ -1143,7 +1155,7 @@ public:
 
 		if (nullptr == p_working_mem) {
 			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-			r_error_str = "[GDI]keyboard, working mem error";
+			r_error_str = "[GDI]mouse, working mem error";
 			return 0;
 		}
 
@@ -1164,6 +1176,77 @@ public:
 		*p_outputs[2] = os->get_mouse_position();
 		*p_outputs[3] = (Object*)(nullptr);
 
+		// check area path, if null, we will create it manual
+		Node *target = Object::cast_to<Node>((Object*)*p_inputs[0]);
+		auto area_path = this->node->get_mouse_pick_area_path();
+		if (area_path == NodePath() && nullptr != target) {
+			printf("area path is null.....\n");
+			this->node->set_mouse_pick_area_path(String("just/a/test"));
+			// calculate the comb aabb manual
+			int child_num = target->get_child_count();
+			Vector3 min_pos, max_pos;
+			bool dirty_flag = false;
+			bool has_area_flag = false;
+
+			// check self mesh
+			MeshInstance *self_mesh = Object::cast_to<MeshInstance>(target);
+			if (nullptr != self_mesh) {
+				auto aabb = self_mesh->get_transformed_aabb();
+				auto tmp_max_pos = aabb.position + aabb.size;
+				auto tmp_min_pos = aabb.position;
+
+				if (!dirty_flag) {
+					min_pos = tmp_min_pos;
+					max_pos = tmp_max_pos;
+					dirty_flag = true;
+				}
+			}
+
+			// check self area
+			Area *self_area = Object::cast_to<Area>(target);
+			if (nullptr != self_area) {
+				CollisionShape *cs = nullptr;
+				int child_num = self_area->get_child_count();
+				for (int i = 0; i < child_num; ++i) {
+					cs = Object::cast_to<CollisionShape>(self_area->get_child(i));
+					if (nullptr != cs) {
+						has_area_flag = true;
+						break;
+					}
+				}
+			}
+
+			if (!first_create_manual_area_flag) {
+				// add the Area node with collision shape dynamicly
+				if (!has_area_flag) {
+					// check child mesh and area situation
+					check_child_mesh_area_func(target, dirty_flag, has_area_flag, min_pos, max_pos);
+
+// 					Vector3 target_pos = target->get_global_transform().origin;
+// 					Vector3 center_pos = dirty_flag ? ((max_pos + min_pos) / 2.0) : target_pos;
+// 					Vector3 dir = center_pos - target_pos;
+// 					float diff_len = dir.length();
+// 					dir.normalize();
+// 					// the 0.1 extents prevents the null area, if no valid mesh under the node
+// 					Vector3 extents = dirty_flag ? ((max_pos - center_pos) + Vector3(0.1, 0.1, 0.1)) : Vector3(0.1, 0.1, 0.1);
+// 
+// 					Area *new_area = memnew(Area);
+// 					CollisionShape *cs = memnew(CollisionShape);
+// 					BoxShape *bs = memnew(BoxShape);
+// 					bs->set_extents(extents);
+// 
+// 					new_area->add_child(cs);
+// 					target->add_child(new_area);
+// 					cs->set_shape(bs);
+
+// 					if (dirty_flag) {
+// 						new_area->translate(dir * diff_len);
+// 					}
+					//os->print("[GDI]attach the Area node manual, dirty flag[%d], extents[%f][%f][%f]\n", dirty_flag, extents.x, extents.y, extents.z);
+				}
+			}
+		}
+
 		// check ray intersect
 		Object *object = instance->get_owner_ptr();
 		Node *node = Object::cast_to<Node>(object);
@@ -1176,7 +1259,7 @@ public:
 				 auto p1 = root->get_mouse_position();
 				 auto p2 = os->get_mouse_position();
 				 auto from = cam->project_ray_origin(os->get_mouse_position());
-				 auto to = from + cam->project_ray_normal(os->get_mouse_position()) * 1000.0;
+				 auto to = from + cam->project_ray_normal(os->get_mouse_position()) * 10000.0;
 
 				 PhysicsDirectSpaceState::RayResult res;
 				 bool bRes = state->intersect_ray(from, to, res, Set<RID>(), 0xFFFFFFFF, true, true, true);
@@ -1624,17 +1707,17 @@ public:
 			Node *node = Object::cast_to<Node>(object);
 			if (nullptr != node) {
 				node->get_tree()->reload_current_scene();
-				os->print("reload cur scene.......\n");
+// 				os->print("reload cur scene.......\n");
 			}
 
-			// 			auto size = objs_init_trans_vec.size();
-			// 			for (int i = 0; i < size; ++i) {
-			// 				auto restInfo = objs_init_trans_vec[i];
-			// 				Spatial *spa = Object::cast_to<Spatial>(restInfo.node);
-			// 				if (nullptr != spa) {
-			// 					spa->set_global_transform(restInfo.trans);
-			// 				}
-			// 			}
+// 			auto size = objs_init_trans_vec.size();
+// 			for (int i = 0; i < size; ++i) {
+// 				auto restInfo = objs_init_trans_vec[i];
+// 				Spatial *spa = Object::cast_to<Spatial>(restInfo.node);
+// 				if (nullptr != spa) {
+// 					spa->set_global_transform(restInfo.trans);
+// 				}
+// 			}
 			break;
 		}
 		case GDIVisualScriptCustomNode::INIT_PARTIAL: {
@@ -1719,7 +1802,7 @@ public:
 	}
 };
 
-VisualScriptNodeInstance *GDIVisualScriptCustomNode::instance(VisualScriptInstance *p_instance) {
+VisualScriptNodeInstance * GDIVisualScriptCustomNode::instance(VisualScriptInstance *p_instance) {
 
 	GDIVisualScriptNodeInstanceCustom *instance = memnew(GDIVisualScriptNodeInstanceCustom);
 	instance->node = this;
