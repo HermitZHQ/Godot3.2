@@ -14,8 +14,6 @@
 #include "scene/3d/area.h"
 #include "scene/3d/collision_shape.h"
 #include "scene/resources/box_shape.h"
-//#include "scene/3d/collision_polygon.h"
-//#include "scene/resources/plane_shape.h"
 #include "scene/main/viewport.h"
 #include "scene/3d/camera.h"
 #include "core/node_path.h"
@@ -504,8 +502,8 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 			break;
 		}
 		case 3: {
-			ret.name = L"选中物体";
-			ret.type = Variant::OBJECT;
+			ret.name = L"拣选标识";
+			ret.type = Variant::BOOL;
 			break;
 		}
 		default: {
@@ -738,6 +736,7 @@ void GDIVisualScriptCustomNode::set_function(const StringName &p_type) {
 	// 	_change_notify();
 	// 	ports_changed_notify();
 }
+
 StringName GDIVisualScriptCustomNode::get_function() const {
 
 	return function;
@@ -843,14 +842,6 @@ unsigned int GDIVisualScriptCustomNode::get_task_split_num() const {
 	return task_split_num;
 }
 
-void GDIVisualScriptCustomNode::set_mouse_pick_area_path(const NodePath &path) {
-	mouse_pick_area_path = path;
-}
-
-NodePath GDIVisualScriptCustomNode::get_mouse_pick_area_path() const {
-	return mouse_pick_area_path;
-}
-
 void GDIVisualScriptCustomNode::add_sub_task_index_and_objs_state(Vector<GDIVisualScriptCustomNode::RestoreInfo> &state_vec) {
 
 	sub_tasks_objs_state_vec.push_back(state_vec);
@@ -913,9 +904,6 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("area_trigger_entered_signal_callback", "area"), &GDIVisualScriptCustomNode::area_trigger_entered_signal_callback);
 	ClassDB::bind_method(D_METHOD("area_trigger_exited_signal_callback", "area"), &GDIVisualScriptCustomNode::area_trigger_exited_signal_callback);
-
-	ClassDB::bind_method(D_METHOD("set_mouse_pick_area_path", "path"), &GDIVisualScriptCustomNode::set_mouse_pick_area_path);
-	ClassDB::bind_method(D_METHOD("get_mouse_pick_area_path"), &GDIVisualScriptCustomNode::get_mouse_pick_area_path);
 
 	ClassDB::bind_method(D_METHOD("set_task_split_num", "num"), &GDIVisualScriptCustomNode::set_task_split_num);
 	ClassDB::bind_method(D_METHOD("get_task_split_num"), &GDIVisualScriptCustomNode::get_task_split_num);
@@ -985,7 +973,6 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 	// 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "function"), "set_function", "get_function"); //when set, if loaded properly, will override argument count.
 	ADD_PROPERTY(PropertyInfo(Variant::INT, L"(组合)任务数量"), "set_use_default_args", "get_use_default_args");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, L"(任务拆分)数量"), "set_task_split_num", "get_task_split_num");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "(鼠标)拣选Area", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Area"), "set_mouse_pick_area_path", "get_mouse_pick_area_path");
 	// 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "validate"), "set_validate", "get_validate");
 	// 	ADD_PROPERTY(PropertyInfo(Variant::INT, "rpc_call_mode", PROPERTY_HINT_ENUM, "Disabled,Reliable,Unreliable,ReliableToID,UnreliableToID"), "set_rpc_call_mode", "get_rpc_call_mode"); //when set, if loaded properly, will override argument count.
 
@@ -1029,8 +1016,10 @@ public:
 	// task flow control relevant----
 	bool task_ctrl_already_execute_once_flag = false;
 
-	// area trigger relevant----
+	// area trigger(and mouse) relevant----
 	bool first_create_manual_area_flag = false;
+	Area *manual_created_area = nullptr;
+	CollisionObject *selected_area = nullptr;
 
 	// record singleton to increase the invoke efficiency----
 	_OS *_os = nullptr;
@@ -1150,243 +1139,63 @@ public:
 		p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
 		return STEP_EXIT_FUNCTION_BIT;
 	}
+	
+	void manual_generate_area(Spatial *target, const Vector3 min_pos, const Vector3 max_pos, bool dirty_flag) {
 
-	int mouse_handle_func(const Variant **p_inputs, Variant **p_outputs, Variant* p_working_mem, StartMode p_start_mode, Variant::CallError &r_error, String &r_error_str) {
+		Vector3 target_pos = target->get_global_transform().origin;
+		Vector3 center_pos = dirty_flag ? ((max_pos + min_pos) / 2.0) : target_pos;
+		Vector3 dir = center_pos - target_pos;
+		float diff_len = dir.length();
+		dir.normalize();
+		// the 0.1 extents prevents the null area, if no valid mesh under the node
+		Vector3 extents = dirty_flag ? ((max_pos - center_pos) + Vector3(0.1, 0.1, 0.1)) : Vector3(0.1, 0.1, 0.1);
 
-		if (nullptr == p_working_mem) {
-			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-			r_error_str = "[GDI]mouse, working mem error";
-			return 0;
+		manual_created_area = memnew(Area);
+		manual_created_area->set_name("gdi_visual_node_manual_area");
+
+		CollisionShape *cs = memnew(CollisionShape);
+		BoxShape *bs = memnew(BoxShape);
+		bs->set_extents(extents);
+
+		manual_created_area->add_child(cs);
+		target->add_child(manual_created_area);
+		cs->set_shape(bs);
+
+		if (dirty_flag) {
+			manual_created_area->translate(dir * diff_len);
 		}
-
-		static Point2 mouse_point_left;
-		static Point2 mouse_point_right;
-		static Point2 mouse_point_mid;
-		auto left_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_LEFT);
-		auto right_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_RIGHT);
-// 		auto mid_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_MIDDLE); // preserve
-
-		if (input->gdi_get_mouse_button_mask() != 0) {
-			input->gdi_reset_mouse_button_mask();
-			return 4;
-		}		
-
-		*p_outputs[0] = left_button_pressed_flag;
-		*p_outputs[1] = right_button_pressed_flag;
-		*p_outputs[2] = os->get_mouse_position();
-		*p_outputs[3] = (Object*)(nullptr);
-
-		// check area path, if null, we will create it manual
-		Node *target = Object::cast_to<Node>((Object*)*p_inputs[0]);
-		auto area_path = this->node->get_mouse_pick_area_path();
-		if (area_path == NodePath() && nullptr != target) {
-			printf("area path is null.....\n");
-			this->node->set_mouse_pick_area_path(String("just/a/test"));
-			// calculate the comb aabb manual
-			int child_num = target->get_child_count();
-			Vector3 min_pos, max_pos;
-			bool dirty_flag = false;
-			bool has_area_flag = false;
-
-			// check self mesh
-			MeshInstance *self_mesh = Object::cast_to<MeshInstance>(target);
-			if (nullptr != self_mesh) {
-				auto aabb = self_mesh->get_transformed_aabb();
-				auto tmp_max_pos = aabb.position + aabb.size;
-				auto tmp_min_pos = aabb.position;
-
-				if (!dirty_flag) {
-					min_pos = tmp_min_pos;
-					max_pos = tmp_max_pos;
-					dirty_flag = true;
-				}
-			}
-
-			// check self area
-			Area *self_area = Object::cast_to<Area>(target);
-			if (nullptr != self_area) {
-				CollisionShape *cs = nullptr;
-				int child_num = self_area->get_child_count();
-				for (int i = 0; i < child_num; ++i) {
-					cs = Object::cast_to<CollisionShape>(self_area->get_child(i));
-					if (nullptr != cs) {
-						has_area_flag = true;
-						break;
-					}
-				}
-			}
-
-			if (!first_create_manual_area_flag) {
-				// add the Area node with collision shape dynamicly
-				if (!has_area_flag) {
-					// check child mesh and area situation
-					check_child_mesh_area_func(target, dirty_flag, has_area_flag, min_pos, max_pos);
-
-// 					Vector3 target_pos = target->get_global_transform().origin;
-// 					Vector3 center_pos = dirty_flag ? ((max_pos + min_pos) / 2.0) : target_pos;
-// 					Vector3 dir = center_pos - target_pos;
-// 					float diff_len = dir.length();
-// 					dir.normalize();
-// 					// the 0.1 extents prevents the null area, if no valid mesh under the node
-// 					Vector3 extents = dirty_flag ? ((max_pos - center_pos) + Vector3(0.1, 0.1, 0.1)) : Vector3(0.1, 0.1, 0.1);
-// 
-// 					Area *new_area = memnew(Area);
-// 					CollisionShape *cs = memnew(CollisionShape);
-// 					BoxShape *bs = memnew(BoxShape);
-// 					bs->set_extents(extents);
-// 
-// 					new_area->add_child(cs);
-// 					target->add_child(new_area);
-// 					cs->set_shape(bs);
-
-// 					if (dirty_flag) {
-// 						new_area->translate(dir * diff_len);
-// 					}
-					//os->print("[GDI]attach the Area node manual, dirty flag[%d], extents[%f][%f][%f]\n", dirty_flag, extents.x, extents.y, extents.z);
-				}
-			}
-		}
-
-		// check ray intersect
-		Object *object = instance->get_owner_ptr();
-		Node *node = Object::cast_to<Node>(object);
-		Viewport *root = (nullptr != node) ? node->get_tree()->get_root() : nullptr;
-		if (nullptr != root) {
-			 auto world = root->get_world();
-			 PhysicsDirectSpaceState *state = (nullptr != *world) ? world->get_direct_space_state() : nullptr;
-			 Camera *cam = root->get_camera();
-			 if (nullptr != state && nullptr != cam) {
-				 auto p1 = root->get_mouse_position();
-				 auto p2 = os->get_mouse_position();
-				 auto from = cam->project_ray_origin(os->get_mouse_position());
-				 auto to = from + cam->project_ray_normal(os->get_mouse_position()) * 10000.0;
-
-				 PhysicsDirectSpaceState::RayResult res;
-				 bool bRes = state->intersect_ray(from, to, res, Set<RID>(), 0xFFFFFFFF, true, true, true);
-				 if (bRes) {
-					 //CollisionObject *co = Object::cast_to<CollisionObject>(res.collider);
-					 //printf("intersect with object[%S]\n", String(co->get_name()));
-					 *p_outputs[3] = res.collider;
-				 }
-				 //printf("test intersect ray enter..............res[%d], shape[%d]\n from[%f][%f][%f]---to[%f][%f][%f]", bRes, res.shape, from[0], from[1], from[2], to.x, to.y, to.z);
-			 }
-		}
-
-		static uint64_t time = 0;
-		static bool first_left_pressed_flag = false;
-		static bool first_left_released_flag = false;
-		static bool first_left_click_flag = false;
-		static bool second_left_pressed_flag = false;
-		static bool left_drag_flag = false;
-
-		static bool first_right_pressed_flag = false;
-		static bool first_right_released_flag = false;
-
-		static bool first_mid_pressed_flag = false;
-		static bool first_mid_released_flag = false;
-
-		static const unsigned int double_click_interval = 500;
-
-		bool double_click_flag = false;
-		left_drag_flag = false;
-
-		//----mid button relevant(preserve)
-// 		if (!first_mid_pressed_flag && mid_button_pressed_flag) {
-// 			first_mid_pressed_flag = true;
-// 			mouse_point_mid = os->get_mouse_position();
-// 		}
-// 		else if (first_mid_pressed_flag && !first_mid_released_flag && !mid_button_pressed_flag) {
-// 			first_mid_released_flag = true;
-// 		}
-
-		//----right button relevant
-		if (!first_right_pressed_flag && right_button_pressed_flag) {
-			first_right_pressed_flag = true;
-			mouse_point_right = os->get_mouse_position();
-		}
-		else if (first_right_pressed_flag && !first_right_released_flag && !right_button_pressed_flag) {
-			first_right_released_flag = true;
-		}
-
-		//----left button relevant
-		// check drag first
-		if (first_left_pressed_flag && left_button_pressed_flag && mouse_point_left != os->get_mouse_position()) {
-			left_drag_flag = true;
-		}
-		else {
-			if (!first_left_pressed_flag && left_button_pressed_flag) {
-				first_left_pressed_flag = true;
-				time = os->get_system_time_msecs();
-				// prevent drag double click
-				mouse_point_left = os->get_mouse_position();
-			}
-			else if (first_left_pressed_flag && !first_left_released_flag && !left_button_pressed_flag) {
-				first_left_released_flag = true;
-			}
-			else if (first_left_released_flag && left_button_pressed_flag) {
-				second_left_pressed_flag = true;
-			}
-			else if (second_left_pressed_flag && !left_button_pressed_flag) {
-				auto diff_time = os->get_system_time_msecs() - time;
-				// 			os->print("enter second click, diff time[%d]\n", diff_time);
-				if (diff_time < double_click_interval && mouse_point_left == os->get_mouse_position()) {
-					double_click_flag = true;
-				}
-
-				time = 0;
-				second_left_pressed_flag = false;
-				first_left_pressed_flag = false;
-				first_left_released_flag = false;
-			}
-		}
-
-		// reset, if time alreay over
-		if (os->get_system_time_msecs() - time >= double_click_interval) {
-			time = 0;
-			second_left_pressed_flag = false;
-			first_left_click_flag = false;
-			if (!left_drag_flag) {
-				first_left_pressed_flag = false;
-				first_left_released_flag = false;
-			}
-		}
-
-		// double click
-		if (double_click_flag) {
-			return 1;
-		}
-		// drag
-		else if (first_left_pressed_flag && !first_left_released_flag && mouse_point_left != os->get_mouse_position()) {
-			return 2;
-		}
-		// left click
-		else if (first_left_released_flag && !first_left_click_flag && mouse_point_left == os->get_mouse_position()) {
-			//first_left_pressed_flag = false;
-			//first_left_released_flag = false;
-			first_left_click_flag = true;
-			return 0;
-		}
-		// right click
-		else if (first_right_pressed_flag && first_right_released_flag) {
-			first_right_pressed_flag = false;
-			first_right_released_flag = false;
-			if (mouse_point_right == os->get_mouse_position()) {
-				return 3;
-			}
-		}
-		// mid click(preserve)
-// 		else if (first_mid_pressed_flag && first_mid_released_flag) {
-// 			first_mid_pressed_flag = false;
-// 			first_mid_released_flag = false;
-// 			if (mouse_point_mid == os->get_mouse_position()) {
-// 				return 4;
-// 			}
-// 		}
-
-		p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
-		return STEP_EXIT_FUNCTION_BIT;
+		//os->print("[GDI]attach the Area node manual, dirty flag[%d], extents[%f][%f][%f]\n", dirty_flag, extents.x, extents.y, extents.z);
 	}
+	void check_self_mesh_area_aabb(Node *target, Vector3 &min_pos, Vector3 &max_pos, bool &dirty_flag, bool &has_area_flag) {
 
+		// check self mesh
+		MeshInstance *self_mesh = Object::cast_to<MeshInstance>(target);
+		if (nullptr != self_mesh) {
+			auto aabb = self_mesh->get_transformed_aabb();
+			auto tmp_max_pos = aabb.position + aabb.size;
+			auto tmp_min_pos = aabb.position;
+
+			if (!dirty_flag) {
+				min_pos = tmp_min_pos;
+				max_pos = tmp_max_pos;
+				dirty_flag = true;
+			}
+		}
+
+		// check self area
+		Area *self_area = Object::cast_to<Area>(target);
+		if (nullptr != self_area) {
+			CollisionShape *cs = nullptr;
+			int child_num = self_area->get_child_count();
+			for (int i = 0; i < child_num; ++i) {
+				cs = Object::cast_to<CollisionShape>(self_area->get_child(i));
+				if (nullptr != cs) {
+					has_area_flag = true;
+					break;
+				}
+			}
+		}
+	}
 	void check_child_mesh_area_func(Node *node, bool &dirty_flag, bool &has_area_flag, Vector3 &min_pos, Vector3 &max_pos) {
 
 		int child_num = node->get_child_count();
@@ -1472,61 +1281,14 @@ public:
 		bool dirty_flag = false;
 		bool has_area_flag = false;
 
-		// check self mesh
-		MeshInstance *self_mesh = Object::cast_to<MeshInstance>(target);
-		if (nullptr != self_mesh) {
-			auto aabb = self_mesh->get_transformed_aabb();
-			auto tmp_max_pos = aabb.position + aabb.size;
-			auto tmp_min_pos = aabb.position;
-
-			if (!dirty_flag) {
-				min_pos = tmp_min_pos;
-				max_pos = tmp_max_pos;
-				dirty_flag = true;
-			}
-		}
-
-		// check self area
-		Area *self_area = Object::cast_to<Area>(target);
-		if (nullptr != self_area) {
-			CollisionShape *cs = nullptr;
-			int child_num = self_area->get_child_count();
-			for (int i = 0; i < child_num; ++i) {
-				cs = Object::cast_to<CollisionShape>(self_area->get_child(i));
-				if (nullptr != cs) {
-					has_area_flag = true;
-					break;
-				}
-			}
-		}
+		check_self_mesh_area_aabb(target, min_pos, max_pos, dirty_flag, has_area_flag);
 
 		if (!first_create_manual_area_flag) {
 			// add the Area node with collision shape dynamicly
 			if (!has_area_flag) {
 				// check child mesh and area situation
 				check_child_mesh_area_func(target, dirty_flag, has_area_flag, min_pos, max_pos);
-
-				Vector3 target_pos = target->get_global_transform().origin;
-				Vector3 center_pos = dirty_flag ? ((max_pos + min_pos) / 2.0) : target_pos;
-				Vector3 dir = center_pos - target_pos;
-				float diff_len = dir.length();
-				dir.normalize();
-				// the 0.1 extents prevents the null area, if no valid mesh under the node
-				Vector3 extents = dirty_flag ? ((max_pos - center_pos) + Vector3(0.1, 0.1, 0.1)) : Vector3(0.1, 0.1, 0.1);
-
-				Area *new_area = memnew(Area);
-				CollisionShape *cs = memnew(CollisionShape);
-				BoxShape *bs = memnew(BoxShape);
-				bs->set_extents(extents);
-
-				new_area->add_child(cs);
-				target->add_child(new_area);
-				cs->set_shape(bs);
-
-				if (dirty_flag) {
-					new_area->translate(dir * diff_len);
-				}
-				//os->print("[GDI]attach the Area node manual, dirty flag[%d], extents[%f][%f][%f]\n", dirty_flag, extents.x, extents.y, extents.z);
+				manual_generate_area(target, min_pos, max_pos, dirty_flag);
 			}
 
 			auto err = area->connect("area_entered", this->node, "area_trigger_entered_signal_callback");
@@ -1543,7 +1305,7 @@ public:
 			first_create_manual_area_flag = true;
 		}
 
-		// 		bool area_entered_flag = this->node->get_area_trigger_entered_area_num() > 0 ? true : false;
+		//bool area_entered_flag = this->node->get_area_trigger_entered_area_num() > 0 ? true : false;
 		bool area_entered_flag = this->node->check_node_in_entered_areas(target);
 		*p_outputs[0] = area_entered_flag;
 
@@ -1681,11 +1443,11 @@ public:
 			int ret = keyboard_handle_func(p_inputs, p_outputs, p_working_mem, r_error, r_error_str);
 			return ret;
 		}
-		case GDIVisualScriptCustomNode::MOUSE: {
+		//case GDIVisualScriptCustomNode::MOUSE: {
 
-			int ret = mouse_handle_func(p_inputs, p_outputs, p_working_mem, p_start_mode, r_error, r_error_str);
-			return ret;
-		}
+		//	int ret = mouse_handle_func(p_inputs, p_outputs, p_working_mem, p_start_mode, r_error, r_error_str);
+		//	return ret;
+		//}
 		case GDIVisualScriptCustomNode::AREA_TIGGER: {
 
 			int ret = area_trigger_handle_func(p_inputs, p_outputs, r_error, r_error_str);
@@ -1707,17 +1469,17 @@ public:
 			Node *node = Object::cast_to<Node>(object);
 			if (nullptr != node) {
 				node->get_tree()->reload_current_scene();
-// 				os->print("reload cur scene.......\n");
+ 				//os->print("reload cur scene.......\n");
 			}
 
-// 			auto size = objs_init_trans_vec.size();
-// 			for (int i = 0; i < size; ++i) {
-// 				auto restInfo = objs_init_trans_vec[i];
-// 				Spatial *spa = Object::cast_to<Spatial>(restInfo.node);
-// 				if (nullptr != spa) {
-// 					spa->set_global_transform(restInfo.trans);
-// 				}
-// 			}
+ 			//auto size = objs_init_trans_vec.size();
+ 			//for (int i = 0; i < size; ++i) {
+ 			//	auto restInfo = objs_init_trans_vec[i];
+ 			//	Spatial *spa = Object::cast_to<Spatial>(restInfo.node);
+ 			//	if (nullptr != spa) {
+ 			//		spa->set_global_transform(restInfo.trans);
+ 			//	}
+ 			//}
 			break;
 		}
 		case GDIVisualScriptCustomNode::INIT_PARTIAL: {
@@ -1735,60 +1497,60 @@ public:
 			break;
 		}
 		// 先保留下，很有可能后面又会加入这种简化版的节点
-// 		case GDIVisualScriptCustomNode::MAT_ALBEDO: {
-// 			Object *object = instance->get_owner_ptr();
-// 			Node *node = Object::cast_to<Node>(object);
-// 			if (nullptr == node) {
-// // 				os->print("[GDI]Material albedo node, can not convert obj to node\n");
-// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-// 				r_error_str = "[GDI]Material albedo node, can not convert obj to node";
-// 				return 0;
-// 			}
-// 
-// 			NodePath path = *p_inputs[0];
-// 			Node *target_node = node->get_node(path);
-// 			if (nullptr == target_node) {
-// // 				os->print("[GDI]Material albedo node, target node is null\n");
-// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-// 				r_error_str = "[GDI]Material albedo node, target node is null";
-// 				return 0;
-// 			}
-// 
-// 			MeshInstance *mesh = Object::cast_to<MeshInstance>(target_node);
-// 			if (nullptr == mesh) {
-// // 				os->print("[GDI]Material albedo node, can not convert to mesh inst\n");
-// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-// 				r_error_str = "[GDI]Material albedo node, can not convert to mesh inst";
-// 				return 0;
-// 			}
-// 			if (mesh->get_surface_material_count() == 0) {
-// // 				os->print("[GDI]Material albedo node, surface is null\n");
-// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-// 				r_error_str = "[GDI]Material albedo node, surface is null";
-// 				return 0;
-// 			}
-// 
-// 			unsigned int surface_index = *p_inputs[2];
-// 			if (surface_index > mesh->get_surface_material_count() - 1) {
-// // 				os->print("[GDI]Material albedo node, invalid surface index\n");
-// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
-// 				r_error_str = "[GDI]Material albedo node, invalid surface index";
-// 				return 0;
-// 			}
-// 
-// 			auto mat = Object::cast_to<SpatialMaterial>(*(mesh->get_surface_material(surface_index)));
-// 			if (nullptr == mat) {
-// // 				os->print("[GDI]Material albedo node, can not find material with index[%d]\n", surface_index);
-// 				r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
-// 				r_error_str = "[GDI]Material albedo node, can not find material with index";
-// 				return 0;
-// 			}
-// 
-// 			mat->set_albedo(*p_inputs[1]);
-// 			mesh->set_surface_material(surface_index, mat);
-// 
-// 			break;
-// 		}
+ 		//case GDIVisualScriptCustomNode::MAT_ALBEDO: {
+ 		//	Object *object = instance->get_owner_ptr();
+ 		//	Node *node = Object::cast_to<Node>(object);
+ 		//	if (nullptr == node) {
+  	//			os->print("[GDI]Material albedo node, can not convert obj to node\n");
+ 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+ 		//		r_error_str = "[GDI]Material albedo node, can not convert obj to node";
+ 		//		return 0;
+ 		//	}
+ 
+ 		//	NodePath path = *p_inputs[0];
+ 		//	Node *target_node = node->get_node(path);
+ 		//	if (nullptr == target_node) {
+  	//			os->print("[GDI]Material albedo node, target node is null\n");
+ 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+ 		//		r_error_str = "[GDI]Material albedo node, target node is null";
+ 		//		return 0;
+ 		//	}
+ 
+ 		//	MeshInstance *mesh = Object::cast_to<MeshInstance>(target_node);
+ 		//	if (nullptr == mesh) {
+  	//			os->print("[GDI]Material albedo node, can not convert to mesh inst\n");
+ 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+ 		//		r_error_str = "[GDI]Material albedo node, can not convert to mesh inst";
+ 		//		return 0;
+ 		//	}
+ 		//	if (mesh->get_surface_material_count() == 0) {
+  	//			os->print("[GDI]Material albedo node, surface is null\n");
+ 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+ 		//		r_error_str = "[GDI]Material albedo node, surface is null";
+ 		//		return 0;
+ 		//	}
+ 
+ 		//	unsigned int surface_index = *p_inputs[2];
+ 		//	if (surface_index > mesh->get_surface_material_count() - 1) {
+  	//			os->print("[GDI]Material albedo node, invalid surface index\n");
+ 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+ 		//		r_error_str = "[GDI]Material albedo node, invalid surface index";
+ 		//		return 0;
+ 		//	}
+ 
+ 		//	auto mat = Object::cast_to<SpatialMaterial>(*(mesh->get_surface_material(surface_index)));
+ 		//	if (nullptr == mat) {
+  	//			os->print("[GDI]Material albedo node, can not find material with index[%d]\n", surface_index);
+ 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+ 		//		r_error_str = "[GDI]Material albedo node, can not find material with index";
+ 		//		return 0;
+ 		//	}
+ 
+ 		//	mat->set_albedo(*p_inputs[1]);
+ 		//	mesh->set_surface_material(surface_index, mat);
+ 
+ 		//	break;
+ 		//}
 		}
 
 		if (!validate) {
@@ -1846,3 +1608,519 @@ GDIVisualScriptCustomNode::~GDIVisualScriptCustomNode() {
 }
 
 unsigned int GDIVisualScriptCustomNode::global_task_id = 1;
+
+class GDIVisualScriptNodeInstanceCustomMouse : public VisualScriptNodeInstance {
+public:
+	int input_args;
+	bool validate;
+	int returns;
+
+	GDIVisualScriptCustomNodeMouse *node;
+	VisualScriptInstance *instance;
+
+	// mouse relevant----
+	uint64_t time = 0;
+
+	Point2 mouse_point_left;
+	Point2 mouse_point_right;
+	Point2 mouse_point_mid;
+
+	bool first_left_pressed_flag = false;
+	bool first_left_released_flag = false;
+	bool first_left_click_flag = false;
+	bool second_left_pressed_flag = false;
+	bool left_drag_flag = false;
+
+	bool first_right_pressed_flag = false;
+	bool first_right_released_flag = false;
+
+	bool first_mid_pressed_flag = false;
+	bool first_mid_released_flag = false;
+
+	const unsigned int double_click_interval = 500;
+
+	Spatial *target = nullptr;
+	Viewport *view_port = nullptr;
+	Camera *cam = nullptr;
+	PhysicsDirectSpaceState *state = nullptr;
+
+	Area *manual_created_area = nullptr;
+	CollisionObject *selected_area = nullptr;
+
+	bool first_create_manual_area_flag = false;
+
+	// record singleton to increase the invoke efficiency----
+	_OS *_os = nullptr;
+	OS *os = nullptr;
+	Input *input = nullptr;
+
+	GDIVisualScriptNodeInstanceCustomMouse()
+		:_os(_OS::get_singleton())
+		, os(OS::get_singleton())
+		, input(Input::get_singleton())
+	{}
+
+	void manual_generate_area(Spatial *target, const Vector3 min_pos, const Vector3 max_pos, bool dirty_flag) {
+
+		Vector3 target_pos = target->get_global_transform().origin;
+		Vector3 center_pos = dirty_flag ? ((max_pos + min_pos) / 2.0) : target_pos;
+		Vector3 dir = center_pos - target_pos;
+		float diff_len = dir.length();
+		dir.normalize();
+		// the 0.1 extents prevents the null area, if no valid mesh under the node
+		Vector3 extents = dirty_flag ? ((max_pos - center_pos) + Vector3(0.1, 0.1, 0.1)) : Vector3(0.1, 0.1, 0.1);
+
+		manual_created_area = memnew(Area);
+		manual_created_area->set_name("gdi_visual_node_manual_area");
+
+		CollisionShape *cs = memnew(CollisionShape);
+		BoxShape *bs = memnew(BoxShape);
+		bs->set_extents(extents);
+
+		manual_created_area->add_child(cs);
+		target->add_child(manual_created_area);
+		cs->set_shape(bs);
+
+		if (dirty_flag) {
+			manual_created_area->translate(dir * diff_len);
+		}
+		//os->print("[GDI]attach the Area node manual, dirty flag[%d], extents[%f][%f][%f]\n", dirty_flag, extents.x, extents.y, extents.z);
+	}
+	void check_self_mesh_area_aabb(Node *target, Vector3 &min_pos, Vector3 &max_pos, bool &dirty_flag, bool &has_area_flag) {
+
+		// check self mesh
+		MeshInstance *self_mesh = Object::cast_to<MeshInstance>(target);
+		if (nullptr != self_mesh) {
+			auto aabb = self_mesh->get_transformed_aabb();
+			auto tmp_max_pos = aabb.position + aabb.size;
+			auto tmp_min_pos = aabb.position;
+
+			if (!dirty_flag) {
+				min_pos = tmp_min_pos;
+				max_pos = tmp_max_pos;
+				dirty_flag = true;
+			}
+		}
+
+		// check self area
+		Area *self_area = Object::cast_to<Area>(target);
+		if (nullptr != self_area) {
+			CollisionShape *cs = nullptr;
+			int child_num = self_area->get_child_count();
+			for (int i = 0; i < child_num; ++i) {
+				cs = Object::cast_to<CollisionShape>(self_area->get_child(i));
+				if (nullptr != cs) {
+					has_area_flag = true;
+					break;
+				}
+			}
+		}
+	}
+	void check_child_mesh_area_func(Node *node, bool &dirty_flag, bool &has_area_flag, Vector3 &min_pos, Vector3 &max_pos) {
+
+		int child_num = node->get_child_count();
+		for (int i = 0; i < child_num; ++i) {
+			Node *child = node->get_child(i);
+			int child_chlid_num = child->get_child_count();
+			if (child_chlid_num > 0) {
+				check_child_mesh_area_func(child, dirty_flag, has_area_flag, min_pos, max_pos);
+			}
+
+			MeshInstance *mesh = Object::cast_to<MeshInstance>(child);
+			Area *area = Object::cast_to<Area>(child);
+			if (nullptr != mesh) {
+				auto aabb = mesh->get_transformed_aabb();
+				auto tmp_max_pos = aabb.position + aabb.size;
+				auto tmp_min_pos = aabb.position;
+
+				if (!dirty_flag) {
+					min_pos = tmp_min_pos;
+					max_pos = tmp_max_pos;
+					dirty_flag = true;
+				}
+				else {
+					min_pos.x = (tmp_min_pos.x < min_pos.x ? tmp_min_pos.x : min_pos.x);
+					min_pos.y = (tmp_min_pos.y < min_pos.y ? tmp_min_pos.y : min_pos.y);
+					min_pos.z = (tmp_min_pos.z < min_pos.z ? tmp_min_pos.z : min_pos.z);
+
+					max_pos.x = (tmp_max_pos.x > max_pos.x ? tmp_max_pos.x : max_pos.x);
+					max_pos.y = (tmp_max_pos.y > max_pos.y ? tmp_max_pos.y : max_pos.y);
+					max_pos.z = (tmp_max_pos.z > max_pos.z ? tmp_max_pos.z : max_pos.z);
+				}
+			}
+			else if (nullptr != area) {
+				CollisionShape *cs = nullptr;
+				int child_num = area->get_child_count();
+				for (int i = 0; i < child_num; ++i) {
+					cs = Object::cast_to<CollisionShape>(area->get_child(i));
+					if (nullptr != cs) {
+						has_area_flag = true;
+						break;
+					}
+				}
+			}
+		}
+	}
+	void check_mouse_ray_intersect(Variant **p_outputs) {
+
+		if (nullptr == view_port) {
+			Object *object = instance->get_owner_ptr();
+			Node *node = Object::cast_to<Node>(object);
+			view_port = (nullptr != node) ? node->get_tree()->get_root() : nullptr;
+
+			if (nullptr != view_port) {
+				auto world = view_port->get_world();
+				state = (nullptr != *world) ? world->get_direct_space_state() : nullptr;
+				cam = view_port->get_camera();
+			}
+		}
+
+		if (nullptr != view_port && nullptr != state && nullptr != cam) {
+			auto p1 = view_port->get_mouse_position();
+			auto p2 = os->get_mouse_position();
+			auto from = cam->project_ray_origin(os->get_mouse_position());
+			auto to = from + cam->project_ray_normal(os->get_mouse_position()) * 10000.0;
+
+			PhysicsDirectSpaceState::RayResult res;
+			bool bRes = state->intersect_ray(from, to, res, Set<RID>(), 0xFFFFFFFF, true, true, true);
+			if (bRes) {
+				CollisionObject *co = Object::cast_to<CollisionObject>(res.collider);
+				//printf("intersect with object[%S]\n", String(co->get_name()));
+
+				if (nullptr != selected_area &&
+					co->get_name() == selected_area->get_name() &&
+					co->get_global_transform() == selected_area->get_global_transform()) {
+					//*p_outputs[3] = co;
+					*p_outputs[3] = true;
+					//printf("ray match succeed1...\n");
+				}
+				else if (nullptr != manual_created_area &&
+					co->get_name() == manual_created_area->get_name() &&
+					co->get_global_transform() == manual_created_area->get_global_transform()) {
+					//*p_outputs[3] = co;
+					*p_outputs[3] = true;
+					//printf("ray match succeed2...\n");
+				}
+				else {
+					//*p_outputs[3] = (Object*)nullptr;
+					*p_outputs[3] = false;
+				}
+			}
+			//printf("test intersect ray enter..............res[%d], shape[%d]\n from[%f][%f][%f]---to[%f][%f][%f]", bRes, res.shape, from[0], from[1], from[2], to.x, to.y, to.z);
+		}
+	}
+	int mouse_handle_func(const Variant **p_inputs, Variant **p_outputs, Variant* p_working_mem, StartMode p_start_mode, Variant::CallError &r_error, String &r_error_str) {
+
+		if (nullptr == p_working_mem) {
+			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+			r_error_str = "[GDI]mouse, working mem error";
+			return 0;
+		}
+
+		auto left_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_LEFT);
+		auto right_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_RIGHT);
+		//auto mid_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_MIDDLE); // preserve
+
+		*p_outputs[0] = left_button_pressed_flag;
+		*p_outputs[1] = right_button_pressed_flag;
+		*p_outputs[2] = os->get_mouse_position();
+		//*p_outputs[3] = (Object*)(nullptr);
+		*p_outputs[3] = false;
+
+		// check area path, if null, we will create it manual
+		if (nullptr == target) {
+			target = Object::cast_to<Spatial>((Object*)*p_inputs[0]);
+		}
+		auto area_path = this->node->get_mouse_pick_area_path();
+		Object *object = instance->get_owner_ptr();
+		Node *node = Object::cast_to<Node>(object);
+		if (area_path != NodePath() && nullptr != node) {
+			selected_area = Object::cast_to<CollisionObject>(node->get_node(area_path));
+		}
+
+		if (area_path == NodePath() && nullptr != target) {
+			// 			printf("area path is null.....\n");
+
+						// calculate the comb aabb manual
+			int child_num = target->get_child_count();
+			Vector3 min_pos, max_pos;
+			bool dirty_flag = false;
+			bool has_area_flag = false;
+
+			check_self_mesh_area_aabb(target, min_pos, max_pos, dirty_flag, has_area_flag);
+
+			if (!first_create_manual_area_flag) {
+				// add the Area node with collision shape dynamicly
+				if (!has_area_flag) {
+					// check child mesh and area situation, 
+// 					check_child_mesh_area_func(target, dirty_flag, has_area_flag, min_pos, max_pos);
+
+					manual_generate_area(target, min_pos, max_pos, dirty_flag);
+
+					first_create_manual_area_flag = true;
+				}
+			}
+		}
+
+		// check ray intersect
+		check_mouse_ray_intersect(p_outputs);
+
+		//----mouse wheel
+		auto mouse_btn_mask = input->gdi_get_mouse_button_mask();
+		if (mouse_btn_mask != 0) {
+			input->gdi_reset_mouse_button_mask();
+			if ((mouse_btn_mask & (1 << (BUTTON_WHEEL_UP - 1))) != 0 ||
+				(mouse_btn_mask & (1 << (BUTTON_WHEEL_DOWN - 1))) != 0) {
+				return 4;
+			}
+		}
+
+		bool double_click_flag = false;
+		left_drag_flag = false;
+
+		//----mid button relevant(preserve)
+// 		if (!first_mid_pressed_flag && mid_button_pressed_flag) {
+// 			first_mid_pressed_flag = true;
+// 			mouse_point_mid = os->get_mouse_position();
+// 		}
+// 		else if (first_mid_pressed_flag && !first_mid_released_flag && !mid_button_pressed_flag) {
+// 			first_mid_released_flag = true;
+// 		}
+
+		//----right button relevant
+		if (!first_right_pressed_flag && right_button_pressed_flag) {
+			first_right_pressed_flag = true;
+			mouse_point_right = os->get_mouse_position();
+		}
+		else if (first_right_pressed_flag && !first_right_released_flag && !right_button_pressed_flag) {
+			first_right_released_flag = true;
+		}
+
+		//----left button relevant
+		// check drag first
+		if (first_left_pressed_flag && left_button_pressed_flag && mouse_point_left != os->get_mouse_position()) {
+			left_drag_flag = true;
+		}
+		else {
+			if (!first_left_pressed_flag && left_button_pressed_flag) {
+				first_left_pressed_flag = true;
+				time = os->get_system_time_msecs();
+				// prevent drag double click
+				mouse_point_left = os->get_mouse_position();
+			}
+			else if (first_left_pressed_flag && !first_left_released_flag && !left_button_pressed_flag) {
+				first_left_released_flag = true;
+			}
+			else if (first_left_released_flag && left_button_pressed_flag) {
+				second_left_pressed_flag = true;
+			}
+			else if (second_left_pressed_flag && !left_button_pressed_flag) {
+				auto diff_time = os->get_system_time_msecs() - time;
+				// 			os->print("enter second click, diff time[%d]\n", diff_time);
+				if (diff_time < double_click_interval && mouse_point_left == os->get_mouse_position()) {
+					double_click_flag = true;
+				}
+
+				time = 0;
+				second_left_pressed_flag = false;
+				first_left_pressed_flag = false;
+				first_left_released_flag = false;
+			}
+		}
+
+		// reset, if time alreay over
+		if (os->get_system_time_msecs() - time >= double_click_interval) {
+			time = 0;
+			second_left_pressed_flag = false;
+			first_left_click_flag = false;
+			if (!left_drag_flag) {
+				first_left_pressed_flag = false;
+				first_left_released_flag = false;
+			}
+		}
+
+		// double click
+		if (double_click_flag) {
+			return 1;
+		}
+		// drag
+		else if (first_left_pressed_flag && !first_left_released_flag && mouse_point_left != os->get_mouse_position()) {
+			return 2;
+		}
+		// left click
+		else if (first_left_released_flag && !first_left_click_flag && mouse_point_left == os->get_mouse_position()) {
+			//first_left_pressed_flag = false;
+			//first_left_released_flag = false;
+			first_left_click_flag = true;
+			return 0;
+		}
+		// right click
+		else if (first_right_pressed_flag && first_right_released_flag) {
+			first_right_pressed_flag = false;
+			first_right_released_flag = false;
+			if (mouse_point_right == os->get_mouse_position()) {
+				return 3;
+			}
+		}
+		// mid click(preserve)
+		//else if (first_mid_pressed_flag && first_mid_released_flag) {
+		//	first_mid_pressed_flag = false;
+		//	first_mid_released_flag = false;
+		//	if (mouse_point_mid == os->get_mouse_position()) {
+		//		return 4;
+		//	}
+		//}
+
+		p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
+		return STEP_EXIT_FUNCTION_BIT;
+	}
+
+	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) override	{
+
+		int ret = mouse_handle_func(p_inputs, p_outputs, p_working_mem, p_start_mode, r_error, r_error_str);
+		return ret;
+	}
+
+	virtual int get_working_memory_size() const override {
+		return 1;
+	}
+
+};
+
+void GDIVisualScriptCustomNodeMouse::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_mouse_pick_area_path", "path"), &GDIVisualScriptCustomNodeMouse::set_mouse_pick_area_path);
+	ClassDB::bind_method(D_METHOD("get_mouse_pick_area_path"), &GDIVisualScriptCustomNodeMouse::get_mouse_pick_area_path);
+
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, L"(鼠标)拣选碰撞区", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Area,KinematicBody,PhysicalBone,RigidBody,VehicleBody,StaticBody"), "set_mouse_pick_area_path", "get_mouse_pick_area_path");
+}
+
+int GDIVisualScriptCustomNodeMouse::get_output_sequence_port_count() const {
+
+	return 5;
+}
+
+bool GDIVisualScriptCustomNodeMouse::has_input_sequence_port() const {
+
+	return true;
+}
+
+String GDIVisualScriptCustomNodeMouse::get_output_sequence_port_text(int p_port) const {
+
+	switch (p_port)
+	{
+	case 0: {
+		return L"左键单击";
+	}
+	case 1: {
+		return L"左键双击";
+	}
+	case 2: {
+		return L"左键拖动";
+	}
+	case 3: {
+		return L"右键单击";
+	}
+	case 4: {
+		return L"中间滚轮";
+	}
+	default:
+		return L"未处理索引";
+	}
+}
+
+int GDIVisualScriptCustomNodeMouse::get_input_value_port_count() const {
+
+	return 1;
+}
+
+int GDIVisualScriptCustomNodeMouse::get_output_value_port_count() const {
+
+	return 4;
+}
+
+PropertyInfo GDIVisualScriptCustomNodeMouse::get_input_value_port_info(int p_idx) const {
+
+	PropertyInfo pi;
+	pi.name = L"拣选节点";
+	pi.type = Variant::OBJECT;
+	return pi;
+}
+
+PropertyInfo GDIVisualScriptCustomNodeMouse::get_output_value_port_info(int p_idx) const {
+
+	PropertyInfo pi;
+
+	switch (p_idx)
+	{
+	case 0: {
+		pi.name = L"左键按下";
+		pi.type = Variant::BOOL;
+		break;
+	}
+	case 1: {
+		pi.name = L"右键按下";
+		pi.type = Variant::BOOL;
+		break;
+	}
+	case 2: {
+		pi.name = L"鼠标坐标";
+		pi.type = Variant::BOOL;
+		break;
+	}
+	case 3: {
+		pi.name = L"拣选标识";
+		pi.type = Variant::BOOL;
+		break;
+	}
+	default: {
+		pi.name = L"未处理类型";
+		pi.type = Variant::NIL;
+		break;
+	}
+	}
+
+	return pi;
+}
+
+String GDIVisualScriptCustomNodeMouse::get_caption() const {
+
+	return L"鼠标";
+}
+
+String GDIVisualScriptCustomNodeMouse::get_category() const {
+
+	return L"Express";
+}
+
+String GDIVisualScriptCustomNodeMouse::get_text() const {
+
+	return L"鼠标按键处理";
+}
+
+void GDIVisualScriptCustomNodeMouse::set_mouse_pick_area_path(const NodePath &path) {
+
+	mouse_pick_area_path = path;
+}
+
+NodePath GDIVisualScriptCustomNodeMouse::get_mouse_pick_area_path() const {
+
+	return mouse_pick_area_path;
+}
+
+VisualScriptNodeInstance * GDIVisualScriptCustomNodeMouse::instance(VisualScriptInstance *p_instance) {
+
+	GDIVisualScriptNodeInstanceCustomMouse *instance = memnew(GDIVisualScriptNodeInstanceCustomMouse);
+	instance->node = this;
+	instance->instance = p_instance;
+	instance->returns = get_output_value_port_count();
+	instance->input_args = get_input_value_port_count();
+	return instance;
+}
+
+GDIVisualScriptCustomNodeMouse::GDIVisualScriptCustomNodeMouse() {
+
+}
+
+GDIVisualScriptCustomNodeMouse::~GDIVisualScriptCustomNodeMouse() {
+
+}

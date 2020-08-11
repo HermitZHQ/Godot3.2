@@ -264,6 +264,7 @@ class VisualScriptEditor : public ScriptEditorBase {
 	void _gdi_create_process_func_node();
 	void _gdi_create_ready_func_node();
 	void _gdi_delete_function(const String &name);
+	void _gdi_create_new_visual_node(Variant vnode, Point2 &ofs);
 
 	int editing_id;
 	int editing_input;

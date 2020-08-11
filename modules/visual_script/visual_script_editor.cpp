@@ -2409,18 +2409,18 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 		vnode.instance();
 // 		OS::get_singleton()->print("drop node instance[%x]\n", *vnode);
 
-		bool already_create_function_node_flag = false;
+		bool already_create_visual_node_flag = false;
 
 		if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::ACTIVE]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::ACTIVE);
 
-			already_create_function_node_flag = true;
+			already_create_visual_node_flag = true;
 			_gdi_create_ready_func_node();
 		}
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::LOOP]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::LOOP);
 
-			already_create_function_node_flag = true;
+			already_create_visual_node_flag = true;
 			_gdi_create_process_func_node();
 		}
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::TASK_CONTROL]) {
@@ -2462,7 +2462,10 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 			}
 		}
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::MOUSE]) {
-			vnode->set_custom_mode(GDIVisualScriptCustomNode::MOUSE);
+			Ref<GDIVisualScriptCustomNodeMouse> node;
+			node.instance();
+			_gdi_create_new_visual_node(node, ofs);
+			already_create_visual_node_flag = true;
 		}
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::AREA_TIGGER]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::AREA_TIGGER);
@@ -2480,34 +2483,13 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::INIT_PARTIAL);
 		}
 
-		if (!already_create_function_node_flag) {
-			int new_id = script->get_available_id();
-	
-			undo_redo->create_action(TTR("Add Node"));
-			undo_redo->add_do_method(script.ptr(), "add_node", default_func, new_id, vnode, ofs);
-	// 		undo_redo->add_do_method(vnode.ptr(), "set_base_type", script->get_instance_base_type());
-	// 		undo_redo->add_do_method(vnode.ptr(), "set_function", d["custom"]);
-	
-			undo_redo->add_undo_method(script.ptr(), "remove_node", default_func, new_id);
-			undo_redo->add_do_method(this, "_update_graph");
-			undo_redo->add_undo_method(this, "_update_graph");
-			undo_redo->commit_action();
-	
-			Node *node = graph->get_node(itos(new_id));
-			if (node) {
-				graph->set_selected(node);
-				_node_selected(node);
-			}
-// 			GraphNode *gn = Object::cast_to<GraphNode>(node);
-// 			if (gn) {
-// 				gn->set_show_close_button(true);
-// 			}
+		if (!already_create_visual_node_flag) {
+			_gdi_create_new_visual_node(vnode, ofs);
 		}
 	}
 }
 
-void VisualScriptEditor::_gdi_create_process_func_node()
-{
+void VisualScriptEditor::_gdi_create_process_func_node() {
 	String name = "_process";
 	if (script->has_function(name)) {
 		EditorNode::get_singleton()->show_warning(L"该任务模块已存在，且只能存在一个");
@@ -2569,8 +2551,7 @@ void VisualScriptEditor::_gdi_create_process_func_node()
 	_update_graph();
 }
 
-void VisualScriptEditor::_gdi_create_ready_func_node()
-{
+void VisualScriptEditor::_gdi_create_ready_func_node() {
 	String name = "_ready";
 	if (script->has_function(name)) {
 		EditorNode::get_singleton()->show_warning(L"该任务模块已存在，且只能存在一个");
@@ -2660,6 +2641,31 @@ void VisualScriptEditor::_gdi_delete_function(const String &name) {
 	undo_redo->add_do_method(this, "_update_graph");
 	undo_redo->add_undo_method(this, "_update_graph");
 	undo_redo->commit_action();
+}
+
+void VisualScriptEditor::_gdi_create_new_visual_node(Variant vnode, Point2 &ofs) {
+
+	int new_id = script->get_available_id();
+
+	undo_redo->create_action(TTR("Add Node"));
+	undo_redo->add_do_method(script.ptr(), "add_node", default_func, new_id, vnode, ofs);
+	/*undo_redo->add_do_method(vnode.ptr(), "set_base_type", script->get_instance_base_type());
+	undo_redo->add_do_method(vnode.ptr(), "set_function", d["custom"]);*/
+
+	undo_redo->add_undo_method(script.ptr(), "remove_node", default_func, new_id);
+	undo_redo->add_do_method(this, "_update_graph");
+	undo_redo->add_undo_method(this, "_update_graph");
+	undo_redo->commit_action();
+
+	Node *node = graph->get_node(itos(new_id));
+	if (node) {
+		graph->set_selected(node);
+		_node_selected(node);
+	}
+	/*GraphNode *gn = Object::cast_to<GraphNode>(node);
+	if (gn) {
+		gn->set_show_close_button(true);
+	}*/
 }
 
 void VisualScriptEditor::_selected_method(const String &p_method, const String &p_type, const bool p_connecting) {

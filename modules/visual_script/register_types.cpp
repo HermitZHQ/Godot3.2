@@ -92,6 +92,7 @@ void register_visual_script_types() {
 	ClassDB::register_class<VisualScriptEmitSignal>();
 
 	ClassDB::register_class<GDIVisualScriptCustomNode>();
+	ClassDB::register_class<GDIVisualScriptCustomNodeMouse>();
 
 	ClassDB::register_class<VisualScriptReturn>();
 	ClassDB::register_class<VisualScriptCondition>();

@@ -145,9 +145,6 @@ public:
 	void set_task_split_num(unsigned int num);
 	unsigned int get_task_split_num() const;
 
-	void set_mouse_pick_area_path(const NodePath &path);
-	NodePath get_mouse_pick_area_path() const;
-
 	void add_sub_task_index_and_objs_state(Vector<RestoreInfo> &state_vec);
 	void set_sub_task_cur_index(unsigned int index);
 	unsigned int get_sub_task_cur_index() const;
@@ -168,13 +165,42 @@ private:
 	unsigned int sub_task_cur_index;
 	Vector<Vector<RestoreInfo>> sub_tasks_objs_state_vec;
 
-	NodePath mouse_pick_area_path;
-
 	static unsigned int global_task_id;
 };
 
 VARIANT_ENUM_CAST(GDIVisualScriptCustomNode::CallMode);
 VARIANT_ENUM_CAST(GDIVisualScriptCustomNode::RPCCallMode);
 VARIANT_ENUM_CAST(GDIVisualScriptCustomNode::CustomMode);
+
+class GDIVisualScriptCustomNodeMouse : public VisualScriptNode {
+
+	GDCLASS(GDIVisualScriptCustomNodeMouse, VisualScriptNode);
+
+protected:
+	static void _bind_methods();
+
+public:
+	virtual int get_output_sequence_port_count() const override;
+	virtual bool has_input_sequence_port() const override;
+	virtual String get_output_sequence_port_text(int p_port) const override;
+	virtual int get_input_value_port_count() const override;
+	virtual int get_output_value_port_count() const override;
+	virtual PropertyInfo get_input_value_port_info(int p_idx) const override;
+	virtual PropertyInfo get_output_value_port_info(int p_idx) const override;
+	virtual String get_caption() const override;
+	virtual String get_category() const override;
+	virtual String get_text() const override;
+
+	void set_mouse_pick_area_path(const NodePath &path);
+	NodePath get_mouse_pick_area_path() const;
+
+	virtual VisualScriptNodeInstance *instance(VisualScriptInstance *p_instance);
+
+	GDIVisualScriptCustomNodeMouse();
+	~GDIVisualScriptCustomNodeMouse();
+
+private:
+	NodePath mouse_pick_area_path;
+};
 
 #endif // GDI_VISUAL_SCRIPT_CUSTOM_NODES_H
