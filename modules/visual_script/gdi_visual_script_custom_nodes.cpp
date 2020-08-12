@@ -611,12 +611,12 @@ void GDIVisualScriptCustomNode::set_custom_mode(CustomMode p_mode) {
 	if (TASK_CONTROL == p_mode) {
 		set_task_id(global_task_id++);
 	}
-	// 	OS::get_singleton()->print("set custom mode: [%d], this[%x]\n", custom_mode, this);
+	//OS::get_singleton()->print("set custom mode: [%d], this[%x]\n", custom_mode, this);
 }
 
 GDIVisualScriptCustomNode::CustomMode GDIVisualScriptCustomNode::get_custom_mode() const {
 
-	// 	OS::get_singleton()->print("get custom mode: [%d], this[%x]\n", custom_mode, this);
+	//OS::get_singleton()->print("get custom mode: [%d], this[%x]\n", custom_mode, this);
 	return custom_mode;
 }
 
@@ -788,7 +788,7 @@ void GDIVisualScriptCustomNode::area_trigger_entered_signal_callback(Node *area)
 		return;
 	}
 
-	// 	printf("area enter...\n");
+	//printf("area enter...\n");
 	area_trigger_entered_area_vec.push_back(area);
 }
 
@@ -796,7 +796,7 @@ void GDIVisualScriptCustomNode::area_trigger_exited_signal_callback(Node *area) 
 
 	int res = area_trigger_entered_area_vec.find(area);
 	if (res >= 0) {
-		// 		printf("area exit...\n");
+		//printf("area exit...\n");
 		area_trigger_entered_area_vec.erase(area);
 	}
 }
@@ -864,10 +864,10 @@ void GDIVisualScriptCustomNode::restore_sub_task_state(unsigned int index) {
 		auto objs_state = sub_tasks_objs_state_vec[index];
 		auto size = objs_state.size();
 		for (int i = 0; i < size; ++i) {
-			// 			if (String(obj->key()->get_name()) == String("Spatial")) {
-			// 				auto t = obj->key()->get_global_transform();
-			// 				printf("--rest1 transform:\n x1:%f, y1:%f, z1:%f\n x2:%f, y2:%f, z2:%f\n x3:%f, y3:%f, z3:%f\n", t.basis[0].x, t.basis[0].y, t.basis[0].z, t.basis[1].x, t.basis[1].y, t.basis[1].z, t.basis[2].x, t.basis[2].y, t.basis[2].z);
-			// 			}
+			/*if (String(obj->key()->get_name()) == String("Spatial")) {
+				auto t = obj->key()->get_global_transform();
+				printf("--rest1 transform:\n x1:%f, y1:%f, z1:%f\n x2:%f, y2:%f, z2:%f\n x3:%f, y3:%f, z3:%f\n", t.basis[0].x, t.basis[0].y, t.basis[0].z, t.basis[1].x, t.basis[1].y, t.basis[1].z, t.basis[2].x, t.basis[2].y, t.basis[2].z);
+			}*/
 
 			auto restInfo = objs_state[i];
 			Spatial *spa = Object::cast_to<Spatial>(restInfo.node);
@@ -876,7 +876,7 @@ void GDIVisualScriptCustomNode::restore_sub_task_state(unsigned int index) {
 				spa->get_transform();
 
 				spa->set_global_transform(restInfo.trans);
-				// 				spa->force_update_transform();
+				/*spa->force_update_transform();*/
 			}
 		}
 	}
@@ -1618,36 +1618,45 @@ public:
 	GDIVisualScriptCustomNodeMouse *node;
 	VisualScriptInstance *instance;
 
-	// mouse relevant----
+	// ----mouse key states relevant
 	uint64_t time = 0;
 
 	Point2 mouse_point_left;
 	Point2 mouse_point_right;
 	Point2 mouse_point_mid;
 
+	bool drag_flag = false;
+	// the reason why I set the flags separately, is to prevent the planner change her mind
+	// she may wants to support the keys at same time
 	bool first_left_pressed_flag = false;
 	bool first_left_released_flag = false;
 	bool first_left_click_flag = false;
 	bool second_left_pressed_flag = false;
-	bool left_drag_flag = false;
 
 	bool first_right_pressed_flag = false;
 	bool first_right_released_flag = false;
+	bool first_right_click_flag = false;
+	bool second_right_pressed_flag = false;
 
 	bool first_mid_pressed_flag = false;
 	bool first_mid_released_flag = false;
+	bool first_mid_click_flag = false;
+	bool second_mid_pressed_flag = false;
 
 	const unsigned int double_click_interval = 500;
 
+	// ----ray intersect
 	Spatial *target = nullptr;
 	Viewport *view_port = nullptr;
 	Camera *cam = nullptr;
 	PhysicsDirectSpaceState *state = nullptr;
-
 	Area *manual_created_area = nullptr;
 	CollisionObject *selected_area = nullptr;
-
 	bool first_create_manual_area_flag = false;
+
+	// -----miscellaneous
+	String key_name;
+	GDIVisualScriptCustomNodeMouse::MouseKey key_type;
 
 	// record singleton to increase the invoke efficiency----
 	_OS *_os = nullptr;
@@ -1776,8 +1785,6 @@ public:
 		}
 
 		if (nullptr != view_port && nullptr != state && nullptr != cam) {
-			auto p1 = view_port->get_mouse_position();
-			auto p2 = os->get_mouse_position();
 			auto from = cam->project_ray_origin(os->get_mouse_position());
 			auto to = from + cam->project_ray_normal(os->get_mouse_position()) * 10000.0;
 
@@ -1817,19 +1824,57 @@ public:
 			return 0;
 		}
 
+		// check input mouse key name
+		if (key_name == String()) {
+			key_name = *p_inputs[0];
+
+			if (key_name == this->node->get_mouse_key_string(GDIVisualScriptCustomNodeMouse::LEFT)) {
+				key_type = GDIVisualScriptCustomNodeMouse::LEFT;
+			}
+			else if (key_name == this->node->get_mouse_key_string(GDIVisualScriptCustomNodeMouse::RIGHT)) {
+				key_type = GDIVisualScriptCustomNodeMouse::RIGHT;
+			}
+			else if (key_name == this->node->get_mouse_key_string(GDIVisualScriptCustomNodeMouse::MID)) {
+				key_type = GDIVisualScriptCustomNodeMouse::MID;
+			}
+			else {
+				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+				r_error_str = "[GDI]mouse, key name error";
+				return 0;
+			}
+		}
+
+		// get all keys flag
 		auto left_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_LEFT);
 		auto right_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_RIGHT);
-		//auto mid_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_MIDDLE); // preserve
+		auto mid_button_pressed_flag = input->is_mouse_button_pressed(BUTTON_MIDDLE);
+		auto mouse_btn_mask = input->gdi_get_mouse_button_mask();
+		int wheel_value = 0;
+		if ((mouse_btn_mask & (1 << (BUTTON_WHEEL_UP - 1))) != 0) {
+			wheel_value = 1;
+		}
+		else if ((mouse_btn_mask & (1 << (BUTTON_WHEEL_DOWN - 1))) != 0) {
+			wheel_value = -1;
+		}
 
-		*p_outputs[0] = left_button_pressed_flag;
-		*p_outputs[1] = right_button_pressed_flag;
+		// output the first param(pressed)
+		if (key_type == GDIVisualScriptCustomNodeMouse::LEFT) {
+			*p_outputs[0] = left_button_pressed_flag;
+		}
+		else if (key_type == GDIVisualScriptCustomNodeMouse::RIGHT) {
+			*p_outputs[0] = right_button_pressed_flag;
+		}
+		else if (key_type == GDIVisualScriptCustomNodeMouse::MID) {
+			*p_outputs[0] = mid_button_pressed_flag;
+		}
+
+		*p_outputs[1] = wheel_value;
 		*p_outputs[2] = os->get_mouse_position();
-		//*p_outputs[3] = (Object*)(nullptr);
 		*p_outputs[3] = false;
 
 		// check area path, if null, we will create it manual
 		if (nullptr == target) {
-			target = Object::cast_to<Spatial>((Object*)*p_inputs[0]);
+			target = Object::cast_to<Spatial>((Object*)*p_inputs[1]);
 		}
 		auto area_path = this->node->get_mouse_pick_area_path();
 		Object *object = instance->get_owner_ptr();
@@ -1839,9 +1884,9 @@ public:
 		}
 
 		if (area_path == NodePath() && nullptr != target) {
-			// 			printf("area path is null.....\n");
+			//printf("area path is null.....\n");
 
-						// calculate the comb aabb manual
+			// calculate the comb aabb manual
 			int child_num = target->get_child_count();
 			Vector3 min_pos, max_pos;
 			bool dirty_flag = false;
@@ -1854,9 +1899,7 @@ public:
 				if (!has_area_flag) {
 					// check child mesh and area situation, 
 // 					check_child_mesh_area_func(target, dirty_flag, has_area_flag, min_pos, max_pos);
-
 					manual_generate_area(target, min_pos, max_pos, dirty_flag);
-
 					first_create_manual_area_flag = true;
 				}
 			}
@@ -1865,111 +1908,186 @@ public:
 		// check ray intersect
 		check_mouse_ray_intersect(p_outputs);
 
-		//----mouse wheel
-		auto mouse_btn_mask = input->gdi_get_mouse_button_mask();
+		// ----mouse wheel
 		if (mouse_btn_mask != 0) {
 			input->gdi_reset_mouse_button_mask();
 			if ((mouse_btn_mask & (1 << (BUTTON_WHEEL_UP - 1))) != 0 ||
 				(mouse_btn_mask & (1 << (BUTTON_WHEEL_DOWN - 1))) != 0) {
-				return 4;
+				return 3;
 			}
 		}
 
 		bool double_click_flag = false;
-		left_drag_flag = false;
+		drag_flag = false;
 
-		//----mid button relevant(preserve)
-// 		if (!first_mid_pressed_flag && mid_button_pressed_flag) {
-// 			first_mid_pressed_flag = true;
-// 			mouse_point_mid = os->get_mouse_position();
-// 		}
-// 		else if (first_mid_pressed_flag && !first_mid_released_flag && !mid_button_pressed_flag) {
-// 			first_mid_released_flag = true;
-// 		}
+		if (key_type == GDIVisualScriptCustomNodeMouse::LEFT) {
 
-		//----right button relevant
-		if (!first_right_pressed_flag && right_button_pressed_flag) {
-			first_right_pressed_flag = true;
-			mouse_point_right = os->get_mouse_position();
-		}
-		else if (first_right_pressed_flag && !first_right_released_flag && !right_button_pressed_flag) {
-			first_right_released_flag = true;
-		}
-
-		//----left button relevant
-		// check drag first
-		if (first_left_pressed_flag && left_button_pressed_flag && mouse_point_left != os->get_mouse_position()) {
-			left_drag_flag = true;
-		}
-		else {
-			if (!first_left_pressed_flag && left_button_pressed_flag) {
-				first_left_pressed_flag = true;
-				time = os->get_system_time_msecs();
-				// prevent drag double click
-				mouse_point_left = os->get_mouse_position();
+			// ----left button relevant
+			// check drag first
+			if (first_left_pressed_flag && left_button_pressed_flag && mouse_point_left != os->get_mouse_position()) {
+				drag_flag = true;
 			}
-			else if (first_left_pressed_flag && !first_left_released_flag && !left_button_pressed_flag) {
-				first_left_released_flag = true;
-			}
-			else if (first_left_released_flag && left_button_pressed_flag) {
-				second_left_pressed_flag = true;
-			}
-			else if (second_left_pressed_flag && !left_button_pressed_flag) {
-				auto diff_time = os->get_system_time_msecs() - time;
-				// 			os->print("enter second click, diff time[%d]\n", diff_time);
-				if (diff_time < double_click_interval && mouse_point_left == os->get_mouse_position()) {
-					double_click_flag = true;
+			else {
+				if (!first_left_pressed_flag && left_button_pressed_flag) {
+					first_left_pressed_flag = true;
+					time = os->get_system_time_msecs();
+					// prevent drag double click
+					mouse_point_left = os->get_mouse_position();
 				}
+				else if (first_left_pressed_flag && !first_left_released_flag && !left_button_pressed_flag) {
+					first_left_released_flag = true;
+				}
+				else if (first_left_released_flag && left_button_pressed_flag) {
+					second_left_pressed_flag = true;
+				}
+				else if (second_left_pressed_flag && !left_button_pressed_flag) {
+					auto diff_time = os->get_system_time_msecs() - time;
+					// 			os->print("enter second click, diff time[%d]\n", diff_time);
+					if (diff_time < double_click_interval && mouse_point_left == os->get_mouse_position()) {
+						double_click_flag = true;
+					}
+	
+					time = 0;
+					second_left_pressed_flag = false;
+					first_left_pressed_flag = false;
+					first_left_released_flag = false;
+				}
+			}
 
-				time = 0;
-				second_left_pressed_flag = false;
-				first_left_pressed_flag = false;
-				first_left_released_flag = false;
+			// double click
+			if (double_click_flag) {
+				return 1;
+			}
+			// drag
+			else if (first_left_pressed_flag && !first_left_released_flag && mouse_point_left != os->get_mouse_position()) {
+				return 2;
+			}
+			// left click
+			else if (first_left_released_flag && !first_left_click_flag && mouse_point_left == os->get_mouse_position()) {
+				first_left_click_flag = true;
+				return 0;
+			}
+		}
+		else if (key_type == GDIVisualScriptCustomNodeMouse::RIGHT) {
+
+			// ----right button relevant
+			// check drag first
+			if (first_right_pressed_flag && right_button_pressed_flag && mouse_point_right != os->get_mouse_position()) {
+				drag_flag = true;
+			}
+			else {
+				if (!first_right_pressed_flag && right_button_pressed_flag) {
+					first_right_pressed_flag = true;
+					time = os->get_system_time_msecs();
+					// prevent drag double click
+					mouse_point_right = os->get_mouse_position();
+				}
+				else if (first_right_pressed_flag && !first_right_released_flag && !right_button_pressed_flag) {
+					first_right_released_flag = true;
+				}
+				else if (first_right_released_flag && right_button_pressed_flag) {
+					second_right_pressed_flag = true;
+				}
+				else if (second_right_pressed_flag && !right_button_pressed_flag) {
+					auto diff_time = os->get_system_time_msecs() - time;
+					// 			os->print("enter second click, diff time[%d]\n", diff_time);
+					if (diff_time < double_click_interval && mouse_point_right == os->get_mouse_position()) {
+						double_click_flag = true;
+					}
+
+					time = 0;
+					second_right_pressed_flag = false;
+					first_right_pressed_flag = false;
+					first_right_released_flag = false;
+				}
+			}
+
+			// double click
+			if (double_click_flag) {
+				return 1;
+			}
+			// drag
+			else if (first_right_pressed_flag && !first_right_released_flag && mouse_point_right != os->get_mouse_position()) {
+				return 2;
+			}
+			// right click
+			else if (first_right_released_flag && !first_right_click_flag && mouse_point_right == os->get_mouse_position()) {
+				first_right_click_flag = true;
+				return 0;
+			}
+		}
+		else if (key_type == GDIVisualScriptCustomNodeMouse::MID) {
+
+			// ----mid button relevant(preserve)
+			// check drag first
+			if (first_mid_pressed_flag && mid_button_pressed_flag && mouse_point_mid != os->get_mouse_position()) {
+				drag_flag = true;
+			}
+			else {
+				if (!first_mid_pressed_flag && mid_button_pressed_flag) {
+					first_mid_pressed_flag = true;
+					time = os->get_system_time_msecs();
+					// prevent drag double click
+					mouse_point_mid = os->get_mouse_position();
+				}
+				else if (first_mid_pressed_flag && !first_mid_released_flag && !mid_button_pressed_flag) {
+					first_mid_released_flag = true;
+				}
+				else if (first_mid_released_flag && mid_button_pressed_flag) {
+					second_mid_pressed_flag = true;
+				}
+				else if (second_mid_pressed_flag && !mid_button_pressed_flag) {
+					auto diff_time = os->get_system_time_msecs() - time;
+					// 			os->print("enter second click, diff time[%d]\n", diff_time);
+					if (diff_time < double_click_interval && mouse_point_mid == os->get_mouse_position()) {
+						double_click_flag = true;
+					}
+
+					time = 0;
+					second_mid_pressed_flag = false;
+					first_mid_pressed_flag = false;
+					first_mid_released_flag = false;
+				}
+			}
+
+			// double click
+			if (double_click_flag) {
+				return 1;
+			}
+			// drag
+			else if (first_mid_pressed_flag && !first_mid_released_flag && mouse_point_mid != os->get_mouse_position()) {
+				return 2;
+			}
+			// mid click
+			else if (first_mid_released_flag && !first_mid_click_flag && mouse_point_mid == os->get_mouse_position()) {
+				first_mid_click_flag = true;
+				return 0;
 			}
 		}
 
-		// reset, if time alreay over
+		// ----reset, if time over
 		if (os->get_system_time_msecs() - time >= double_click_interval) {
 			time = 0;
 			second_left_pressed_flag = false;
 			first_left_click_flag = false;
-			if (!left_drag_flag) {
+
+			second_right_pressed_flag = false;
+			first_right_click_flag = false;
+
+			second_mid_pressed_flag = false;
+			first_mid_click_flag = false;
+
+			if (!drag_flag) {
 				first_left_pressed_flag = false;
 				first_left_released_flag = false;
-			}
-		}
 
-		// double click
-		if (double_click_flag) {
-			return 1;
-		}
-		// drag
-		else if (first_left_pressed_flag && !first_left_released_flag && mouse_point_left != os->get_mouse_position()) {
-			return 2;
-		}
-		// left click
-		else if (first_left_released_flag && !first_left_click_flag && mouse_point_left == os->get_mouse_position()) {
-			//first_left_pressed_flag = false;
-			//first_left_released_flag = false;
-			first_left_click_flag = true;
-			return 0;
-		}
-		// right click
-		else if (first_right_pressed_flag && first_right_released_flag) {
-			first_right_pressed_flag = false;
-			first_right_released_flag = false;
-			if (mouse_point_right == os->get_mouse_position()) {
-				return 3;
+				first_right_pressed_flag = false;
+				first_right_released_flag = false;
+
+				first_mid_pressed_flag = false;
+				first_mid_released_flag = false;
 			}
 		}
-		// mid click(preserve)
-		//else if (first_mid_pressed_flag && first_mid_released_flag) {
-		//	first_mid_pressed_flag = false;
-		//	first_mid_released_flag = false;
-		//	if (mouse_point_mid == os->get_mouse_position()) {
-		//		return 4;
-		//	}
-		//}
 
 		p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
 		return STEP_EXIT_FUNCTION_BIT;
@@ -1994,9 +2112,14 @@ void GDIVisualScriptCustomNodeMouse::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, L"(鼠标)拣选碰撞区", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Area,KinematicBody,PhysicalBone,RigidBody,VehicleBody,StaticBody"), "set_mouse_pick_area_path", "get_mouse_pick_area_path");
 }
 
+String GDIVisualScriptCustomNodeMouse::get_mouse_key_string(MouseKey key) const {
+
+	return mouse_key_list[key];
+}
+
 int GDIVisualScriptCustomNodeMouse::get_output_sequence_port_count() const {
 
-	return 5;
+	return 4;
 }
 
 bool GDIVisualScriptCustomNodeMouse::has_input_sequence_port() const {
@@ -2009,19 +2132,16 @@ String GDIVisualScriptCustomNodeMouse::get_output_sequence_port_text(int p_port)
 	switch (p_port)
 	{
 	case 0: {
-		return L"左键单击";
+		return L"单击";
 	}
 	case 1: {
-		return L"左键双击";
+		return L"双击";
 	}
 	case 2: {
-		return L"左键拖动";
+		return L"拖动";
 	}
 	case 3: {
-		return L"右键单击";
-	}
-	case 4: {
-		return L"中间滚轮";
+		return L"滚轮";
 	}
 	default:
 		return L"未处理索引";
@@ -2030,7 +2150,7 @@ String GDIVisualScriptCustomNodeMouse::get_output_sequence_port_text(int p_port)
 
 int GDIVisualScriptCustomNodeMouse::get_input_value_port_count() const {
 
-	return 1;
+	return 2;
 }
 
 int GDIVisualScriptCustomNodeMouse::get_output_value_port_count() const {
@@ -2041,8 +2161,25 @@ int GDIVisualScriptCustomNodeMouse::get_output_value_port_count() const {
 PropertyInfo GDIVisualScriptCustomNodeMouse::get_input_value_port_info(int p_idx) const {
 
 	PropertyInfo pi;
-	pi.name = L"拣选节点";
-	pi.type = Variant::OBJECT;
+
+	switch (p_idx)
+	{
+	case 0: {
+		pi.name = L"键位选择";
+		pi.type = Variant::STRING;
+		pi.hint = PROPERTY_HINT_ENUM;
+		pi.hint_string = mouse_key_list[LEFT] + "," + mouse_key_list[RIGHT] + "," + mouse_key_list[MID];
+		break;
+	}
+	case 1: {
+		pi.name = L"拣选节点";
+		pi.type = Variant::OBJECT;
+		break;
+	}
+	default:
+		break;
+	}
+
 	return pi;
 }
 
@@ -2053,18 +2190,18 @@ PropertyInfo GDIVisualScriptCustomNodeMouse::get_output_value_port_info(int p_id
 	switch (p_idx)
 	{
 	case 0: {
-		pi.name = L"左键按下";
+		pi.name = L"按下";
 		pi.type = Variant::BOOL;
 		break;
 	}
 	case 1: {
-		pi.name = L"右键按下";
-		pi.type = Variant::BOOL;
+		pi.name = L"滚轮值";
+		pi.type = Variant::INT;
 		break;
 	}
 	case 2: {
 		pi.name = L"鼠标坐标";
-		pi.type = Variant::BOOL;
+		pi.type = Variant::VECTOR2;
 		break;
 	}
 	case 3: {

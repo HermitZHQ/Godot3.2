@@ -724,18 +724,6 @@ bool CustomPropertyEditor::edit(Object *p_owner, const String &p_name, Variant::
 				}
 				value_editor[0]->set_max_length(1);
 				value_editor[0]->set_text(v);
-
-				//---- show check box
-				checks20gc->show();
-
-				CheckBox *c = checks20[0];
-				c->set_text("True");
-				checks20gc->set_position(Vector2(4, 4) * EDSCALE);
-				c->set_pressed(v);
-				c->show();
-
-				checks20gc->set_size(checks20gc->get_minimum_size());
-				set_size(checks20gc->get_position() + checks20gc->get_size() + c->get_size() + Vector2(4, 4) * EDSCALE);
 			}
 			else {
 				List<String> names;

@@ -180,6 +180,18 @@ protected:
 	static void _bind_methods();
 
 public:
+	enum MouseKey
+	{
+		LEFT,
+		RIGHT,
+		MID,
+
+		MAX_COUNT
+	};
+	const String mouse_key_list[3] = { L"左键", L"右键", L"中键" };
+
+	String get_mouse_key_string(MouseKey key) const;
+
 	virtual int get_output_sequence_port_count() const override;
 	virtual bool has_input_sequence_port() const override;
 	virtual String get_output_sequence_port_text(int p_port) const override;
