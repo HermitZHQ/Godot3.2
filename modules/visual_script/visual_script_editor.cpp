@@ -2415,13 +2415,13 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::ACTIVE);
 
 			already_create_visual_node_flag = true;
-			_gdi_create_ready_func_node();
+			_gdi_create_ready_func_node(ofs);
 		}
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::LOOP]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::LOOP);
 
 			already_create_visual_node_flag = true;
-			_gdi_create_process_func_node();
+			_gdi_create_process_func_node(ofs);
 		}
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::TASK_CONTROL]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::TASK_CONTROL);
@@ -2489,7 +2489,7 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 	}
 }
 
-void VisualScriptEditor::_gdi_create_process_func_node() {
+void VisualScriptEditor::_gdi_create_process_func_node(const Vector2 &ofs) {
 	String name = "_process";
 	if (script->has_function(name)) {
 		EditorNode::get_singleton()->show_warning(L"该任务模块已存在，且只能存在一个");
@@ -2526,7 +2526,7 @@ void VisualScriptEditor::_gdi_create_process_func_node() {
 		func_node->add_argument(minfo.arguments[i].type, L"帧时差", -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
 	}
 
-	Vector2 ofs = _get_available_pos();
+// 	Vector2 ofs = _get_available_pos();
 // 	ofs.y += 20.0;
 
 	undo_redo->add_do_method(script.ptr(), "add_node", name, script->get_available_id(), func_node, ofs);
@@ -2551,7 +2551,7 @@ void VisualScriptEditor::_gdi_create_process_func_node() {
 	_update_graph();
 }
 
-void VisualScriptEditor::_gdi_create_ready_func_node() {
+void VisualScriptEditor::_gdi_create_ready_func_node(const Vector2 &ofs) {
 	String name = "_ready";
 	if (script->has_function(name)) {
 		EditorNode::get_singleton()->show_warning(L"该任务模块已存在，且只能存在一个");
@@ -2583,7 +2583,7 @@ void VisualScriptEditor::_gdi_create_ready_func_node() {
 	undo_redo->create_action(TTR("Add Function"));
 	undo_redo->add_do_method(script.ptr(), "add_function", name);
 
-	Vector2 ofs = _get_available_pos();
+// 	Vector2 ofs = _get_available_pos();
 
 	undo_redo->add_do_method(script.ptr(), "add_node", name, script->get_available_id(), func_node, ofs);
 // 	undo_redo->add_do_method(script.ptr(), "add_node", L"循环调用", script->get_available_id(), func_node, ofs);

@@ -261,8 +261,8 @@ class VisualScriptEditor : public ScriptEditorBase {
 	void drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from);
 
 	// 修改点：加入创建内置process和ready的函数
-	void _gdi_create_process_func_node();
-	void _gdi_create_ready_func_node();
+	void _gdi_create_process_func_node(const Vector2 &ofs);
+	void _gdi_create_ready_func_node(const Vector2 &ofs);
 	void _gdi_delete_function(const String &name);
 	void _gdi_create_new_visual_node(Variant vnode, Point2 &ofs);
 
@@ -342,8 +342,8 @@ public:
 	// 避免到处手动分散写常量
 	// 不能随意修改数组中的顺序，必须和enum匹配
 private:
-	const String gdi_str_custom_node_list[11] = { L"激活(主任务)", L"循环(主任务)", L"任务拆分", L"任务控制", L"键盘", L"鼠标",
-												 L"空间触发器", L"定时器", L"组合", L"初始化", L"部分初始化" };
+	const String gdi_str_custom_node_list[10] = { L"激活(主任务)", L"循环(主任务)", L"任务拆分", L"任务控制", L"键盘", L"鼠标",
+												 L"空间触发器", L"定时器", L"组合", L"初始化" };
 };
 
 // Singleton
