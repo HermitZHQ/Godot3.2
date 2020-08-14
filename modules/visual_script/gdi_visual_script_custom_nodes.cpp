@@ -17,6 +17,7 @@
 #include "scene/main/viewport.h"
 #include "scene/3d/camera.h"
 #include "core/node_path.h"
+#include <string>
 
 
 int GDIVisualScriptCustomNode::get_output_sequence_port_count() const {
@@ -1055,7 +1056,7 @@ public:
 				return 0;
 			}
 
-			os->print("--------start collect sub task init info, task index[%d]\n", task_split_cur_execute_index);
+			//os->print("--------start collect sub task init info, task index[%d]\n", task_split_cur_execute_index);
 			Vector<GDIVisualScriptCustomNode::RestoreInfo> spatial_trans_vec;
 			collect_init_info(root, spatial_trans_vec);
 			sub_task_objs_state_vec.push_back(spatial_trans_vec);
@@ -1063,7 +1064,7 @@ public:
 			// store the info to node
 			GDIVisualScriptCustomNode *custom_node = Object::cast_to<GDIVisualScriptCustomNode>(this->node);
 			if (nullptr != custom_node) {
-				// 				os->print("set sub task index and objs state, index[%d] addr[%x]\n", task_split_cur_execute_index, custom_node);
+				//os->print("set sub task index and objs state, index[%d] addr[%x]\n", task_split_cur_execute_index, custom_node);
 				custom_node->add_sub_task_index_and_objs_state(spatial_trans_vec);
 			}
 		}
@@ -1827,14 +1828,15 @@ public:
 		// check input mouse key name
 		if (key_name == String()) {
 			key_name = *p_inputs[0];
-
-			if (key_name == this->node->get_mouse_key_string(GDIVisualScriptCustomNodeMouse::LEFT)) {
+			printf("test key name[%S]\n", key_name);
+			
+			if (key_name == std::to_string(GDIVisualScriptCustomNodeMouse::LEFT).c_str()) {
 				key_type = GDIVisualScriptCustomNodeMouse::LEFT;
 			}
-			else if (key_name == this->node->get_mouse_key_string(GDIVisualScriptCustomNodeMouse::RIGHT)) {
+			else if (key_name == std::to_string(GDIVisualScriptCustomNodeMouse::RIGHT).c_str()) {
 				key_type = GDIVisualScriptCustomNodeMouse::RIGHT;
 			}
-			else if (key_name == this->node->get_mouse_key_string(GDIVisualScriptCustomNodeMouse::MID)) {
+			else if (key_name == std::to_string(GDIVisualScriptCustomNodeMouse::MID).c_str()) {
 				key_type = GDIVisualScriptCustomNodeMouse::MID;
 			}
 			else {
@@ -2166,7 +2168,7 @@ PropertyInfo GDIVisualScriptCustomNodeMouse::get_input_value_port_info(int p_idx
 	{
 	case 0: {
 		pi.name = L"键位选择";
-		pi.type = Variant::STRING;
+		pi.type = Variant::INT;
 		pi.hint = PROPERTY_HINT_ENUM;
 		pi.hint_string = mouse_key_list[LEFT] + "," + mouse_key_list[RIGHT] + "," + mouse_key_list[MID];
 		break;
@@ -2226,7 +2228,7 @@ String GDIVisualScriptCustomNodeMouse::get_caption() const {
 
 String GDIVisualScriptCustomNodeMouse::get_category() const {
 
-	return L"Express";
+	return L"custom";
 }
 
 String GDIVisualScriptCustomNodeMouse::get_text() const {

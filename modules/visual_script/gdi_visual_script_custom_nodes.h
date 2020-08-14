@@ -98,7 +98,7 @@ public:
 
 	virtual String get_caption() const;
 	virtual String get_text() const;
-	virtual String get_category() const { return "customs"; }
+	virtual String get_category() const { return "custom"; }
 
 	void set_custom_mode(CustomMode p_mode);
 	CustomMode get_custom_mode() const;
