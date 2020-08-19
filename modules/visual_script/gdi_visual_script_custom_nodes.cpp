@@ -1,5 +1,6 @@
 #include "gdi_visual_script_custom_nodes.h"
 
+#include <string>
 #include "core/engine.h"
 #include "core/io/resource_loader.h"
 #include "core/os/os.h"
@@ -17,7 +18,7 @@
 #include "scene/main/viewport.h"
 #include "scene/3d/camera.h"
 #include "core/node_path.h"
-#include <string>
+#include "modules/enet/networked_multiplayer_enet.h"
 
 
 int GDIVisualScriptCustomNode::get_output_sequence_port_count() const {
@@ -990,7 +991,7 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 	BIND_ENUM_CONSTANT(RPC_UNRELIABLE_TO_ID);
 }
 
-class GDIVisualScriptNodeInstanceCustom : public VisualScriptNodeInstance {
+class GDIVisualScriptNodeInstanceCustom : public VisualScriptNodeInstance, public GDICustomNodeBase {
 public:
 	GDIVisualScriptCustomNode::CustomMode custom_mode;
 	NodePath node_path;
@@ -1021,17 +1022,6 @@ public:
 	bool first_create_manual_area_flag = false;
 	Area *manual_created_area = nullptr;
 	CollisionObject *selected_area = nullptr;
-
-	// record singleton to increase the invoke efficiency----
-	_OS *_os = nullptr;
-	OS *os = nullptr;
-	Input *input = nullptr;
-
-	GDIVisualScriptNodeInstanceCustom()
-		:_os(_OS::get_singleton())
-		, os(OS::get_singleton())
-		, input(Input::get_singleton())
-	{}
 
 	virtual int get_working_memory_size() const { return 1; }
 	//virtual bool is_output_port_unsequenced(int p_idx) const { return false; }
@@ -1610,7 +1600,8 @@ GDIVisualScriptCustomNode::~GDIVisualScriptCustomNode() {
 
 unsigned int GDIVisualScriptCustomNode::global_task_id = 1;
 
-class GDIVisualScriptNodeInstanceCustomMouse : public VisualScriptNodeInstance {
+// ----------------------------------------------Mouse relevant
+class GDIVisualScriptNodeInstanceCustomMouse : public VisualScriptNodeInstance, public GDICustomNodeBase {
 public:
 	int input_args;
 	bool validate;
@@ -1658,17 +1649,6 @@ public:
 	// -----miscellaneous
 	String key_name;
 	GDIVisualScriptCustomNodeMouse::MouseKey key_type;
-
-	// record singleton to increase the invoke efficiency----
-	_OS *_os = nullptr;
-	OS *os = nullptr;
-	Input *input = nullptr;
-
-	GDIVisualScriptNodeInstanceCustomMouse()
-		:_os(_OS::get_singleton())
-		, os(OS::get_singleton())
-		, input(Input::get_singleton())
-	{}
 
 	void manual_generate_area(Spatial *target, const Vector3 min_pos, const Vector3 max_pos, bool dirty_flag) {
 
@@ -1828,7 +1808,7 @@ public:
 		// check input mouse key name
 		if (key_name == String()) {
 			key_name = *p_inputs[0];
-			printf("test key name[%S]\n", key_name);
+			printf("test key name[%S]\n", key_name.c_str());
 			
 			if (key_name == std::to_string(GDIVisualScriptCustomNodeMouse::LEFT).c_str()) {
 				key_type = GDIVisualScriptCustomNodeMouse::LEFT;
@@ -2261,5 +2241,242 @@ GDIVisualScriptCustomNodeMouse::GDIVisualScriptCustomNodeMouse() {
 }
 
 GDIVisualScriptCustomNodeMouse::~GDIVisualScriptCustomNodeMouse() {
+
+}
+
+// ----------------------------------Multi Player(sync)
+class GDIVisualScriptNodeInstanceCustomMultiPlayer : public VisualScriptNodeInstance, public GDICustomNodeBase {
+public:
+	int input_args;
+	bool validate;
+	int returns;
+
+	GDIVisualScriptCustomNodeMultiPlayer *node;
+	VisualScriptInstance *instance;
+
+	// ----multi player
+	bool already_create_flag = false;
+	bool create_succeed_flag = false;
+	bool is_server_flag = false;
+	Ref<NetworkedMultiplayerENet> multi_player_enet = nullptr;
+
+	GDIVisualScriptNodeInstanceCustomMultiPlayer() {
+
+		multi_player_enet.instance();
+	}
+
+	~GDIVisualScriptNodeInstanceCustomMultiPlayer() {
+
+	}
+
+	int server_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
+
+		int port = *p_inputs[2];
+		int connect_num = *p_inputs[3];
+		static const unsigned int max_connect = 32;
+		if (connect_num > max_connect) {
+			r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+			r_error_str = "[GDI]max connect num is 32";
+			return 0;
+		}
+
+		Error err = multi_player_enet->create_server(port, connect_num);
+		if (Error::OK != err) {
+			create_succeed_flag = false;
+
+			r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+			r_error_str = "[GDI]create server failed";
+			if (0 == port || port > 0xFF) {
+				r_error_str = "[GDI]invalid port num";
+			}
+
+			return 0;
+		}
+
+		create_succeed_flag = true;
+		os->print("create server succeed\n");
+
+		return 0;
+	}
+	int client_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
+
+		String ip = *p_inputs[1];
+		int port = *p_inputs[2];
+
+		Error err = multi_player_enet->create_client(ip, port);
+		if (Error::OK != err) {
+			create_succeed_flag = false;
+
+			r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+			r_error_str = "[GDI]create client failed";
+			if (0 == port || port > 0xFF) {
+				r_error_str = "[GDI]invalid port num";
+			}
+			if (String() == ip) {
+				r_error_str = "[GDI]invalid ip str";
+			}
+
+			return 0;
+		}
+
+		create_succeed_flag = true;
+		os->print("create client succeed\n");
+
+		return 0;
+	}
+	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) override	{
+
+		if (!already_create_flag) {
+			Node *node = Object::cast_to<Node>(instance->get_owner_ptr());
+			if (nullptr == node) {
+				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+				r_error_str = "[GDI]can't get instance node";
+				return 0;
+			}
+
+			// Server----
+			if (true == (bool)(*p_inputs[0])) {
+				server_handle_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
+			}
+			// Client----
+			else {
+				client_handle_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
+			}
+		
+			node->get_tree()->set_network_peer(multi_player_enet);
+			node->get_tree()->connect("network_peer_connected", this->node, "peer_connected");
+			node->get_tree()->connect("network_peer_disconnected", this->node, "peer_disconnected");
+
+			already_create_flag = true;
+		}
+
+		*p_outputs[0] = create_succeed_flag;
+
+		return 0;
+	}
+
+	virtual int get_working_memory_size() const override {
+		return 1;
+	}
+
+};
+
+void GDIVisualScriptCustomNodeMultiPlayer::_bind_methods() {
+
+	ClassDB::bind_method(D_METHOD("peer_connected", "id"), &GDIVisualScriptCustomNodeMultiPlayer::peer_connected);
+	ClassDB::bind_method(D_METHOD("peer_disconnected", "id"), &GDIVisualScriptCustomNodeMultiPlayer::peer_disconnected);
+}
+
+int GDIVisualScriptCustomNodeMultiPlayer::get_output_sequence_port_count() const {
+	return 1;
+}
+
+bool GDIVisualScriptCustomNodeMultiPlayer::has_input_sequence_port() const {
+	return true;
+}
+
+String GDIVisualScriptCustomNodeMultiPlayer::get_output_sequence_port_text(int p_port) const {
+	return String();
+}
+
+int GDIVisualScriptCustomNodeMultiPlayer::get_input_value_port_count() const {
+	return 4;
+}
+
+int GDIVisualScriptCustomNodeMultiPlayer::get_output_value_port_count() const {
+	return 1;
+}
+
+PropertyInfo GDIVisualScriptCustomNodeMultiPlayer::get_input_value_port_info(int p_idx) const {
+
+	PropertyInfo pi;
+	switch (p_idx)
+	{
+	case 0: {
+		pi.name = L"是否为服务器";
+		pi.type = Variant::BOOL;
+		break;
+	}
+	case 1: {
+		pi.name = L"IP地址";
+		pi.type = Variant::STRING;
+		break;
+	}
+	case 2: {
+		pi.name = L"端口";
+		pi.type = Variant::INT;
+		break;
+	}
+	case 3: {
+		pi.name = L"最大连接数";
+		pi.type = Variant::INT;
+		break;
+	}
+	default:
+		break;
+	}
+
+	return pi;
+}
+
+PropertyInfo GDIVisualScriptCustomNodeMultiPlayer::get_output_value_port_info(int p_idx) const {
+
+	PropertyInfo pi;
+	pi.name = L"成功";
+	pi.type = Variant::BOOL;
+	return pi;
+}
+
+String GDIVisualScriptCustomNodeMultiPlayer::get_caption() const {
+
+	return L"多人协同";
+}
+
+String GDIVisualScriptCustomNodeMultiPlayer::get_category() const {
+
+	return L"custom";
+}
+
+String GDIVisualScriptCustomNodeMultiPlayer::get_text() const {
+
+	return L"创建服务器或客户端";
+}
+
+VisualScriptNodeInstance * GDIVisualScriptCustomNodeMultiPlayer::instance(VisualScriptInstance *p_instance) {
+
+	GDIVisualScriptNodeInstanceCustomMultiPlayer *instance = memnew(GDIVisualScriptNodeInstanceCustomMultiPlayer);
+	instance->node = this;
+	instance->instance = p_instance;
+	instance->returns = get_output_value_port_count();
+	instance->input_args = get_input_value_port_count();
+	return instance;
+}
+
+void GDIVisualScriptCustomNodeMultiPlayer::peer_connected(int id) {
+
+	os->print("peer connected[%d]..\n", id);
+}
+
+void GDIVisualScriptCustomNodeMultiPlayer::peer_disconnected(int id) {
+
+	os->print("peer disconnected[%d]..\n", id);
+}
+
+GDIVisualScriptCustomNodeMultiPlayer::GDIVisualScriptCustomNodeMultiPlayer() {
+
+}
+
+GDIVisualScriptCustomNodeMultiPlayer::~GDIVisualScriptCustomNodeMultiPlayer() {
+
+}
+
+GDICustomNodeBase::GDICustomNodeBase()
+	:_os(_OS::get_singleton())
+	, os(OS::get_singleton())
+	, input(Input::get_singleton()) {
+
+}
+
+GDICustomNodeBase::~GDICustomNodeBase() {
 
 }

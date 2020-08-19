@@ -2479,6 +2479,12 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::INIT]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::INIT);
 		}
+		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::MULTI_PLAYER]) {
+			Ref<GDIVisualScriptCustomNodeMultiPlayer> node;
+			node.instance();
+			_gdi_create_new_visual_node(node, ofs);
+			already_create_visual_node_flag = true;
+		}
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::INIT_PARTIAL]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::INIT_PARTIAL);
 		}

@@ -5,7 +5,42 @@
 
 class Spatial;
 class Transfrom;
-class GDIVisualScriptCustomNode : public VisualScriptNode {
+class OS;
+class _OS;
+class Input;
+
+class GDICustomNodeBase
+{
+public:
+	enum CustomMode
+	{
+		ACTIVE,
+		LOOP,
+		TASK_SPLIT,
+		TASK_CONTROL,
+		KEYBOARD,
+		MOUSE,
+		AREA_TIGGER,
+		TIMER,
+		COMBINATION,
+		INIT,
+		MULTI_PLAYER,
+
+		INIT_PARTIAL,// preserve
+		MAX_COUNT
+	};
+
+	GDICustomNodeBase();
+	~GDICustomNodeBase();
+
+protected:
+	// record singleton to increase the invoke efficiency----
+	_OS *_os = nullptr;
+	OS *os = nullptr;
+	Input *input = nullptr;
+};
+
+class GDIVisualScriptCustomNode : public VisualScriptNode, public GDICustomNodeBase {
 
 	GDCLASS(GDIVisualScriptCustomNode, VisualScriptNode);
 
@@ -24,23 +59,6 @@ public:
 		RPC_UNRELIABLE,
 		RPC_RELIABLE_TO_ID,
 		RPC_UNRELIABLE_TO_ID
-	};
-
-	enum CustomMode
-	{
-		ACTIVE,
-		LOOP,
-		TASK_SPLIT,
-		TASK_CONTROL,
-		KEYBOARD,
-		MOUSE,
-		AREA_TIGGER,
-		TIMER,
-		COMBINATION,
-		INIT,
-		INIT_PARTIAL,
-
-		MAX_COUNT
 	};
 
 	struct RestoreInfo
@@ -172,7 +190,7 @@ VARIANT_ENUM_CAST(GDIVisualScriptCustomNode::CallMode);
 VARIANT_ENUM_CAST(GDIVisualScriptCustomNode::RPCCallMode);
 VARIANT_ENUM_CAST(GDIVisualScriptCustomNode::CustomMode);
 
-class GDIVisualScriptCustomNodeMouse : public VisualScriptNode {
+class GDIVisualScriptCustomNodeMouse : public VisualScriptNode, public GDICustomNodeBase {
 
 	GDCLASS(GDIVisualScriptCustomNodeMouse, VisualScriptNode);
 
@@ -213,6 +231,36 @@ public:
 
 private:
 	NodePath mouse_pick_area_path;
+};
+
+class GDIVisualScriptCustomNodeMultiPlayer : public VisualScriptNode, public GDICustomNodeBase {
+
+	GDCLASS(GDIVisualScriptCustomNodeMultiPlayer, VisualScriptNode);
+
+protected:
+	static void _bind_methods();
+
+public:
+	virtual int get_output_sequence_port_count() const override;
+	virtual bool has_input_sequence_port() const override;
+	virtual String get_output_sequence_port_text(int p_port) const override;
+	virtual int get_input_value_port_count() const override;
+	virtual int get_output_value_port_count() const override;
+	virtual PropertyInfo get_input_value_port_info(int p_idx) const override;
+	virtual PropertyInfo get_output_value_port_info(int p_idx) const override;
+	virtual String get_caption() const override;
+	virtual String get_category() const override;
+	virtual String get_text() const override;
+
+	virtual VisualScriptNodeInstance *instance(VisualScriptInstance *p_instance);
+
+	void peer_connected(int id);
+	void peer_disconnected(int id);
+
+	GDIVisualScriptCustomNodeMultiPlayer();
+	~GDIVisualScriptCustomNodeMultiPlayer();
+
+private:
 };
 
 #endif // GDI_VISUAL_SCRIPT_CUSTOM_NODES_H
