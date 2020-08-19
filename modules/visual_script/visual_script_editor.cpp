@@ -2480,10 +2480,26 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::INIT);
 		}
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::MULTI_PLAYER]) {
-			Ref<GDIVisualScriptCustomNodeMultiPlayer> node;
-			node.instance();
-			_gdi_create_new_visual_node(node, ofs);
-			already_create_visual_node_flag = true;
+			bool already_has_multi_player_flag = false;
+			int graph_child_count = graph->get_child_count();
+			for (int i = 0; i < graph_child_count; ++i) {
+				GraphNode *gn = Object::cast_to<GraphNode>(graph->get_child(i));
+				if (nullptr != gn && gn->get_title() == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::MULTI_PLAYER]) {
+					already_has_multi_player_flag = true;
+					break;
+				}
+			}
+
+			if (!already_has_multi_player_flag) {
+				Ref<GDIVisualScriptCustomNodeMultiPlayer> node;
+				node.instance();
+				_gdi_create_new_visual_node(node, ofs);
+				already_create_visual_node_flag = true;
+			} 
+			else {
+				EditorNode::get_singleton()->show_warning(L"该任务模块已存在，且只能存在一个");
+				return;
+			}
 		}
 		else if (d["custom"] == gdi_str_custom_node_list[GDIVisualScriptCustomNode::CustomMode::INIT_PARTIAL]) {
 			vnode->set_custom_mode(GDIVisualScriptCustomNode::INIT_PARTIAL);

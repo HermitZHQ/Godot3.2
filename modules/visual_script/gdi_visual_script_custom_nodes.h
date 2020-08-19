@@ -241,6 +241,14 @@ protected:
 	static void _bind_methods();
 
 public:
+	enum ConnectionStatus
+	{
+		CONNECTTING,
+		CONNECTED,
+		DISCONNECTED,
+		CONNECTION_FAILED
+	};
+
 	virtual int get_output_sequence_port_count() const override;
 	virtual bool has_input_sequence_port() const override;
 	virtual String get_output_sequence_port_text(int p_port) const override;
@@ -254,13 +262,21 @@ public:
 
 	virtual VisualScriptNodeInstance *instance(VisualScriptInstance *p_instance);
 
+	ConnectionStatus get_connection_status() const;
+
+	// Server&Client
 	void peer_connected(int id);
 	void peer_disconnected(int id);
+	// Client
+	void client_connected_to_server();
+	void client_connection_failed();
+	void client_server_disconnected();
 
 	GDIVisualScriptCustomNodeMultiPlayer();
 	~GDIVisualScriptCustomNodeMultiPlayer();
 
 private:
+	ConnectionStatus connection_status;
 };
 
 #endif // GDI_VISUAL_SCRIPT_CUSTOM_NODES_H

@@ -2346,6 +2346,11 @@ public:
 			node->get_tree()->set_network_peer(multi_player_enet);
 			node->get_tree()->connect("network_peer_connected", this->node, "peer_connected");
 			node->get_tree()->connect("network_peer_disconnected", this->node, "peer_disconnected");
+			if (!multi_player_enet->is_server()) {
+				node->get_tree()->connect("connected_to_server", this->node, "client_connected_to_server");
+				node->get_tree()->connect("connection_failed", this->node, "client_connection_failed");
+				node->get_tree()->connect("server_disconnected", this->node, "client_server_disconnected");
+			}
 
 			already_create_flag = true;
 		}
@@ -2365,6 +2370,10 @@ void GDIVisualScriptCustomNodeMultiPlayer::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("peer_connected", "id"), &GDIVisualScriptCustomNodeMultiPlayer::peer_connected);
 	ClassDB::bind_method(D_METHOD("peer_disconnected", "id"), &GDIVisualScriptCustomNodeMultiPlayer::peer_disconnected);
+
+	ClassDB::bind_method(D_METHOD("client_connected_to_server"), &GDIVisualScriptCustomNodeMultiPlayer::client_connected_to_server);
+	ClassDB::bind_method(D_METHOD("client_connection_failed"), &GDIVisualScriptCustomNodeMultiPlayer::client_connection_failed);
+	ClassDB::bind_method(D_METHOD("client_server_disconnected"), &GDIVisualScriptCustomNodeMultiPlayer::client_server_disconnected);
 }
 
 int GDIVisualScriptCustomNodeMultiPlayer::get_output_sequence_port_count() const {
@@ -2444,6 +2453,7 @@ String GDIVisualScriptCustomNodeMultiPlayer::get_text() const {
 
 VisualScriptNodeInstance * GDIVisualScriptCustomNodeMultiPlayer::instance(VisualScriptInstance *p_instance) {
 
+// 	os->print("create multi player instance.....\n");
 	GDIVisualScriptNodeInstanceCustomMultiPlayer *instance = memnew(GDIVisualScriptNodeInstanceCustomMultiPlayer);
 	instance->node = this;
 	instance->instance = p_instance;
@@ -2452,14 +2462,36 @@ VisualScriptNodeInstance * GDIVisualScriptCustomNodeMultiPlayer::instance(Visual
 	return instance;
 }
 
+
+GDIVisualScriptCustomNodeMultiPlayer::ConnectionStatus GDIVisualScriptCustomNodeMultiPlayer::get_connection_status() const {
+
+	return connection_status;
+}
+
 void GDIVisualScriptCustomNodeMultiPlayer::peer_connected(int id) {
 
 	os->print("peer connected[%d]..\n", id);
+// 	connection_status = CONNECTED;
 }
 
 void GDIVisualScriptCustomNodeMultiPlayer::peer_disconnected(int id) {
 
 	os->print("peer disconnected[%d]..\n", id);
+}
+
+void GDIVisualScriptCustomNodeMultiPlayer::client_connected_to_server() {
+
+	os->print("client, connected to server\n");
+}
+
+void GDIVisualScriptCustomNodeMultiPlayer::client_connection_failed() {
+
+	os->print("client, connection failed\n");
+}
+
+void GDIVisualScriptCustomNodeMultiPlayer::client_server_disconnected() {
+
+	os->print("client, server disconnected\n");
 }
 
 GDIVisualScriptCustomNodeMultiPlayer::GDIVisualScriptCustomNodeMultiPlayer() {
