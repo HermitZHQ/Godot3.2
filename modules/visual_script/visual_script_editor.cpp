@@ -2497,9 +2497,9 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 // 				_gdi_create_new_visual_node(node, ofs, "rpc_call_test_func");
 				already_create_visual_node_flag = true;
 
-				undo_redo->create_action(TTR("Add Function"));
-				undo_redo->add_do_method(script.ptr(), "add_function", "rpc_call_test_func");
-				undo_redo->add_undo_method(script.ptr(), "remove_function", "rpc_call_test_func");
+// 				undo_redo->create_action(TTR("Add Function"));
+// 				undo_redo->add_do_method(script.ptr(), "add_function", "rpc_call_test_func");
+// 				undo_redo->add_undo_method(script.ptr(), "remove_function", "rpc_call_test_func");
 
 // 				String name = "rpc_call_test_func";
 // 				if (script->has_function(name)) {

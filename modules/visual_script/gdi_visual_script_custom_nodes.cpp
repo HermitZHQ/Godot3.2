@@ -2296,7 +2296,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::client_connected_to_server() 
 		return;
 	}
 
-	node->rpc("rpc_call_test_func");
+// 	node->rpc("rpc_call_test_func");
 }
 
 void GDIVisualScriptNodeInstanceCustomMultiPlayer::client_connection_failed() {
@@ -2390,7 +2390,6 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 			client_handle_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
 		}
 
-		node->get_tree()->set_network_peer(multi_player_enet);
 		node->get_tree()->connect("network_peer_connected", this, "peer_connected");
 		node->get_tree()->connect("network_peer_disconnected", this, "peer_disconnected");
 		if (!multi_player_enet->is_server()) {
@@ -2398,13 +2397,46 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 			node->get_tree()->connect("connection_failed", this, "client_connection_failed");
 			node->get_tree()->connect("server_disconnected", this, "client_server_disconnected");
 		}
-		node->rpc_config("rpc_call_test_func", MultiplayerAPI::RPCMode::RPC_MODE_REMOTESYNC);
+		//node->rpc_config("rpc_call_test_func", MultiplayerAPI::RPCMode::RPC_MODE_REMOTESYNC);
+
+		multi_player_enet->set_transfer_channel(1);
+		multi_player_enet->set_transfer_mode(NetworkedMultiplayerPeer::TRANSFER_MODE_UNRELIABLE);
+		node->get_tree()->set_network_peer(multi_player_enet);
 
 		already_create_flag = true;
 	}
 
 	*p_outputs[0] = create_succeed_flag;
-	node->rpc("rpc_call_test_func");
+	//node->rpc("rpc_call_test_func");
+
+	// test send msg from client to server
+	if (!multi_player_enet->is_server()) {
+		unsigned char cBuf[256] = "12345";
+
+		auto status = multi_player_enet->get_connection_status();
+		if (status == NetworkedMultiplayerPeer::CONNECTION_CONNECTED) {
+			Variant v = "123";
+			multi_player_enet->set_target_peer(1);
+			Error err = multi_player_enet->put_var(v);
+			if (err == Error::OK) {
+				os->print("send msg ok.....\n");
+			}
+		}
+	}
+	else {
+		if (multi_player_enet->get_available_packet_count()) {
+			const unsigned char *cBuf = nullptr;
+			int size = 0;
+			auto peer = multi_player_enet->get_packet_peer();
+			os->print("get one msg, peer[d]\n", peer);
+
+			Variant v;
+			Error err = multi_player_enet->get_var(v);
+			if (err == Error::OK) {
+				os->print("get msg ok.....[%s]\n", String(v));
+			}
+		}
+	}
 
 	return 0;
 }
@@ -2415,8 +2447,8 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::get_working_memory_size() cons
 
 void GDIVisualScriptCustomNodeMultiPlayer::_bind_methods() {
 
-	ClassDB::add_virtual_method("GDIVisualScriptCustomNodeMultiPlayer", MethodInfo(Variant::NIL, "rpc_call_test_func"));
-	ClassDB::bind_method(D_METHOD("rpc_call_test_func"), &GDIVisualScriptCustomNodeMultiPlayer::rpc_call_test_func);
+// 	ClassDB::add_virtual_method("GDIVisualScriptCustomNodeMultiPlayer", MethodInfo(Variant::NIL, "rpc_call_test_func"));
+// 	ClassDB::bind_method(D_METHOD("rpc_call_test_func"), &GDIVisualScriptCustomNodeMultiPlayer::rpc_call_test_func);
 }
 
 int GDIVisualScriptCustomNodeMultiPlayer::get_output_sequence_port_count() const {
@@ -2498,8 +2530,8 @@ VisualScriptNodeInstance * GDIVisualScriptCustomNodeMultiPlayer::instance(Visual
 
 // 	VisualScript *vs = p_instance->get_script_ptr();
 // 	if (nullptr != vs) {
-// 		os->print("already add rpc \n");
 // 		vs->add_function("rpc_call_test_func");
+// 		os->print("add rpc_call_test_func\n");
 // 	}
 
 // 	os->print("create multi player instance.....\n");
