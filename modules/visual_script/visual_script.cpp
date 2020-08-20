@@ -331,6 +331,7 @@ void VisualScript::add_node(const StringName &p_func, int p_id, const Ref<Visual
 		ERR_FAIL_COND_MSG(func.function_id >= 0, "A function node has already been set here.");
 
 		func.function_id = p_id;
+		OS::get_singleton()->print("------------->real set function id here\n");
 	}
 
 	Function::NodeData nd;
@@ -343,6 +344,7 @@ void VisualScript::add_node(const StringName &p_func, int p_id, const Ref<Visual
 	vsn->validate_input_default_values(); // Validate when fully loaded
 
 	func.nodes[p_id] = nd;
+	OS::get_singleton()->print("add node with func[%S], id[%d]\n", String(p_func), p_id);
 }
 
 void VisualScript::remove_node(const StringName &p_func, int p_id) {
@@ -2114,6 +2116,10 @@ void VisualScriptInstance::create(const Ref<VisualScript> &p_script, Object *p_o
 		Map<StringName, int> local_var_indices;
 
 		if (function.node < 0) {
+			OS::get_singleton()->print("---------------------------------------------\n");
+			for (const Map<StringName, VisualScript::Function>::Element *E2 = script->functions.front(); E2; E2 = E2->next()) {
+				OS::get_singleton()->print("funcion name[%S], id[%d]\n", String(E2->key()), E2->get().function_id);
+			}
 			VisualScriptLanguage::singleton->debug_break_parse(get_script()->get_path(), 0, "No start node in function: " + String(E->key()));
 
 			ERR_CONTINUE(function.node < 0);
@@ -2285,6 +2291,7 @@ void VisualScriptInstance::create(const Ref<VisualScript> &p_script, Object *p_o
 		}
 
 		functions[E->key()] = function;
+		OS::get_singleton()->print("add function[%S] to visual script instance.............\n", String(E->key()));
 	}
 }
 

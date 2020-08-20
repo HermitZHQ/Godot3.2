@@ -20,6 +20,7 @@
 #include "core/node_path.h"
 #include "modules/enet/networked_multiplayer_enet.h"
 
+class GDIVisualScriptNodeInstanceCustomMultiPlayer;
 
 int GDIVisualScriptCustomNode::get_output_sequence_port_count() const {
 
@@ -1601,7 +1602,8 @@ GDIVisualScriptCustomNode::~GDIVisualScriptCustomNode() {
 unsigned int GDIVisualScriptCustomNode::global_task_id = 1;
 
 // ----------------------------------------------Mouse relevant
-class GDIVisualScriptNodeInstanceCustomMouse : public VisualScriptNodeInstance, public GDICustomNodeBase {
+class GDIVisualScriptNodeInstanceCustomMouse :
+	public VisualScriptNodeInstance, public GDICustomNodeBase, public Object {
 public:
 	int input_args;
 	bool validate;
@@ -2245,135 +2247,176 @@ GDIVisualScriptCustomNodeMouse::~GDIVisualScriptCustomNodeMouse() {
 }
 
 // ----------------------------------Multi Player(sync)
-class GDIVisualScriptNodeInstanceCustomMultiPlayer : public VisualScriptNodeInstance, public GDICustomNodeBase {
-public:
-	int input_args;
-	bool validate;
-	int returns;
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::_bind_methods() {
 
-	GDIVisualScriptCustomNodeMultiPlayer *node;
-	VisualScriptInstance *instance;
+	ClassDB::bind_method(D_METHOD("peer_connected", "id"), &GDIVisualScriptNodeInstanceCustomMultiPlayer::peer_connected);
+	ClassDB::bind_method(D_METHOD("peer_disconnected", "id"), &GDIVisualScriptNodeInstanceCustomMultiPlayer::peer_disconnected);
 
-	// ----multi player
-	bool already_create_flag = false;
-	bool create_succeed_flag = false;
-	bool is_server_flag = false;
-	Ref<NetworkedMultiplayerENet> multi_player_enet = nullptr;
+	ClassDB::bind_method(D_METHOD("client_connected_to_server"), &GDIVisualScriptNodeInstanceCustomMultiPlayer::client_connected_to_server);
+	ClassDB::bind_method(D_METHOD("client_connection_failed"), &GDIVisualScriptNodeInstanceCustomMultiPlayer::client_connection_failed);
+	ClassDB::bind_method(D_METHOD("client_server_disconnected"), &GDIVisualScriptNodeInstanceCustomMultiPlayer::client_server_disconnected);
 
-	GDIVisualScriptNodeInstanceCustomMultiPlayer() {
+	ClassDB::bind_method(D_METHOD("rpc_call_test_func"), &GDIVisualScriptNodeInstanceCustomMultiPlayer::rpc_call_test_func);
+// 	ClassDB::add_virtual_method("GDIVisualScriptNodeInstanceCustomMultiPlayer", MethodInfo(Variant::NIL, "rpc_call_test_func"));
+// 	ClassDB::add_virtual_method("Node", MethodInfo(Variant::NIL, "rpc_call_test_func"));
+// 	ClassDB::add_virtual_method("VisualScriptInstance", MethodInfo(Variant::NIL, "rpc_call_test_func"));
+}
 
-		multi_player_enet.instance();
+GDIVisualScriptNodeInstanceCustomMultiPlayer::GDIVisualScriptNodeInstanceCustomMultiPlayer() {
+
+	multi_player_enet.instance();
+}
+
+
+GDIVisualScriptNodeInstanceCustomMultiPlayer& GDIVisualScriptNodeInstanceCustomMultiPlayer::get_singleton() {
+
+	static GDIVisualScriptNodeInstanceCustomMultiPlayer inst;
+	return inst;
+}
+GDIVisualScriptNodeInstanceCustomMultiPlayer::~GDIVisualScriptNodeInstanceCustomMultiPlayer() {
+
+}
+
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::peer_connected(int id) {
+
+	os->print("peer connected[%d]..\n", id);
+	// 	connection_status = CONNECTED;
+}
+
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::peer_disconnected(int id) {
+
+	os->print("peer disconnected[%d]..\n", id);
+}
+
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::client_connected_to_server() {
+
+	os->print("client, connected to server\n");
+	Node *node = Object::cast_to<Node>(instance->get_owner_ptr());
+	if (nullptr == node) {
+		return;
 	}
 
-	~GDIVisualScriptNodeInstanceCustomMultiPlayer() {
+	node->rpc("rpc_call_test_func");
+}
 
-	}
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::client_connection_failed() {
 
-	int server_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
+	os->print("client, connection failed\n");
+}
 
-		int port = *p_inputs[2];
-		int connect_num = *p_inputs[3];
-		static const unsigned int max_connect = 32;
-		if (connect_num > max_connect) {
-			r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
-			r_error_str = "[GDI]max connect num is 32";
-			return 0;
-		}
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::client_server_disconnected() {
 
-		Error err = multi_player_enet->create_server(port, connect_num);
-		if (Error::OK != err) {
-			create_succeed_flag = false;
+	os->print("client, server disconnected\n");
+}
 
-			r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
-			r_error_str = "[GDI]create server failed";
-			if (0 == port || port > 0xFF) {
-				r_error_str = "[GDI]invalid port num";
-			}
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::rpc_call_test_func() {
 
-			return 0;
-		}
+	os->print("rpc test call func\n");
+}
 
-		create_succeed_flag = true;
-		os->print("create server succeed\n");
+int GDIVisualScriptNodeInstanceCustomMultiPlayer::server_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
 
+	int port = *p_inputs[2];
+	int connect_num = *p_inputs[3];
+	static const unsigned int max_connect = 32;
+	if (connect_num > max_connect) {
+		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+		r_error_str = "[GDI]max connect num is 32";
 		return 0;
 	}
-	int client_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
 
-		String ip = *p_inputs[1];
-		int port = *p_inputs[2];
+	Error err = multi_player_enet->create_server(port, connect_num);
+	if (Error::OK != err) {
+		create_succeed_flag = false;
 
-		Error err = multi_player_enet->create_client(ip, port);
-		if (Error::OK != err) {
-			create_succeed_flag = false;
-
-			r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
-			r_error_str = "[GDI]create client failed";
-			if (0 == port || port > 0xFF) {
-				r_error_str = "[GDI]invalid port num";
-			}
-			if (String() == ip) {
-				r_error_str = "[GDI]invalid ip str";
-			}
-
-			return 0;
+		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+		r_error_str = "[GDI]create server failed";
+		if (0 == port || port > 0xFF) {
+			r_error_str = "[GDI]invalid port num";
 		}
-
-		create_succeed_flag = true;
-		os->print("create client succeed\n");
-
-		return 0;
-	}
-	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) override	{
-
-		if (!already_create_flag) {
-			Node *node = Object::cast_to<Node>(instance->get_owner_ptr());
-			if (nullptr == node) {
-				r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-				r_error_str = "[GDI]can't get instance node";
-				return 0;
-			}
-
-			// Server----
-			if (true == (bool)(*p_inputs[0])) {
-				server_handle_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
-			}
-			// Client----
-			else {
-				client_handle_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
-			}
-		
-			node->get_tree()->set_network_peer(multi_player_enet);
-			node->get_tree()->connect("network_peer_connected", this->node, "peer_connected");
-			node->get_tree()->connect("network_peer_disconnected", this->node, "peer_disconnected");
-			if (!multi_player_enet->is_server()) {
-				node->get_tree()->connect("connected_to_server", this->node, "client_connected_to_server");
-				node->get_tree()->connect("connection_failed", this->node, "client_connection_failed");
-				node->get_tree()->connect("server_disconnected", this->node, "client_server_disconnected");
-			}
-
-			already_create_flag = true;
-		}
-
-		*p_outputs[0] = create_succeed_flag;
 
 		return 0;
 	}
 
-	virtual int get_working_memory_size() const override {
-		return 1;
+	create_succeed_flag = true;
+	os->print("create server succeed\n");
+
+	return 0;
+}
+
+int GDIVisualScriptNodeInstanceCustomMultiPlayer::client_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
+
+	String ip = *p_inputs[1];
+	int port = *p_inputs[2];
+
+	Error err = multi_player_enet->create_client(ip, port);
+	if (Error::OK != err) {
+		create_succeed_flag = false;
+
+		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+		r_error_str = "[GDI]create client failed";
+		if (0 == port || port > 0xFF) {
+			r_error_str = "[GDI]invalid port num";
+		}
+		if (String() == ip) {
+			r_error_str = "[GDI]invalid ip str";
+		}
+
+		return 0;
 	}
 
-};
+	create_succeed_flag = true;
+	os->print("create client succeed\n");
+
+	return 0;
+}
+
+int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
+
+	Node *node = Object::cast_to<Node>(instance->get_owner_ptr());
+	if (nullptr == node) {
+		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+		r_error_str = "[GDI]can't get instance node";
+		return 0;
+	}
+	if (!already_create_flag) {
+
+		// Server----
+		if (true == (bool)(*p_inputs[0])) {
+			server_handle_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
+		}
+		// Client----
+		else {
+			client_handle_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
+		}
+
+		node->get_tree()->set_network_peer(multi_player_enet);
+		node->get_tree()->connect("network_peer_connected", this, "peer_connected");
+		node->get_tree()->connect("network_peer_disconnected", this, "peer_disconnected");
+		if (!multi_player_enet->is_server()) {
+			node->get_tree()->connect("connected_to_server", this, "client_connected_to_server");
+			node->get_tree()->connect("connection_failed", this, "client_connection_failed");
+			node->get_tree()->connect("server_disconnected", this, "client_server_disconnected");
+		}
+		node->rpc_config("rpc_call_test_func", MultiplayerAPI::RPCMode::RPC_MODE_REMOTESYNC);
+
+		already_create_flag = true;
+	}
+
+	*p_outputs[0] = create_succeed_flag;
+	node->rpc("rpc_call_test_func");
+
+	return 0;
+}
+
+int GDIVisualScriptNodeInstanceCustomMultiPlayer::get_working_memory_size() const {
+	return 1;
+}
 
 void GDIVisualScriptCustomNodeMultiPlayer::_bind_methods() {
 
-	ClassDB::bind_method(D_METHOD("peer_connected", "id"), &GDIVisualScriptCustomNodeMultiPlayer::peer_connected);
-	ClassDB::bind_method(D_METHOD("peer_disconnected", "id"), &GDIVisualScriptCustomNodeMultiPlayer::peer_disconnected);
-
-	ClassDB::bind_method(D_METHOD("client_connected_to_server"), &GDIVisualScriptCustomNodeMultiPlayer::client_connected_to_server);
-	ClassDB::bind_method(D_METHOD("client_connection_failed"), &GDIVisualScriptCustomNodeMultiPlayer::client_connection_failed);
-	ClassDB::bind_method(D_METHOD("client_server_disconnected"), &GDIVisualScriptCustomNodeMultiPlayer::client_server_disconnected);
+	ClassDB::add_virtual_method("GDIVisualScriptCustomNodeMultiPlayer", MethodInfo(Variant::NIL, "rpc_call_test_func"));
+	ClassDB::bind_method(D_METHOD("rpc_call_test_func"), &GDIVisualScriptCustomNodeMultiPlayer::rpc_call_test_func);
 }
 
 int GDIVisualScriptCustomNodeMultiPlayer::get_output_sequence_port_count() const {
@@ -2453,8 +2496,15 @@ String GDIVisualScriptCustomNodeMultiPlayer::get_text() const {
 
 VisualScriptNodeInstance * GDIVisualScriptCustomNodeMultiPlayer::instance(VisualScriptInstance *p_instance) {
 
+// 	VisualScript *vs = p_instance->get_script_ptr();
+// 	if (nullptr != vs) {
+// 		os->print("already add rpc \n");
+// 		vs->add_function("rpc_call_test_func");
+// 	}
+
 // 	os->print("create multi player instance.....\n");
-	GDIVisualScriptNodeInstanceCustomMultiPlayer *instance = memnew(GDIVisualScriptNodeInstanceCustomMultiPlayer);
+	// keep multi player singleton(also limit the create num in visual_script_editor)
+	GDIVisualScriptNodeInstanceCustomMultiPlayer *instance = &GDIVisualScriptNodeInstanceCustomMultiPlayer::get_singleton();
 	instance->node = this;
 	instance->instance = p_instance;
 	instance->returns = get_output_value_port_count();
@@ -2462,36 +2512,15 @@ VisualScriptNodeInstance * GDIVisualScriptCustomNodeMultiPlayer::instance(Visual
 	return instance;
 }
 
-
 GDIVisualScriptCustomNodeMultiPlayer::ConnectionStatus GDIVisualScriptCustomNodeMultiPlayer::get_connection_status() const {
 
 	return connection_status;
 }
 
-void GDIVisualScriptCustomNodeMultiPlayer::peer_connected(int id) {
 
-	os->print("peer connected[%d]..\n", id);
-// 	connection_status = CONNECTED;
-}
+void GDIVisualScriptCustomNodeMultiPlayer::rpc_call_test_func() {
 
-void GDIVisualScriptCustomNodeMultiPlayer::peer_disconnected(int id) {
-
-	os->print("peer disconnected[%d]..\n", id);
-}
-
-void GDIVisualScriptCustomNodeMultiPlayer::client_connected_to_server() {
-
-	os->print("client, connected to server\n");
-}
-
-void GDIVisualScriptCustomNodeMultiPlayer::client_connection_failed() {
-
-	os->print("client, connection failed\n");
-}
-
-void GDIVisualScriptCustomNodeMultiPlayer::client_server_disconnected() {
-
-	os->print("client, server disconnected\n");
+	os->print("test rpc func...\n");
 }
 
 GDIVisualScriptCustomNodeMultiPlayer::GDIVisualScriptCustomNodeMultiPlayer() {

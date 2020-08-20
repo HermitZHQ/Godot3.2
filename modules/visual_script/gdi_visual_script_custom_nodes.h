@@ -2,12 +2,13 @@
 #define GDI_VISUAL_SCRIPT_CUSTOM_NODES_H
 
 #include "visual_script.h"
+#include "visual_script_nodes.h"
 
-class Spatial;
 class Transfrom;
 class OS;
 class _OS;
 class Input;
+class NetworkedMultiplayerENet;
 
 class GDICustomNodeBase
 {
@@ -263,20 +264,57 @@ public:
 	virtual VisualScriptNodeInstance *instance(VisualScriptInstance *p_instance);
 
 	ConnectionStatus get_connection_status() const;
+	virtual void rpc_call_test_func();
 
-	// Server&Client
+	~GDIVisualScriptCustomNodeMultiPlayer();
+	GDIVisualScriptCustomNodeMultiPlayer();
+
+private:
+	ConnectionStatus connection_status;
+};
+
+class GDIVisualScriptNodeInstanceCustomMultiPlayer
+	: public VisualScriptNodeInstance, public GDICustomNodeBase, public Object {
+
+	GDCLASS(GDIVisualScriptNodeInstanceCustomMultiPlayer, Object);
+
+protected:
+	static void _bind_methods();
+
+private:
+	GDIVisualScriptNodeInstanceCustomMultiPlayer();
+
+public:
+	int input_args;
+	bool validate;
+	int returns;
+
+	GDIVisualScriptCustomNodeMultiPlayer *node;
+	VisualScriptInstance *instance;
+
+	// ----multi player
+	bool already_create_flag = false;
+	bool create_succeed_flag = false;
+	bool is_server_flag = false;
+	Ref<NetworkedMultiplayerENet> multi_player_enet = nullptr;
+
+	static GDIVisualScriptNodeInstanceCustomMultiPlayer& get_singleton();
+	~GDIVisualScriptNodeInstanceCustomMultiPlayer();
+
 	void peer_connected(int id);
 	void peer_disconnected(int id);
-	// Client
+
 	void client_connected_to_server();
 	void client_connection_failed();
 	void client_server_disconnected();
 
-	GDIVisualScriptCustomNodeMultiPlayer();
-	~GDIVisualScriptCustomNodeMultiPlayer();
+	void rpc_call_test_func();
 
-private:
-	ConnectionStatus connection_status;
+	int server_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str);
+	int client_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str);
+	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) override;
+
+	virtual int get_working_memory_size() const override;
 };
 
 #endif // GDI_VISUAL_SCRIPT_CUSTOM_NODES_H
