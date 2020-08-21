@@ -344,7 +344,6 @@ void VisualScript::add_node(const StringName &p_func, int p_id, const Ref<Visual
 	vsn->validate_input_default_values(); // Validate when fully loaded
 
 	func.nodes[p_id] = nd;
-	OS::get_singleton()->print("add node with func[%S], id[%d]\n", String(p_func), p_id);
 }
 
 void VisualScript::remove_node(const StringName &p_func, int p_id) {

@@ -19,6 +19,8 @@
 #include "scene/3d/camera.h"
 #include "core/node_path.h"
 #include "modules/enet/networked_multiplayer_enet.h"
+#include "core/io/tcp_server.h"
+#include "core/io/stream_peer_tcp.h"
 
 class GDIVisualScriptNodeInstanceCustomMultiPlayer;
 
@@ -1810,7 +1812,7 @@ public:
 		// check input mouse key name
 		if (key_name == String()) {
 			key_name = *p_inputs[0];
-			printf("test key name[%S]\n", key_name.c_str());
+// 			printf("test key name[%S]\n", key_name.c_str());
 			
 			if (key_name == std::to_string(GDIVisualScriptCustomNodeMouse::LEFT).c_str()) {
 				key_type = GDIVisualScriptCustomNodeMouse::LEFT;
@@ -2265,6 +2267,8 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::_bind_methods() {
 GDIVisualScriptNodeInstanceCustomMultiPlayer::GDIVisualScriptNodeInstanceCustomMultiPlayer() {
 
 	multi_player_enet.instance();
+	server.instance();
+	client.instance();
 }
 
 
@@ -2314,7 +2318,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::rpc_call_test_func() {
 	os->print("rpc test call func\n");
 }
 
-int GDIVisualScriptNodeInstanceCustomMultiPlayer::server_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
+int GDIVisualScriptNodeInstanceCustomMultiPlayer::server_create_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
 
 	int port = *p_inputs[2];
 	int connect_num = *p_inputs[3];
@@ -2325,43 +2329,60 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::server_handle_func(const Varia
 		return 0;
 	}
 
-	Error err = multi_player_enet->create_server(port, connect_num);
-	if (Error::OK != err) {
-		create_succeed_flag = false;
+	// method1: use multi player(gds)
+// 	Error err = multi_player_enet->create_server(port, connect_num);
+// 	if (Error::OK != err) {
+// 		create_succeed_flag = false;
+// 
+// 		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+// 		r_error_str = "[GDI]create server failed";
+// 		if (0 == port || port > 0xFF) {
+// 			r_error_str = "[GDI]invalid port num";
+// 		}
+// 
+// 		return 0;
+// 	}
+// 
+// 	create_succeed_flag = true;
+// 	os->print("create server succeed\n");
 
-		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
-		r_error_str = "[GDI]create server failed";
-		if (0 == port || port > 0xFF) {
-			r_error_str = "[GDI]invalid port num";
-		}
-
-		return 0;
+	// method2: use low-level tcp
+	Error err = server->listen(port);
+	if (Error::OK == err) {
+		create_succeed_flag = true;
+		os->print("create server succeed\n");
 	}
-
-	create_succeed_flag = true;
-	os->print("create server succeed\n");
 
 	return 0;
 }
 
-int GDIVisualScriptNodeInstanceCustomMultiPlayer::client_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
+int GDIVisualScriptNodeInstanceCustomMultiPlayer::client_create_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
 
 	String ip = *p_inputs[1];
 	int port = *p_inputs[2];
 
-	Error err = multi_player_enet->create_client(ip, port);
-	if (Error::OK != err) {
-		create_succeed_flag = false;
+	// method1: use multi player
+// 	Error err = multi_player_enet->create_client(ip, port);
+// 	if (Error::OK != err) {
+// 		create_succeed_flag = false;
+// 
+// 		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+// 		r_error_str = "[GDI]create client failed";
+// 		if (0 == port || port > 0xFF) {
+// 			r_error_str = "[GDI]invalid port num";
+// 		}
+// 		if (String() == ip) {
+// 			r_error_str = "[GDI]invalid ip str";
+// 		}
+// 
+// 		return 0;
+// 	}
 
-		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
-		r_error_str = "[GDI]create client failed";
-		if (0 == port || port > 0xFF) {
-			r_error_str = "[GDI]invalid port num";
-		}
-		if (String() == ip) {
-			r_error_str = "[GDI]invalid ip str";
-		}
-
+	// method2: use tcp peer
+	Error err = client->connect_to_host(ip, port);
+	if (err != Error::OK) {
+		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+		r_error_str = "[GDI]client connect failed";
 		return 0;
 	}
 
@@ -2371,73 +2392,155 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::client_handle_func(const Varia
 	return 0;
 }
 
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::generate_all_nodes_sync_data_info(Node *node) {
+
+	SyncDataInfo sdi(node);
+	stored_sync_data_info_map.insert(node, sdi);
+
+	auto child_count = node->get_child_count();
+	if (child_count > 0) {
+		for (int i = 0; i < child_count; ++i) {
+			Node *child = node->get_child(i);
+			generate_all_nodes_sync_data_info(child);
+		}
+	}
+}
+
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::update_all_nodes_sync_data_info(Node *node) {
+
+	SyncDataInfo sdi(node);
+	auto e = stored_sync_data_info_map.find(node);
+	if (nullptr != e && !(e->value() == sdi)) {
+		e->value() = sdi;
+		changed_data_info_vec.push_back(sdi);
+	}
+
+	auto child_count = node->get_child_count();
+	if (child_count > 0) {
+		for (int i = 0; i < child_count; ++i) {
+			Node *child = node->get_child(i);
+			update_all_nodes_sync_data_info(child);
+		}
+	}
+}
+
+Node* GDIVisualScriptNodeInstanceCustomMultiPlayer::find_node_with_id_and_name(uint64_t id, const String &name) {
+
+	for (auto e = stored_sync_data_info_map.front(); e; e = e->next()) {
+		if (e->value().instance_id == id && e->value().name == name) {
+			return e->key();
+		}
+	}
+}
+
 int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
 
-	Node *node = Object::cast_to<Node>(instance->get_owner_ptr());
+	bool is_server_flag = (bool)*p_inputs[0];
+	static Node *node = Object::cast_to<Node>(instance->get_owner_ptr());
 	if (nullptr == node) {
 		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
 		r_error_str = "[GDI]can't get instance node";
 		return 0;
 	}
+
+	static Node *root = node->get_tree()->get_current_scene();
+	if (nullptr == root) {
+		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+		r_error_str = "[GDI]can't get root node";
+		return 0;
+	}
+
 	if (!already_create_flag) {
+		// init all nodes data info at the create time
+		generate_all_nodes_sync_data_info(root);
+
+		// for test, output all nodes info
+		for (auto e = stored_sync_data_info_map.front(); e; e = e->next()) {
+			os->print("[Node info]name[%S], id[%d]\n", e->value().name, e->value().instance_id);
+		}
 
 		// Server----
-		if (true == (bool)(*p_inputs[0])) {
-			server_handle_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
+		if (is_server_flag) {
+			server_create_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
 		}
 		// Client----
 		else {
-			client_handle_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
+			client_create_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
 		}
-
-		node->get_tree()->connect("network_peer_connected", this, "peer_connected");
-		node->get_tree()->connect("network_peer_disconnected", this, "peer_disconnected");
-		if (!multi_player_enet->is_server()) {
-			node->get_tree()->connect("connected_to_server", this, "client_connected_to_server");
-			node->get_tree()->connect("connection_failed", this, "client_connection_failed");
-			node->get_tree()->connect("server_disconnected", this, "client_server_disconnected");
-		}
-		//node->rpc_config("rpc_call_test_func", MultiplayerAPI::RPCMode::RPC_MODE_REMOTESYNC);
-
-		multi_player_enet->set_transfer_channel(1);
-		multi_player_enet->set_transfer_mode(NetworkedMultiplayerPeer::TRANSFER_MODE_UNRELIABLE);
-		node->get_tree()->set_network_peer(multi_player_enet);
 
 		already_create_flag = true;
 	}
 
+	// Server, accept new client
+	if (is_server_flag) {
+		if (server->is_listening()) {
+			auto new_client = server->take_connection();
+
+			if (nullptr != *new_client) {
+				server_clients_map.insert(new_client->get_instance_id(), new_client);
+				os->print("new client connected\n");
+			}
+		}
+	}
+
+	changed_data_info_vec.clear();
+	update_all_nodes_sync_data_info(root);
+
+	int changed_data_num = changed_data_info_vec.size();
+	if (changed_data_num > 0) {
+		// if it is server, just broadcast the msg, if not, send to server first, let it do the broadcast
+		if (is_server_flag) {
+			Array arr;
+			arr.push_back((int)SERVER_DATA_SYNC);
+			arr.push_back(changed_data_num);
+			for (int i = 0; i < changed_data_num; ++i) {
+				auto &data = changed_data_info_vec[i];
+				arr.push_back(data.instance_id);
+				arr.push_back(data.name);
+				arr.push_back(data.transform);
+			}
+
+			for (auto e = server_clients_map.front(); e; e = e->next()) {
+				auto &socket = e->value();
+				socket->put_var(arr);
+			}
+		}
+		else {
+
+		}
+	}
+
+	// Client, sync data
+	if (!is_server_flag && client->is_connected_to_host() && client->get_available_bytes()) {
+		Variant var = client->get_var();
+		Array arr = var;
+		int protocol = arr.pop_front();
+		switch (protocol) {
+		case SERVER_DATA_SYNC: {
+			int data_num = arr.pop_front();
+			os->print("get changed data, protocol[%d], data_num[%d]\n", protocol, data_num);
+
+			for (int i = 0; i < data_num; ++i) {
+				uint64_t instance_id = arr.pop_front();
+				String name = arr.pop_front();
+				Transform trans = arr.pop_front();
+
+				// use id and name to find the matched node
+				Node *node = find_node_with_id_and_name(instance_id, name);
+				// update the transform
+				Spatial *spatial = Object::cast_to<Spatial>(node);
+				if (nullptr != spatial) {
+					spatial->set_global_transform(trans);
+				}
+			}
+			break;
+		}
+		default:
+			break;
+		}
+	}
+
 	*p_outputs[0] = create_succeed_flag;
-	//node->rpc("rpc_call_test_func");
-
-	// test send msg from client to server
-	if (!multi_player_enet->is_server()) {
-		unsigned char cBuf[256] = "12345";
-
-		auto status = multi_player_enet->get_connection_status();
-		if (status == NetworkedMultiplayerPeer::CONNECTION_CONNECTED) {
-			Variant v = "123";
-			multi_player_enet->set_target_peer(1);
-			Error err = multi_player_enet->put_var(v);
-			if (err == Error::OK) {
-				os->print("send msg ok.....\n");
-			}
-		}
-	}
-	else {
-		if (multi_player_enet->get_available_packet_count()) {
-			const unsigned char *cBuf = nullptr;
-			int size = 0;
-			auto peer = multi_player_enet->get_packet_peer();
-			os->print("get one msg, peer[d]\n", peer);
-
-			Variant v;
-			Error err = multi_player_enet->get_var(v);
-			if (err == Error::OK) {
-				os->print("get msg ok.....[%s]\n", String(v));
-			}
-		}
-	}
-
 	return 0;
 }
 
@@ -2572,4 +2675,29 @@ GDICustomNodeBase::GDICustomNodeBase()
 
 GDICustomNodeBase::~GDICustomNodeBase() {
 
+}
+
+GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(Node *node)
+{
+	if (nullptr == node) {
+		return;
+	}
+
+	instance_id = node->get_instance_id();
+	name = node->get_name();
+
+	Spatial *spatial = Object::cast_to<Spatial>(node);
+	if (nullptr != spatial) {
+		transform = spatial->get_global_transform();
+	}
+}
+
+bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(const SyncDataInfo &other) {
+
+	if (transform == other.transform) {
+		return true;
+	}
+	else {
+		return false;
+	}
 }

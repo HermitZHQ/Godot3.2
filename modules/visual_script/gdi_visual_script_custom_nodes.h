@@ -3,12 +3,15 @@
 
 #include "visual_script.h"
 #include "visual_script_nodes.h"
+#include "scene/main/node.h"
 
 class Transfrom;
 class OS;
 class _OS;
 class Input;
 class NetworkedMultiplayerENet;
+class TCP_Server;
+class StreamPeerTCP;
 
 class GDICustomNodeBase
 {
@@ -278,6 +281,15 @@ class GDIVisualScriptNodeInstanceCustomMultiPlayer
 
 	GDCLASS(GDIVisualScriptNodeInstanceCustomMultiPlayer, Object);
 
+	enum MultiPlayerSyncProtocol
+	{
+		SERVER_DATA_SYNC,
+		CLIENT_DATA_CHANGE,
+		NEW_INSTANCE_SYNC,// preserve
+
+		MAX_COUNT
+	};
+
 protected:
 	static void _bind_methods();
 
@@ -292,12 +304,28 @@ public:
 	GDIVisualScriptCustomNodeMultiPlayer *node;
 	VisualScriptInstance *instance;
 
-	// ----multi player
+	// ----multi player sync relevant
 	bool already_create_flag = false;
 	bool create_succeed_flag = false;
 	bool is_server_flag = false;
-	Ref<NetworkedMultiplayerENet> multi_player_enet = nullptr;
+	Ref<NetworkedMultiplayerENet> multi_player_enet;
+	Ref<TCP_Server> server;
+	Map<uint64_t, Ref<StreamPeerTCP>> server_clients_map;// (instance_id, tcp_peer)
+	Ref<StreamPeerTCP> client;
+	struct SyncDataInfo 
+	{		
+		uint64_t					instance_id;
+		String						name;
+		Transform					transform;
 
+		SyncDataInfo(){}
+		SyncDataInfo(Node *node);
+		bool operator==(const SyncDataInfo &other);
+	};
+	Map<Node*, SyncDataInfo> stored_sync_data_info_map;
+	Vector<SyncDataInfo> changed_data_info_vec;
+
+	// ----
 	static GDIVisualScriptNodeInstanceCustomMultiPlayer& get_singleton();
 	~GDIVisualScriptNodeInstanceCustomMultiPlayer();
 
@@ -310,8 +338,13 @@ public:
 
 	void rpc_call_test_func();
 
-	int server_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str);
-	int client_handle_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str);
+	int server_create_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str);
+	int client_create_func(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str);
+
+	void generate_all_nodes_sync_data_info(Node *node);
+	void update_all_nodes_sync_data_info(Node *node);
+	Node* find_node_with_id_and_name(uint64_t id, const String &name);
+
 	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) override;
 
 	virtual int get_working_memory_size() const override;
