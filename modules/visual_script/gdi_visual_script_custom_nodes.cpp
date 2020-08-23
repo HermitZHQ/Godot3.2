@@ -2431,6 +2431,8 @@ Node* GDIVisualScriptNodeInstanceCustomMultiPlayer::find_node_with_id_and_name(u
 			return e->key();
 		}
 	}
+
+	return nullptr;
 }
 
 int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
@@ -2489,24 +2491,25 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 	int changed_data_num = changed_data_info_vec.size();
 	if (changed_data_num > 0) {
 		// if it is server, just broadcast the msg, if not, send to server first, let it do the broadcast
-		if (is_server_flag) {
-			Array arr;
-			arr.push_back((int)SERVER_DATA_SYNC);
-			arr.push_back(changed_data_num);
-			for (int i = 0; i < changed_data_num; ++i) {
-				auto &data = changed_data_info_vec[i];
-				arr.push_back(data.instance_id);
-				arr.push_back(data.name);
-				arr.push_back(data.transform);
-			}
+		Array arr;
+		arr.push_back(is_server_flag ? (int)SERVER_DATA_SYNC : (int)CLIENT_DATA_CHANGE);
+		arr.push_back(changed_data_num);
+		for (int i = 0; i < changed_data_num; ++i) {
+			auto &data = changed_data_info_vec[i];
+			arr.push_back(data.instance_id);
+			arr.push_back(data.name);
+			arr.push_back(data.transform);
+		}
 
+		if (is_server_flag) {
 			for (auto e = server_clients_map.front(); e; e = e->next()) {
 				auto &socket = e->value();
 				socket->put_var(arr);
 			}
-		}
+		} 
 		else {
-
+			client->put_var(arr);
+// 			os->print("client send sync data...\n");
 		}
 	}
 
@@ -2515,10 +2518,11 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 		Variant var = client->get_var();
 		Array arr = var;
 		int protocol = arr.pop_front();
+
 		switch (protocol) {
 		case SERVER_DATA_SYNC: {
 			int data_num = arr.pop_front();
-			os->print("get changed data, protocol[%d], data_num[%d]\n", protocol, data_num);
+// 			os->print("client sync data, protocol[%d], data_num[%d]\n", protocol, data_num);
 
 			for (int i = 0; i < data_num; ++i) {
 				uint64_t instance_id = arr.pop_front();
@@ -2527,16 +2531,95 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 
 				// use id and name to find the matched node
 				Node *node = find_node_with_id_and_name(instance_id, name);
+				if (nullptr == node) {
+					os->print("server sync data failed, not found matched node, id[%d], name[%S]\n", instance_id, name);
+					continue;
+				}
+
 				// update the transform
 				Spatial *spatial = Object::cast_to<Spatial>(node);
 				if (nullptr != spatial) {
 					spatial->set_global_transform(trans);
+				}
+				auto e = stored_sync_data_info_map.find(node);
+				if (nullptr != e) {
+					e->value() = SyncDataInfo(node);
 				}
 			}
 			break;
 		}
 		default:
 			break;
+		}
+	}
+
+	// Server, broadcast sync data
+	if (is_server_flag) {
+		for (auto e = server_clients_map.front(); e; e = e->next()) {
+			auto &client = e->value();
+			if (!client->is_connected_to_host() || !client->get_available_bytes()) {
+				continue;
+			}
+
+			Variant var = client->get_var();
+			Variant varTmp = var.duplicate();
+// 			os->print("test index2-1[%d]\n", (int)varTmp.get(1));
+			Array arr = var;
+			int protocol = arr.pop_front();
+	
+			switch (protocol) {
+			case CLIENT_DATA_CHANGE: {
+// 				os->print("server recv client data change, id[%d]\n", e->key());
+
+				// sync server
+				{
+					int data_num = arr.pop_front();
+					//os->print("get changed data, protocol[%d], data_num[%d]\n", protocol, data_num);
+	
+					for (int i = 0; i < data_num; ++i) {
+						uint64_t instance_id = arr.pop_front();
+						String name = arr.pop_front();
+						Transform trans = arr.pop_front();
+	
+						// use id and name to find the matched node
+						Node *node = find_node_with_id_and_name(instance_id, name);
+						if (nullptr == node) {
+							os->print("server sync data failed, not found matched node\n");
+							continue;
+						}
+	
+						// update the transform
+						Spatial *spatial = Object::cast_to<Spatial>(node);
+						if (nullptr != spatial) {
+							spatial->set_global_transform(trans);
+						}
+						auto e = stored_sync_data_info_map.find(node);
+						if (nullptr != e) {
+							e->value() = SyncDataInfo(node);
+						}
+					}
+				}
+
+				// sync other clients
+				// chanage protocol to broadcast
+// 				os->print("test index2-2[%d]\n", (int)varTmp.get(1));
+				varTmp.set(0, (int)SERVER_DATA_SYNC);
+// 				os->print("test index2-3[%d]\n", (int)varTmp.get(1));
+				for (auto e2 = server_clients_map.front(); e2; e2 = e2->next()) {
+					if (e->key() == e2->key()) {
+						continue;
+					}
+
+					auto &socket = e2->value();
+					socket->put_var(varTmp);
+				}
+
+				break;
+			}
+			default: {
+				break;
+			}
+			}
 		}
 	}
 
