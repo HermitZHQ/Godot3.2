@@ -6,9 +6,13 @@
 #include "scene/main/node.h"
 
 class Transfrom;
+class Material;
+class Color;
+
 class OS;
 class _OS;
 class Input;
+
 class NetworkedMultiplayerENet;
 class TCP_Server;
 class StreamPeerTCP;
@@ -314,12 +318,16 @@ public:
 	Ref<StreamPeerTCP> client;
 	struct SyncDataInfo 
 	{		
-		uint64_t					instance_id;
-		String						name;
-		Transform					transform;
+		uint64_t							instance_id;
+		String								name;
+		Transform							transform;
+		bool								visible;
+		Vector<Ref<SpatialMaterial>>		surf_mat_vec;
+		Vector<Color>						albedo_vec;
 
-		SyncDataInfo(){}
+		SyncDataInfo();
 		SyncDataInfo(Node *node);
+		SyncDataInfo(const Transform &trans, bool v, const Vector<Color> &albedo_vec);
 		bool operator==(const SyncDataInfo &other);
 	};
 	Map<Node*, SyncDataInfo> stored_sync_data_info_map;
@@ -343,7 +351,9 @@ public:
 
 	void generate_all_nodes_sync_data_info(Node *node);
 	void update_all_nodes_sync_data_info(Node *node);
+	void update_stored_nodes_info(SyncDataInfo &stored, SyncDataInfo &changed);
 	Node* find_node_with_id_and_name(uint64_t id, const String &name);
+	void sync_data_with_node(Node *node, SyncDataInfo sdi);
 
 	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) override;
 

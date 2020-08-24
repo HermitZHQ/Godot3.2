@@ -331,7 +331,6 @@ void VisualScript::add_node(const StringName &p_func, int p_id, const Ref<Visual
 		ERR_FAIL_COND_MSG(func.function_id >= 0, "A function node has already been set here.");
 
 		func.function_id = p_id;
-		OS::get_singleton()->print("------------->real set function id here\n");
 	}
 
 	Function::NodeData nd;
@@ -2290,7 +2289,6 @@ void VisualScriptInstance::create(const Ref<VisualScript> &p_script, Object *p_o
 		}
 
 		functions[E->key()] = function;
-		OS::get_singleton()->print("add function[%S] to visual script instance.............\n", String(E->key()));
 	}
 }
 

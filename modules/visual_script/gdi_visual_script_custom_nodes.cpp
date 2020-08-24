@@ -17,6 +17,7 @@
 #include "scene/resources/box_shape.h"
 #include "scene/main/viewport.h"
 #include "scene/3d/camera.h"
+#include "scene/resources/material.h"
 #include "core/node_path.h"
 #include "modules/enet/networked_multiplayer_enet.h"
 #include "core/io/tcp_server.h"
@@ -1639,6 +1640,8 @@ public:
 	bool first_mid_click_flag = false;
 	bool second_mid_pressed_flag = false;
 
+	bool mouse_key_down_flag = false;// use this to do the single click check separately(not mix with double click)
+
 	const unsigned int double_click_interval = 500;
 
 	// ----ray intersect
@@ -1812,8 +1815,8 @@ public:
 		// check input mouse key name
 		if (key_name == String()) {
 			key_name = *p_inputs[0];
-// 			printf("test key name[%S]\n", key_name.c_str());
-			
+			//printf("test key name[%S]\n", key_name);
+
 			if (key_name == std::to_string(GDIVisualScriptCustomNodeMouse::LEFT).c_str()) {
 				key_type = GDIVisualScriptCustomNodeMouse::LEFT;
 			}
@@ -1932,7 +1935,7 @@ public:
 					if (diff_time < double_click_interval && mouse_point_left == os->get_mouse_position()) {
 						double_click_flag = true;
 					}
-	
+
 					time = 0;
 					second_left_pressed_flag = false;
 					first_left_pressed_flag = false;
@@ -1949,8 +1952,16 @@ public:
 				return 2;
 			}
 			// left click
-			else if (first_left_released_flag && !first_left_click_flag && mouse_point_left == os->get_mouse_position()) {
-				first_left_click_flag = true;
+// 			else if (first_left_released_flag && !first_left_click_flag && mouse_point_left == os->get_mouse_position()) {
+// 				first_left_click_flag = true;
+// 				return 0;
+// 			}
+
+			if (!mouse_key_down_flag && left_button_pressed_flag) {
+				mouse_key_down_flag = true;
+			}
+			else if (!left_button_pressed_flag && mouse_key_down_flag) {
+				mouse_key_down_flag = false;
 				return 0;
 			}
 		}
@@ -1997,8 +2008,16 @@ public:
 				return 2;
 			}
 			// right click
-			else if (first_right_released_flag && !first_right_click_flag && mouse_point_right == os->get_mouse_position()) {
-				first_right_click_flag = true;
+// 			else if (first_right_released_flag && !first_right_click_flag && mouse_point_right == os->get_mouse_position()) {
+// 				first_right_click_flag = true;
+// 				return 0;
+// 			}
+
+			if (!mouse_key_down_flag && right_button_pressed_flag) {
+				mouse_key_down_flag = true;
+			}
+			else if (!right_button_pressed_flag && mouse_key_down_flag) {
+				mouse_key_down_flag = false;
 				return 0;
 			}
 		}
@@ -2045,8 +2064,16 @@ public:
 				return 2;
 			}
 			// mid click
-			else if (first_mid_released_flag && !first_mid_click_flag && mouse_point_mid == os->get_mouse_position()) {
-				first_mid_click_flag = true;
+// 			else if (first_mid_released_flag && !first_mid_click_flag && mouse_point_mid == os->get_mouse_position()) {
+// 				first_mid_click_flag = true;
+// 				return 0;
+// 			}
+
+			if (!mouse_key_down_flag && mid_button_pressed_flag) {
+				mouse_key_down_flag = true;
+			}
+			else if (!mid_button_pressed_flag && mouse_key_down_flag) {
+				mouse_key_down_flag = false;
 				return 0;
 			}
 		}
@@ -2381,8 +2408,16 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::client_create_func(const Varia
 	// method2: use tcp peer
 	Error err = client->connect_to_host(ip, port);
 	if (err != Error::OK) {
-		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-		r_error_str = "[GDI]client connect failed";
+		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+		r_error_str = "[GDI]create client failed";
+
+		if (0 == port || port > 0xFF) {
+			r_error_str = "[GDI]invalid port num";
+		}
+		if (String() == ip) {
+			r_error_str = "[GDI]invalid ip str";
+		}
+
 		return 0;
 	}
 
@@ -2411,6 +2446,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::update_all_nodes_sync_data_in
 	SyncDataInfo sdi(node);
 	auto e = stored_sync_data_info_map.find(node);
 	if (nullptr != e && !(e->value() == sdi)) {
+		//update_stored_nodes_info(e->value(), sdi);
 		e->value() = sdi;
 		changed_data_info_vec.push_back(sdi);
 	}
@@ -2424,6 +2460,14 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::update_all_nodes_sync_data_in
 	}
 }
 
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::update_stored_nodes_info(SyncDataInfo &stored, SyncDataInfo &changed) {
+
+	// due to the mechanism of material, we should use the old albedo instead of the new one
+	Vector<Color> albedo_vec = stored.albedo_vec;
+	stored = changed;
+	changed.albedo_vec = albedo_vec;
+}
+
 Node* GDIVisualScriptNodeInstanceCustomMultiPlayer::find_node_with_id_and_name(uint64_t id, const String &name) {
 
 	for (auto e = stored_sync_data_info_map.front(); e; e = e->next()) {
@@ -2433,6 +2477,40 @@ Node* GDIVisualScriptNodeInstanceCustomMultiPlayer::find_node_with_id_and_name(u
 	}
 
 	return nullptr;
+}
+
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *node, SyncDataInfo sdi) {
+
+	// update the transform, visible
+	Spatial *spatial = Object::cast_to<Spatial>(node);
+	if (nullptr != spatial) {
+		spatial->set_global_transform(sdi.transform);
+		spatial->set_visible(sdi.visible);
+	}
+
+	// update the mat, albedo
+	MeshInstance *mi = Object::cast_to<MeshInstance>(node);
+	if (nullptr != mi) {
+		auto mat_num = mi->get_surface_material_count();
+		if (mat_num != sdi.albedo_vec.size()) {
+			os->print("[GDI]this case not handled, should report\n");
+			return;
+		}
+
+		for (int i = 0; i < mat_num; ++i) {
+			SpatialMaterial *sm = Object::cast_to<SpatialMaterial>(*(mi->get_surface_material(i)));
+			if (nullptr == sm) {
+				continue;
+			}
+
+			sm->set_albedo(sdi.albedo_vec[i]);
+		}
+	}
+
+	auto e = stored_sync_data_info_map.find(node);
+	if (nullptr != e) {
+		e->value() = SyncDataInfo(node);
+	}
 }
 
 int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
@@ -2457,9 +2535,9 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 		generate_all_nodes_sync_data_info(root);
 
 		// for test, output all nodes info
-		for (auto e = stored_sync_data_info_map.front(); e; e = e->next()) {
-			os->print("[Node info]name[%S], id[%d]\n", e->value().name, e->value().instance_id);
-		}
+		//for (auto e = stored_sync_data_info_map.front(); e; e = e->next()) {
+		//	os->print("[Node info]name[%S], id[%d]\n", e->value().name, e->value().instance_id);
+		//}
 
 		// Server----
 		if (is_server_flag) {
@@ -2499,6 +2577,14 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 			arr.push_back(data.instance_id);
 			arr.push_back(data.name);
 			arr.push_back(data.transform);
+			arr.push_back(data.visible);
+			// mat num
+			auto mat_num = data.surf_mat_vec.size();
+			arr.push_back(mat_num);
+			for (int j = 0; j < mat_num; ++j) {
+				arr.push_back(data.albedo_vec[j]);
+				os->print("changed color:[%f][%f][%f]\n", data.albedo_vec[j].r, data.albedo_vec[j].g, data.albedo_vec[j].b);
+			}
 		}
 
 		if (is_server_flag) {
@@ -2528,6 +2614,13 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 				uint64_t instance_id = arr.pop_front();
 				String name = arr.pop_front();
 				Transform trans = arr.pop_front();
+				bool visible = arr.pop_front();
+				int mat_num = arr.pop_front();
+				Vector<Color> colorVec;
+				for (int j = 0; j < mat_num; ++j) {
+					colorVec.push_back(arr.pop_front());
+					os->print("sync color:[%f][%f][%f]\n", colorVec[j].r, colorVec[j].g, colorVec[j].b);
+				}
 
 				// use id and name to find the matched node
 				Node *node = find_node_with_id_and_name(instance_id, name);
@@ -2536,15 +2629,7 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 					continue;
 				}
 
-				// update the transform
-				Spatial *spatial = Object::cast_to<Spatial>(node);
-				if (nullptr != spatial) {
-					spatial->set_global_transform(trans);
-				}
-				auto e = stored_sync_data_info_map.find(node);
-				if (nullptr != e) {
-					e->value() = SyncDataInfo(node);
-				}
+				sync_data_with_node(node, SyncDataInfo(trans, visible, colorVec));
 			}
 			break;
 		}
@@ -2563,7 +2648,6 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 
 			Variant var = client->get_var();
 			Variant varTmp = var.duplicate();
-// 			os->print("test index2-1[%d]\n", (int)varTmp.get(1));
 			Array arr = var;
 			int protocol = arr.pop_front();
 	
@@ -2580,6 +2664,12 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 						uint64_t instance_id = arr.pop_front();
 						String name = arr.pop_front();
 						Transform trans = arr.pop_front();
+						bool visible = arr.pop_front();
+						int mat_num = arr.pop_front();
+						Vector<Color> colorVec;
+						for (int j = 0; j < mat_num; ++j) {
+							colorVec.push_back(arr.pop_front());
+						}
 	
 						// use id and name to find the matched node
 						Node *node = find_node_with_id_and_name(instance_id, name);
@@ -2588,23 +2678,13 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 							continue;
 						}
 	
-						// update the transform
-						Spatial *spatial = Object::cast_to<Spatial>(node);
-						if (nullptr != spatial) {
-							spatial->set_global_transform(trans);
-						}
-						auto e = stored_sync_data_info_map.find(node);
-						if (nullptr != e) {
-							e->value() = SyncDataInfo(node);
-						}
+						sync_data_with_node(node, SyncDataInfo(trans, visible, colorVec));
 					}
 				}
 
 				// sync other clients
 				// chanage protocol to broadcast
-// 				os->print("test index2-2[%d]\n", (int)varTmp.get(1));
 				varTmp.set(0, (int)SERVER_DATA_SYNC);
-// 				os->print("test index2-3[%d]\n", (int)varTmp.get(1));
 				for (auto e2 = server_clients_map.front(); e2; e2 = e2->next()) {
 					if (e->key() == e2->key()) {
 						continue;
@@ -2738,7 +2818,7 @@ GDIVisualScriptCustomNodeMultiPlayer::ConnectionStatus GDIVisualScriptCustomNode
 
 void GDIVisualScriptCustomNodeMultiPlayer::rpc_call_test_func() {
 
-	os->print("test rpc func...\n");
+	//os->print("test rpc func...\n");
 }
 
 GDIVisualScriptCustomNodeMultiPlayer::GDIVisualScriptCustomNodeMultiPlayer() {
@@ -2761,6 +2841,7 @@ GDICustomNodeBase::~GDICustomNodeBase() {
 }
 
 GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(Node *node)
+	:SyncDataInfo()
 {
 	if (nullptr == node) {
 		return;
@@ -2772,12 +2853,70 @@ GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(Node *n
 	Spatial *spatial = Object::cast_to<Spatial>(node);
 	if (nullptr != spatial) {
 		transform = spatial->get_global_transform();
+		visible = spatial->is_visible();
 	}
+
+	MeshInstance *mi = Object::cast_to<MeshInstance>(node);
+	if (nullptr != mi) {
+		surf_mat_vec.clear();
+		auto surf_num = mi->get_surface_material_count();
+		for (int i = 0; i < surf_num; ++i) {
+			auto mat = mi->get_surface_material(i);
+			surf_mat_vec.push_back(mat);
+
+			Ref<SpatialMaterial> sm = Object::cast_to<SpatialMaterial>(*mat);
+			if (nullptr != *sm) {
+				albedo_vec.push_back(sm->get_albedo());
+			}
+		}
+	}
+}
+
+GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(const Transform &trans, bool v, const Vector<Color> &albedo_vec)
+	:transform(trans), visible(v)
+{
+	this->albedo_vec = albedo_vec;
+}
+
+GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo()
+	:instance_id(0), visible(true)
+{
+	surf_mat_vec.clear();
 }
 
 bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(const SyncDataInfo &other) {
 
-	if (transform == other.transform) {
+	// check mat----
+	bool same_mat_flag = true;
+	auto left_mat_num = surf_mat_vec.size();
+	auto right_mat_num = other.surf_mat_vec.size();
+	// check mat num
+	if (left_mat_num != right_mat_num) {
+		same_mat_flag = false;
+	}
+	else {
+		// check mat albedo
+		for (int i = 0; i < left_mat_num; ++i) {
+			//OS::get_singleton()->print("test crash, mat1[%x] mat2[%x]\n", *surf_mat_vec[i], *other.surf_mat_vec[i]);
+			if (nullptr == *surf_mat_vec[i] || nullptr == *other.surf_mat_vec[i]) {
+				continue;
+			}
+
+			auto left_albedo = albedo_vec[i];
+			auto right_albedo = other.surf_mat_vec[i]->get_albedo();
+
+			if (left_albedo != right_albedo) {
+				same_mat_flag = false;
+				break;
+			}
+		}
+
+		// todo(maybe some other property...)
+	}
+
+	if (transform == other.transform &&
+		visible == other.visible &&
+		same_mat_flag) {
 		return true;
 	}
 	else {
