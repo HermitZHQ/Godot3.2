@@ -2509,29 +2509,30 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *nod
 				continue;
 			}
 
-			// albedo
-			sm->set_albedo(sdi.albedo_vec[i]);
-
 			// albedo tex
 			//os->print("begin to set albedo tex........\n");
 			auto e = sdi.albedo_tex_map.find(i);
 			auto tex = sm->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
-			if (nullptr != *tex && nullptr != e) {
+			if (nullptr != *tex && nullptr != e && e->value() != tex->get_path()) {
 				tex->set_path(e->value(), true);
 				tex->reload_from_file();
-				os->print("sync slbedo tex1..........\n");
+				os->print("sync albedo tex1..........\n");
 			}
 			else if (nullptr == *tex && nullptr != e) {
 				Ref<StreamTexture> new_tex;
 				new_tex.instance();
-				new_tex->set_path(e->value(), true);
+				new_tex->load(e->value());
 				sm->set_texture(SpatialMaterial::TEXTURE_ALBEDO, new_tex);
-				os->print("sync slbedo tex2..........\n");
+// 				sm->set_albedo(Color(1, 1, 1));
+				os->print("sync albedo tex2..........\n");
 			}
 			else if (nullptr == e && nullptr != *tex) {
 				sm->set_texture(SpatialMaterial::TEXTURE_ALBEDO, nullptr);
-				os->print("sync slbedo tex3..........\n");
+				os->print("sync albedo tex3..........\n");
 			}
+
+			// albedo
+			sm->set_albedo(sdi.albedo_vec[i]);
 		}
 	}
 
@@ -2658,6 +2659,7 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 				String name = arr.pop_front();
 				Transform trans = arr.pop_front();
 				bool visible = arr.pop_front();
+				os->print("sync data id[%d], name[%S]\n", instance_id, name);
 				// albedo
 				Vector<Color> albedo_vec;
 				int mat_num = arr.pop_front();
@@ -2670,7 +2672,7 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 				int albedo_tex_num = arr.pop_front();
 				for (int j = 0; j < albedo_tex_num; ++j) {
 					int idx = arr.pop_front();
-					String tex_path = arr.pop_back();
+					String tex_path = arr.pop_front();
 					albedo_tex_map.insert(idx, tex_path);
 				}
 
@@ -2744,7 +2746,7 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 						int albedo_tex_num = arr.pop_front();
 						for (int j = 0; j < albedo_tex_num; ++j) {
 							int idx = arr.pop_front();
-							String tex_path = arr.pop_back();
+							String tex_path = arr.pop_front();
 							albedo_tex_map.insert(idx, tex_path);
 						}
 
