@@ -2387,6 +2387,7 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::client_create_func(const Varia
 
 	String ip = *p_inputs[1];
 	int port = *p_inputs[2];
+	int pw = *p_inputs[4];
 
 	// method1: use multi player
 // 	Error err = multi_player_enet->create_client(ip, port);
@@ -2421,6 +2422,10 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::client_create_func(const Varia
 		return 0;
 	}
 
+	Array arr;
+	arr.push_back((int)C2S_CLIENT_VERIFY_PW);
+	arr.push_back(pw);
+	client->put_var(arr);
 	create_succeed_flag = true;
 	os->print("create client succeed\n");
 
@@ -2449,6 +2454,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::update_all_nodes_sync_data_in
 		//update_stored_nodes_info(e->value(), sdi);
 		e->value() = sdi;
 		changed_data_info_vec.push_back(sdi);
+		//os->print("sync data changed\n");
 	}
 
 	auto child_count = node->get_child_count();
@@ -2488,7 +2494,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *nod
 		spatial->set_visible(sdi.visible);
 	}
 
-	// update the mat, albedo
+	// update the mat(albedo, tex...)
 	MeshInstance *mi = Object::cast_to<MeshInstance>(node);
 	if (nullptr != mi) {
 		auto mat_num = mi->get_surface_material_count();
@@ -2503,7 +2509,29 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *nod
 				continue;
 			}
 
+			// albedo
 			sm->set_albedo(sdi.albedo_vec[i]);
+
+			// albedo tex
+			//os->print("begin to set albedo tex........\n");
+			auto e = sdi.albedo_tex_map.find(i);
+			auto tex = sm->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
+			if (nullptr != *tex && nullptr != e) {
+				tex->set_path(e->value(), true);
+				tex->reload_from_file();
+				os->print("sync slbedo tex1..........\n");
+			}
+			else if (nullptr == *tex && nullptr != e) {
+				Ref<StreamTexture> new_tex;
+				new_tex.instance();
+				new_tex->set_path(e->value(), true);
+				sm->set_texture(SpatialMaterial::TEXTURE_ALBEDO, new_tex);
+				os->print("sync slbedo tex2..........\n");
+			}
+			else if (nullptr == e && nullptr != *tex) {
+				sm->set_texture(SpatialMaterial::TEXTURE_ALBEDO, nullptr);
+				os->print("sync slbedo tex3..........\n");
+			}
 		}
 	}
 
@@ -2570,8 +2598,9 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 	if (changed_data_num > 0) {
 		// if it is server, just broadcast the msg, if not, send to server first, let it do the broadcast
 		Array arr;
-		arr.push_back(is_server_flag ? (int)SERVER_DATA_SYNC : (int)CLIENT_DATA_CHANGE);
+		arr.push_back(is_server_flag ? (int)S2C_DATA_SYNC : (int)C2S_CLIENT_DATA_CHANGE);
 		arr.push_back(changed_data_num);
+		os->print("--------push back changed data start, server-flag[%d]\n", is_server_flag);
 		for (int i = 0; i < changed_data_num; ++i) {
 			auto &data = changed_data_info_vec[i];
 			arr.push_back(data.instance_id);
@@ -2583,8 +2612,16 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 			arr.push_back(mat_num);
 			for (int j = 0; j < mat_num; ++j) {
 				arr.push_back(data.albedo_vec[j]);
-				os->print("changed color:[%f][%f][%f]\n", data.albedo_vec[j].r, data.albedo_vec[j].g, data.albedo_vec[j].b);
+				//os->print("changed color:[%f][%f][%f]\n", data.albedo_vec[j].r, data.albedo_vec[j].g, data.albedo_vec[j].b);
 			}
+			// albedo tex
+			auto albedo_tex_num = data.albedo_tex_map.size();
+			arr.push_back(albedo_tex_num);
+			for (auto e = data.albedo_tex_map.front(); e; e = e->next()) {
+				arr.push_back(e->key());
+				arr.push_back(e->value());
+			}
+			os->print("push back changed data, tex num[%d], mat num[%d], node[%S]\n", albedo_tex_num, mat_num, data.name);
 		}
 
 		if (is_server_flag) {
@@ -2606,20 +2643,35 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 		int protocol = arr.pop_front();
 
 		switch (protocol) {
-		case SERVER_DATA_SYNC: {
+		case S2C_SERVER_VERIFY_PW_FAILED: {
+			client->disconnect_from_host();
+			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+			r_error_str = "[GDI]multiplayer password wrong";
+			return 0;
+		}
+		case S2C_DATA_SYNC: {
 			int data_num = arr.pop_front();
-// 			os->print("client sync data, protocol[%d], data_num[%d]\n", protocol, data_num);
+			os->print("--------client sync data, protocol[%d], data_num[%d]\n", protocol, data_num);
 
 			for (int i = 0; i < data_num; ++i) {
 				uint64_t instance_id = arr.pop_front();
 				String name = arr.pop_front();
 				Transform trans = arr.pop_front();
 				bool visible = arr.pop_front();
+				// albedo
+				Vector<Color> albedo_vec;
 				int mat_num = arr.pop_front();
-				Vector<Color> colorVec;
 				for (int j = 0; j < mat_num; ++j) {
-					colorVec.push_back(arr.pop_front());
-					os->print("sync color:[%f][%f][%f]\n", colorVec[j].r, colorVec[j].g, colorVec[j].b);
+					albedo_vec.push_back(arr.pop_front());
+					//os->print("sync color:[%f][%f][%f]\n", colorVec[j].r, colorVec[j].g, colorVec[j].b);
+				}
+				// albedo tex
+				Map<int, String> albedo_tex_map;
+				int albedo_tex_num = arr.pop_front();
+				for (int j = 0; j < albedo_tex_num; ++j) {
+					int idx = arr.pop_front();
+					String tex_path = arr.pop_back();
+					albedo_tex_map.insert(idx, tex_path);
 				}
 
 				// use id and name to find the matched node
@@ -2629,7 +2681,8 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 					continue;
 				}
 
-				sync_data_with_node(node, SyncDataInfo(trans, visible, colorVec));
+				os->print("albedo tex num[%d], mat num[%d], node[%S]\n", albedo_tex_num, mat_num, String(node->get_name()));
+				sync_data_with_node(node, SyncDataInfo(trans, visible, albedo_vec, albedo_tex_map));
 			}
 			break;
 		}
@@ -2640,6 +2693,7 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 
 	// Server, broadcast sync data
 	if (is_server_flag) {
+		delete_clients_vec.clear();
 		for (auto e = server_clients_map.front(); e; e = e->next()) {
 			auto &client = e->value();
 			if (!client->is_connected_to_host() || !client->get_available_bytes()) {
@@ -2652,7 +2706,20 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 			int protocol = arr.pop_front();
 	
 			switch (protocol) {
-			case CLIENT_DATA_CHANGE: {
+			case C2S_CLIENT_VERIFY_PW: {
+				int pw = *p_inputs[4];
+				int client_pw = arr.pop_front();
+
+				if (client_pw != pw) {
+					delete_clients_vec.push_back(e->key());
+
+					Array arr;
+					arr.push_back((int)S2C_SERVER_VERIFY_PW_FAILED);
+					client->put_var(arr);
+				}
+				break;
+			}
+			case C2S_CLIENT_DATA_CHANGE: {
 // 				os->print("server recv client data change, id[%d]\n", e->key());
 
 				// sync server
@@ -2665,26 +2732,36 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 						String name = arr.pop_front();
 						Transform trans = arr.pop_front();
 						bool visible = arr.pop_front();
+						// albedo
+						Vector<Color> albedo_vec;
 						int mat_num = arr.pop_front();
-						Vector<Color> colorVec;
 						for (int j = 0; j < mat_num; ++j) {
-							colorVec.push_back(arr.pop_front());
+							albedo_vec.push_back(arr.pop_front());
+							//os->print("sync color:[%f][%f][%f]\n", colorVec[j].r, colorVec[j].g, colorVec[j].b);
 						}
-	
+						// albedo tex
+						Map<int, String> albedo_tex_map;
+						int albedo_tex_num = arr.pop_front();
+						for (int j = 0; j < albedo_tex_num; ++j) {
+							int idx = arr.pop_front();
+							String tex_path = arr.pop_back();
+							albedo_tex_map.insert(idx, tex_path);
+						}
+
 						// use id and name to find the matched node
 						Node *node = find_node_with_id_and_name(instance_id, name);
 						if (nullptr == node) {
-							os->print("server sync data failed, not found matched node\n");
+							os->print("server sync data failed, not found matched node, id[%d], name[%S]\n", instance_id, name);
 							continue;
 						}
-	
-						sync_data_with_node(node, SyncDataInfo(trans, visible, colorVec));
+
+						sync_data_with_node(node, SyncDataInfo(trans, visible, albedo_vec, albedo_tex_map));
 					}
 				}
 
 				// sync other clients
 				// chanage protocol to broadcast
-				varTmp.set(0, (int)SERVER_DATA_SYNC);
+				varTmp.set(0, (int)S2C_DATA_SYNC);
 				for (auto e2 = server_clients_map.front(); e2; e2 = e2->next()) {
 					if (e->key() == e2->key()) {
 						continue;
@@ -2700,6 +2777,11 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 				break;
 			}
 			}
+		}
+
+		for (int i = 0; i < delete_clients_vec.size(); ++i) {
+			os->print("server delete client[%d]\n", delete_clients_vec[i]);
+			server_clients_map.erase(delete_clients_vec[i]);
 		}
 	}
 
@@ -2730,7 +2812,7 @@ String GDIVisualScriptCustomNodeMultiPlayer::get_output_sequence_port_text(int p
 }
 
 int GDIVisualScriptCustomNodeMultiPlayer::get_input_value_port_count() const {
-	return 4;
+	return 5;
 }
 
 int GDIVisualScriptCustomNodeMultiPlayer::get_output_value_port_count() const {
@@ -2743,12 +2825,12 @@ PropertyInfo GDIVisualScriptCustomNodeMultiPlayer::get_input_value_port_info(int
 	switch (p_idx)
 	{
 	case 0: {
-		pi.name = L"是否为服务器";
+		pi.name = L"本机为服务器";
 		pi.type = Variant::BOOL;
 		break;
 	}
 	case 1: {
-		pi.name = L"IP地址";
+		pi.name = L"服务器IP地址";
 		pi.type = Variant::STRING;
 		break;
 	}
@@ -2759,6 +2841,11 @@ PropertyInfo GDIVisualScriptCustomNodeMultiPlayer::get_input_value_port_info(int
 	}
 	case 3: {
 		pi.name = L"最大连接数";
+		pi.type = Variant::INT;
+		break;
+	}
+	case 4: {
+		pi.name = L"密码";
 		pi.type = Variant::INT;
 		break;
 	}
@@ -2856,6 +2943,7 @@ GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(Node *n
 		visible = spatial->is_visible();
 	}
 
+	// Material relevant(albedo, texture...)
 	MeshInstance *mi = Object::cast_to<MeshInstance>(node);
 	if (nullptr != mi) {
 		surf_mat_vec.clear();
@@ -2866,16 +2954,24 @@ GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(Node *n
 
 			Ref<SpatialMaterial> sm = Object::cast_to<SpatialMaterial>(*mat);
 			if (nullptr != *sm) {
+				// albedo
 				albedo_vec.push_back(sm->get_albedo());
+
+				// albedo tex
+				auto tex = sm->get_texture(SpatialMaterial::TextureParam::TEXTURE_ALBEDO);
+				if (nullptr != *tex) {
+					albedo_tex_map.insert(i, tex->get_path());
+				}
 			}
 		}
 	}
 }
 
-GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(const Transform &trans, bool v, const Vector<Color> &albedo_vec)
+GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(const Transform &trans, bool v, const Vector<Color> &albedo_vec, const Map<int, String> &albedo_tex_map)
 	:transform(trans), visible(v)
 {
 	this->albedo_vec = albedo_vec;
+	this->albedo_tex_map = albedo_tex_map;
 }
 
 GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo()
@@ -2886,6 +2982,7 @@ GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo()
 
 bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(const SyncDataInfo &other) {
 
+	// we should keep left param be the stored one(left == right)
 	// check mat----
 	bool same_mat_flag = true;
 	auto left_mat_num = surf_mat_vec.size();
@@ -2895,10 +2992,11 @@ bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(cons
 		same_mat_flag = false;
 	}
 	else {
-		// check mat albedo
+		// check mat albedo, tex
 		for (int i = 0; i < left_mat_num; ++i) {
-			//OS::get_singleton()->print("test crash, mat1[%x] mat2[%x]\n", *surf_mat_vec[i], *other.surf_mat_vec[i]);
+			// albedo--
 			if (nullptr == *surf_mat_vec[i] || nullptr == *other.surf_mat_vec[i]) {
+				//OS::get_singleton()->print("null mat, left[%x], right[%x]\n", *surf_mat_vec[i], *other.surf_mat_vec[i]);
 				continue;
 			}
 
@@ -2906,8 +3004,31 @@ bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(cons
 			auto right_albedo = other.surf_mat_vec[i]->get_albedo();
 
 			if (left_albedo != right_albedo) {
+				//OS::get_singleton()->print("albedo changed............\n");
 				same_mat_flag = false;
 				break;
+			}
+
+			// albedo tex--
+			auto e = albedo_tex_map.find(i);
+			auto right_tex = other.surf_mat_vec[i]->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
+			if (nullptr != *right_tex) {
+				String right_path = right_tex->get_path();
+				//OS::get_singleton()->print("left path[%S], right paht[%S]\n", left_path, right_path);
+				String left_path = nullptr == e ? "" : e->value();
+
+				if (left_path != right_path) {
+					OS::get_singleton()->print("albedo tex changed1............\n");
+					same_mat_flag = false;
+					break;
+				}
+			}
+			else {
+				if (nullptr != e) {
+					OS::get_singleton()->print("albedo tex changed2............\n");
+					same_mat_flag = false;
+					break;
+				}
 			}
 		}
 

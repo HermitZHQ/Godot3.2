@@ -7,7 +7,7 @@
 
 class Transfrom;
 class Material;
-class Color;
+struct Color;
 
 class OS;
 class _OS;
@@ -287,9 +287,11 @@ class GDIVisualScriptNodeInstanceCustomMultiPlayer
 
 	enum MultiPlayerSyncProtocol
 	{
-		SERVER_DATA_SYNC,
-		CLIENT_DATA_CHANGE,
-		NEW_INSTANCE_SYNC,// preserve
+		S2C_DATA_SYNC,
+		C2S_CLIENT_DATA_CHANGE,
+		S2C_NEW_INSTANCE_SYNC,// preserve
+		C2S_CLIENT_VERIFY_PW,
+		S2C_SERVER_VERIFY_PW_FAILED,
 
 		MAX_COUNT
 	};
@@ -315,6 +317,7 @@ public:
 	Ref<NetworkedMultiplayerENet> multi_player_enet;
 	Ref<TCP_Server> server;
 	Map<uint64_t, Ref<StreamPeerTCP>> server_clients_map;// (instance_id, tcp_peer)
+	Vector<uint64_t> delete_clients_vec;
 	Ref<StreamPeerTCP> client;
 	struct SyncDataInfo 
 	{		
@@ -324,10 +327,11 @@ public:
 		bool								visible;
 		Vector<Ref<SpatialMaterial>>		surf_mat_vec;
 		Vector<Color>						albedo_vec;
+		Map<int, String>					albedo_tex_map;
 
 		SyncDataInfo();
 		SyncDataInfo(Node *node);
-		SyncDataInfo(const Transform &trans, bool v, const Vector<Color> &albedo_vec);
+		SyncDataInfo(const Transform &trans, bool v, const Vector<Color> &albedo_vec, const Map<int, String> &albedo_tex_map);
 		bool operator==(const SyncDataInfo &other);
 	};
 	Map<Node*, SyncDataInfo> stored_sync_data_info_map;
