@@ -2857,6 +2857,17 @@ void Node::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("update_configuration_warning"), &Node::update_configuration_warning);
 
+	ClassDB::bind_method(D_METHOD("gdi_set_multiplayer_sync_enable", "enable"), &Node::gdi_set_multiplayer_sync_enable);
+	ClassDB::bind_method(D_METHOD("gdi_get_multiplayer_sync_enable"), &Node::gdi_get_multiplayer_sync_enable);
+	ClassDB::bind_method(D_METHOD("gdi_set_multiplayer_sync_transform_enable", "enable"), &Node::gdi_set_multiplayer_sync_transform_enable);
+	ClassDB::bind_method(D_METHOD("gdi_get_multiplayer_sync_transform_enable"), &Node::gdi_get_multiplayer_sync_transform_enable);
+	ClassDB::bind_method(D_METHOD("gdi_set_multiplayer_sync_visible_enable", "enable"), &Node::gdi_set_multiplayer_sync_visible_enable);
+	ClassDB::bind_method(D_METHOD("gdi_get_multiplayer_sync_visible_enable"), &Node::gdi_get_multiplayer_sync_visible_enable);
+	ClassDB::bind_method(D_METHOD("gdi_set_multiplayer_sync_albedo_enable", "enable"), &Node::gdi_set_multiplayer_sync_albedo_enable);
+	ClassDB::bind_method(D_METHOD("gdi_get_multiplayer_sync_albedo_enable"), &Node::gdi_get_multiplayer_sync_albedo_enable);
+	ClassDB::bind_method(D_METHOD("gdi_set_multiplayer_sync_albedo_tex_enable", "enable"), &Node::gdi_set_multiplayer_sync_albedo_tex_enable);
+	ClassDB::bind_method(D_METHOD("gdi_get_multiplayer_sync_albedo_tex_enable"), &Node::gdi_get_multiplayer_sync_albedo_tex_enable);
+
 	BIND_CONSTANT(NOTIFICATION_ENTER_TREE);
 	BIND_CONSTANT(NOTIFICATION_EXIT_TREE);
 	BIND_CONSTANT(NOTIFICATION_MOVED_IN_PARENT);
@@ -2918,6 +2929,13 @@ void Node::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "multiplayer", PROPERTY_HINT_RESOURCE_TYPE, "MultiplayerAPI", 0), "", "get_multiplayer");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "custom_multiplayer", PROPERTY_HINT_RESOURCE_TYPE, "MultiplayerAPI", 0), "set_custom_multiplayer", "get_custom_multiplayer");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_priority"), "set_process_priority", "get_process_priority");
+
+	ADD_GROUP(L"多人协同设置", L"");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, L"是否开启同步"), "gdi_set_multiplayer_sync_enable", "gdi_get_multiplayer_sync_enable");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, L"同步Transform"), "gdi_set_multiplayer_sync_transform_enable", "gdi_get_multiplayer_sync_transform_enable");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, L"同步显隐"), "gdi_set_multiplayer_sync_visible_enable", "gdi_get_multiplayer_sync_visible_enable");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, L"同步albedo"), "gdi_set_multiplayer_sync_albedo_enable", "gdi_get_multiplayer_sync_albedo_enable");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, L"同步albedo tex"), "gdi_set_multiplayer_sync_albedo_tex_enable", "gdi_get_multiplayer_sync_albedo_tex_enable");
 
 	BIND_VMETHOD(MethodInfo("_process", PropertyInfo(Variant::REAL, "delta")));
 	BIND_VMETHOD(MethodInfo("_physics_process", PropertyInfo(Variant::REAL, "delta")));
@@ -2986,4 +3004,53 @@ Node::~Node() {
 	orphan_node_count--;
 }
 
+void Node::gdi_set_multiplayer_sync_enable(bool bEnable) {
+
+	data.gdi_sync_enable = bEnable;
+}
+
+bool Node::gdi_get_multiplayer_sync_enable() const {
+
+	return data.gdi_sync_enable;
+}
+
+void Node::gdi_set_multiplayer_sync_transform_enable(bool bEnable) {
+
+	data.gdi_sync_transform_enable = bEnable;
+}
+
+bool Node::gdi_get_multiplayer_sync_transform_enable() const {
+
+	return data.gdi_sync_transform_enable;
+}
+
+void Node::gdi_set_multiplayer_sync_visible_enable(bool bEnable) {
+
+	data.gdi_sync_visible_enable = bEnable;
+}
+
+bool Node::gdi_get_multiplayer_sync_visible_enable() const {
+
+	return data.gdi_sync_visible_enable;
+}
+
+void Node::gdi_set_multiplayer_sync_albedo_enable(bool bEnable) {
+
+	data.gdi_sync_albedo_enable = bEnable;
+}
+
+bool Node::gdi_get_multiplayer_sync_albedo_enable() const {
+
+	return data.gdi_sync_albedo_enable;
+}
+
+void Node::gdi_set_multiplayer_sync_albedo_tex_enable(bool bEnable) {
+
+	data.gdi_sync_albedo_tex_enable = bEnable;
+}
+
+bool Node::gdi_get_multiplayer_sync_albedo_tex_enable() const {
+
+	return data.gdi_sync_albedo_tex_enable;
+}
 ////////////////////////////////

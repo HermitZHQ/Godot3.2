@@ -142,6 +142,12 @@ private:
 
 		mutable NodePath *path_cache;
 
+		bool gdi_sync_enable = true;
+		bool gdi_sync_transform_enable = true;
+		bool gdi_sync_visible_enable = true;
+		bool gdi_sync_albedo_enable = true;
+		bool gdi_sync_albedo_tex_enable = true;
+
 	} data;
 
 	enum NameCasing {
@@ -451,6 +457,17 @@ public:
 
 	Node();
 	~Node();
+
+	void gdi_set_multiplayer_sync_enable(bool bEnable);
+	bool gdi_get_multiplayer_sync_enable() const;
+	void gdi_set_multiplayer_sync_transform_enable(bool bEnable);
+	bool gdi_get_multiplayer_sync_transform_enable() const;
+	void gdi_set_multiplayer_sync_visible_enable(bool bEnable);
+	bool gdi_get_multiplayer_sync_visible_enable() const;
+	void gdi_set_multiplayer_sync_albedo_enable(bool bEnable);
+	bool gdi_get_multiplayer_sync_albedo_enable() const;
+	void gdi_set_multiplayer_sync_albedo_tex_enable(bool bEnable);
+	bool gdi_get_multiplayer_sync_albedo_tex_enable() const;
 };
 
 VARIANT_ENUM_CAST(Node::DuplicateFlags);

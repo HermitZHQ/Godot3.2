@@ -2434,8 +2434,13 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::client_create_func(const Varia
 
 void GDIVisualScriptNodeInstanceCustomMultiPlayer::generate_all_nodes_sync_data_info(Node *node) {
 
-	SyncDataInfo sdi(node);
-	stored_sync_data_info_map.insert(node, sdi);
+	if (node->gdi_get_multiplayer_sync_enable()) {
+		SyncDataInfo sdi(node);
+		stored_sync_data_info_map.insert(node, sdi);
+	}
+	//else {
+	//	printf("this node not sync[%S]\n", String(node->get_name()));
+	//}
 
 	auto child_count = node->get_child_count();
 	if (child_count > 0) {
@@ -2490,18 +2495,22 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *nod
 	// update the transform, visible
 	Spatial *spatial = Object::cast_to<Spatial>(node);
 	if (nullptr != spatial) {
-		spatial->set_global_transform(sdi.transform);
-		spatial->set_visible(sdi.visible);
+		if (node->gdi_get_multiplayer_sync_transform_enable()) {
+			spatial->set_global_transform(sdi.transform);
+		}
+		if (node->gdi_get_multiplayer_sync_visible_enable()) {
+			spatial->set_visible(sdi.visible);
+		}
 	}
 
 	// update the mat(albedo, tex...)
 	MeshInstance *mi = Object::cast_to<MeshInstance>(node);
 	if (nullptr != mi) {
 		auto mat_num = mi->get_surface_material_count();
-		if (mat_num != sdi.albedo_vec.size()) {
-			os->print("[GDI]this case not handled, should report\n");
-			return;
-		}
+		//if (mat_num != sdi.albedo_vec.size()) {
+		//	os->print("[GDI]this case not handled, should report\n");
+		//	return;
+		//}
 
 		for (int i = 0; i < mat_num; ++i) {
 			SpatialMaterial *sm = Object::cast_to<SpatialMaterial>(*(mi->get_surface_material(i)));
@@ -2511,28 +2520,32 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *nod
 
 			// albedo tex
 			//os->print("begin to set albedo tex........\n");
-			auto e = sdi.albedo_tex_map.find(i);
-			auto tex = sm->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
-			if (nullptr != *tex && nullptr != e && e->value() != tex->get_path()) {
-				tex->set_path(e->value(), true);
-				tex->reload_from_file();
-				os->print("sync albedo tex1..........\n");
-			}
-			else if (nullptr == *tex && nullptr != e) {
-				Ref<StreamTexture> new_tex;
-				new_tex.instance();
-				new_tex->load(e->value());
-				sm->set_texture(SpatialMaterial::TEXTURE_ALBEDO, new_tex);
-// 				sm->set_albedo(Color(1, 1, 1));
-				os->print("sync albedo tex2..........\n");
-			}
-			else if (nullptr == e && nullptr != *tex) {
-				sm->set_texture(SpatialMaterial::TEXTURE_ALBEDO, nullptr);
-				os->print("sync albedo tex3..........\n");
+			if (node->gdi_get_multiplayer_sync_albedo_tex_enable()) {
+				auto e = sdi.albedo_tex_map.find(i);
+				auto tex = sm->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
+				if (nullptr != *tex && nullptr != e && e->value() != tex->get_path()) {
+					tex->set_path(e->value(), true);
+					tex->reload_from_file();
+					os->print("sync albedo tex1..........\n");
+				}
+				else if (nullptr == *tex && nullptr != e) {
+					Ref<StreamTexture> new_tex;
+					new_tex.instance();
+					// load must use the import path(I used get_path once, it's wrong)
+					new_tex->load(e->value());
+					sm->set_texture(SpatialMaterial::TEXTURE_ALBEDO, new_tex);
+					os->print("sync albedo tex2..........\n");
+				}
+				else if (nullptr == e && nullptr != *tex) {
+					sm->set_texture(SpatialMaterial::TEXTURE_ALBEDO, nullptr);
+					os->print("sync albedo tex3..........\n");
+				}
 			}
 
 			// albedo
-			sm->set_albedo(sdi.albedo_vec[i]);
+			if (node->gdi_get_multiplayer_sync_albedo_enable()) {
+				sm->set_albedo(sdi.albedo_vec[i]);
+			}
 		}
 	}
 
@@ -2609,11 +2622,10 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 			arr.push_back(data.transform);
 			arr.push_back(data.visible);
 			// mat num
-			auto mat_num = data.surf_mat_vec.size();
+			auto mat_num = data.sync_albedo ? data.surf_mat_vec.size() : 0;
 			arr.push_back(mat_num);
 			for (int j = 0; j < mat_num; ++j) {
 				arr.push_back(data.albedo_vec[j]);
-				//os->print("changed color:[%f][%f][%f]\n", data.albedo_vec[j].r, data.albedo_vec[j].g, data.albedo_vec[j].b);
 			}
 			// albedo tex
 			auto albedo_tex_num = data.albedo_tex_map.size();
@@ -2938,11 +2950,25 @@ GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(Node *n
 
 	instance_id = node->get_instance_id();
 	name = node->get_name();
+	class_name = node->get_class_name();
+	sync_trans = node->gdi_get_multiplayer_sync_transform_enable();
+	sync_visible = node->gdi_get_multiplayer_sync_visible_enable();
+	sync_albedo = node->gdi_get_multiplayer_sync_albedo_enable();
+	sync_albedo_tex = node->gdi_get_multiplayer_sync_albedo_tex_enable();
+
+// 	printf("class name[%S], sync type[%S]\n", class_name, sync_type);
+// 	if (sync_type == Node::gdi_sync_type_str_list[1]) {
+// 		OS::get_singleton()->print("check res same sync.....\n");
+// 	}
 
 	Spatial *spatial = Object::cast_to<Spatial>(node);
 	if (nullptr != spatial) {
-		transform = spatial->get_global_transform();
-		visible = spatial->is_visible();
+		if (sync_trans) {
+			transform = spatial->get_global_transform();
+		}
+		if (sync_visible) {
+			visible = spatial->is_visible();
+		}
 	}
 
 	// Material relevant(albedo, texture...)
@@ -2957,12 +2983,16 @@ GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(Node *n
 			Ref<SpatialMaterial> sm = Object::cast_to<SpatialMaterial>(*mat);
 			if (nullptr != *sm) {
 				// albedo
-				albedo_vec.push_back(sm->get_albedo());
+				if (sync_albedo) {
+					albedo_vec.push_back(sm->get_albedo());
+				}
 
 				// albedo tex
-				auto tex = sm->get_texture(SpatialMaterial::TextureParam::TEXTURE_ALBEDO);
-				if (nullptr != *tex) {
-					albedo_tex_map.insert(i, tex->get_path());
+				if (sync_albedo_tex) {
+					auto tex = sm->get_texture(SpatialMaterial::TextureParam::TEXTURE_ALBEDO);
+					if (nullptr != *tex) {
+						albedo_tex_map.insert(i, tex->get_import_path());
+					}
 				}
 			}
 		}
@@ -2978,6 +3008,7 @@ GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(const T
 
 GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo()
 	:instance_id(0), visible(true)
+	, sync_trans(true), sync_visible(true), sync_albedo(true), sync_albedo_tex(true)
 {
 	surf_mat_vec.clear();
 }
@@ -3002,34 +3033,38 @@ bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(cons
 				continue;
 			}
 
-			auto left_albedo = albedo_vec[i];
-			auto right_albedo = other.surf_mat_vec[i]->get_albedo();
-
-			if (left_albedo != right_albedo) {
-				//OS::get_singleton()->print("albedo changed............\n");
-				same_mat_flag = false;
-				break;
-			}
-
-			// albedo tex--
-			auto e = albedo_tex_map.find(i);
-			auto right_tex = other.surf_mat_vec[i]->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
-			if (nullptr != *right_tex) {
-				String right_path = right_tex->get_path();
-				//OS::get_singleton()->print("left path[%S], right paht[%S]\n", left_path, right_path);
-				String left_path = nullptr == e ? "" : e->value();
-
-				if (left_path != right_path) {
-					OS::get_singleton()->print("albedo tex changed1............\n");
+			if (sync_albedo) {
+				auto left_albedo = albedo_vec[i];
+				auto right_albedo = other.surf_mat_vec[i]->get_albedo();
+	
+				if (left_albedo != right_albedo) {
+					//OS::get_singleton()->print("albedo changed............\n");
 					same_mat_flag = false;
 					break;
 				}
 			}
-			else {
-				if (nullptr != e) {
-					OS::get_singleton()->print("albedo tex changed2............\n");
-					same_mat_flag = false;
-					break;
+
+			// albedo tex--
+			if (sync_albedo_tex) {
+				auto e = albedo_tex_map.find(i);
+				auto right_tex = other.surf_mat_vec[i]->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
+				if (nullptr != *right_tex) {
+					String right_path = right_tex->get_import_path();
+					//OS::get_singleton()->print("left path[%S], right paht[%S]\n", left_path, right_path);
+					String left_path = nullptr == e ? "" : e->value();
+	
+					if (left_path != right_path) {
+						OS::get_singleton()->print("albedo tex changed1............\n");
+						same_mat_flag = false;
+						break;
+					}
+				}
+				else {
+					if (nullptr != e) {
+						OS::get_singleton()->print("albedo tex changed2............\n");
+						same_mat_flag = false;
+						break;
+					}
 				}
 			}
 		}

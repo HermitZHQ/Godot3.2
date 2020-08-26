@@ -323,11 +323,17 @@ public:
 	{		
 		uint64_t							instance_id;
 		String								name;
+		String								class_name;
 		Transform							transform;
 		bool								visible;
 		Vector<Ref<SpatialMaterial>>		surf_mat_vec;
 		Vector<Color>						albedo_vec;
 		Map<int, String>					albedo_tex_map;
+
+		bool								sync_trans;
+		bool								sync_visible;
+		bool								sync_albedo;
+		bool								sync_albedo_tex;
 
 		SyncDataInfo();
 		SyncDataInfo(Node *node);
