@@ -2291,7 +2291,9 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::_bind_methods() {
 // 	ClassDB::add_virtual_method("VisualScriptInstance", MethodInfo(Variant::NIL, "rpc_call_test_func"));
 }
 
-GDIVisualScriptNodeInstanceCustomMultiPlayer::GDIVisualScriptNodeInstanceCustomMultiPlayer() {
+GDIVisualScriptNodeInstanceCustomMultiPlayer::GDIVisualScriptNodeInstanceCustomMultiPlayer()
+	:client_unique_id(0)
+{
 
 	multi_player_enet.instance();
 	server.instance();
@@ -2452,7 +2454,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::generate_all_nodes_sync_data_
 }
 
 void GDIVisualScriptNodeInstanceCustomMultiPlayer::update_all_nodes_sync_data_info(Node *node) {
-
+	
 	SyncDataInfo sdi(node);
 	auto e = stored_sync_data_info_map.find(node);
 	if (nullptr != e && !(e->value() == sdi)) {
@@ -2460,6 +2462,10 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::update_all_nodes_sync_data_in
 		e->value() = sdi;
 		changed_data_info_vec.push_back(sdi);
 		//os->print("sync data changed\n");
+	}
+	// to support the dynamic create(but when to delete? for now, it's ignored)
+	else if (nullptr == e) {
+		stored_sync_data_info_map.insert(node, sdi);
 	}
 
 	auto child_count = node->get_child_count();
@@ -2482,6 +2488,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::update_stored_nodes_info(Sync
 Node* GDIVisualScriptNodeInstanceCustomMultiPlayer::find_node_with_id_and_name(uint64_t id, const String &name) {
 
 	for (auto e = stored_sync_data_info_map.front(); e; e = e->next()) {
+		// maybe not use instance id, just use name(because of the dynamic create)
 		if (e->value().instance_id == id && e->value().name == name) {
 			return e->key();
 		}
@@ -2526,7 +2533,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *nod
 				if (nullptr != *tex && nullptr != e && e->value() != tex->get_path()) {
 					tex->set_path(e->value(), true);
 					tex->reload_from_file();
-					os->print("sync albedo tex1..........\n");
+					//os->print("sync albedo tex1..........\n");
 				}
 				else if (nullptr == *tex && nullptr != e) {
 					Ref<StreamTexture> new_tex;
@@ -2534,11 +2541,11 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *nod
 					// load must use the import path(I used get_path once, it's wrong)
 					new_tex->load(e->value());
 					sm->set_texture(SpatialMaterial::TEXTURE_ALBEDO, new_tex);
-					os->print("sync albedo tex2..........\n");
+					//os->print("sync albedo tex2..........\n");
 				}
 				else if (nullptr == e && nullptr != *tex) {
 					sm->set_texture(SpatialMaterial::TEXTURE_ALBEDO, nullptr);
-					os->print("sync albedo tex3..........\n");
+					//os->print("sync albedo tex3..........\n");
 				}
 			}
 
@@ -2555,55 +2562,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *nod
 	}
 }
 
-int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
-
-	bool is_server_flag = (bool)*p_inputs[0];
-	static Node *node = Object::cast_to<Node>(instance->get_owner_ptr());
-	if (nullptr == node) {
-		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-		r_error_str = "[GDI]can't get instance node";
-		return 0;
-	}
-
-	static Node *root = node->get_tree()->get_current_scene();
-	if (nullptr == root) {
-		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-		r_error_str = "[GDI]can't get root node";
-		return 0;
-	}
-
-	if (!already_create_flag) {
-		// init all nodes data info at the create time
-		generate_all_nodes_sync_data_info(root);
-
-		// for test, output all nodes info
-		//for (auto e = stored_sync_data_info_map.front(); e; e = e->next()) {
-		//	os->print("[Node info]name[%S], id[%d]\n", e->value().name, e->value().instance_id);
-		//}
-
-		// Server----
-		if (is_server_flag) {
-			server_create_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
-		}
-		// Client----
-		else {
-			client_create_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
-		}
-
-		already_create_flag = true;
-	}
-
-	// Server, accept new client
-	if (is_server_flag) {
-		if (server->is_listening()) {
-			auto new_client = server->take_connection();
-
-			if (nullptr != *new_client) {
-				server_clients_map.insert(new_client->get_instance_id(), new_client);
-				os->print("new client connected\n");
-			}
-		}
-	}
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::handle_data_change(Node *root) {
 
 	changed_data_info_vec.clear();
 	update_all_nodes_sync_data_info(root);
@@ -2642,68 +2601,15 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 				auto &socket = e->value();
 				socket->put_var(arr);
 			}
-		} 
+		}
 		else {
 			client->put_var(arr);
-// 			os->print("client send sync data...\n");
+			//os->print("client send sync data...\n");
 		}
 	}
+}
 
-	// Client, sync data
-	if (!is_server_flag && client->is_connected_to_host() && client->get_available_bytes()) {
-		Variant var = client->get_var();
-		Array arr = var;
-		int protocol = arr.pop_front();
-
-		switch (protocol) {
-		case S2C_SERVER_VERIFY_PW_FAILED: {
-			client->disconnect_from_host();
-			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
-			r_error_str = "[GDI]multiplayer password wrong";
-			return 0;
-		}
-		case S2C_DATA_SYNC: {
-			int data_num = arr.pop_front();
-			os->print("--------client sync data, protocol[%d], data_num[%d]\n", protocol, data_num);
-
-			for (int i = 0; i < data_num; ++i) {
-				uint64_t instance_id = arr.pop_front();
-				String name = arr.pop_front();
-				Transform trans = arr.pop_front();
-				bool visible = arr.pop_front();
-				os->print("sync data id[%d], name[%S]\n", instance_id, name);
-				// albedo
-				Vector<Color> albedo_vec;
-				int mat_num = arr.pop_front();
-				for (int j = 0; j < mat_num; ++j) {
-					albedo_vec.push_back(arr.pop_front());
-					//os->print("sync color:[%f][%f][%f]\n", colorVec[j].r, colorVec[j].g, colorVec[j].b);
-				}
-				// albedo tex
-				Map<int, String> albedo_tex_map;
-				int albedo_tex_num = arr.pop_front();
-				for (int j = 0; j < albedo_tex_num; ++j) {
-					int idx = arr.pop_front();
-					String tex_path = arr.pop_front();
-					albedo_tex_map.insert(idx, tex_path);
-				}
-
-				// use id and name to find the matched node
-				Node *node = find_node_with_id_and_name(instance_id, name);
-				if (nullptr == node) {
-					os->print("server sync data failed, not found matched node, id[%d], name[%S]\n", instance_id, name);
-					continue;
-				}
-
-				os->print("albedo tex num[%d], mat num[%d], node[%S]\n", albedo_tex_num, mat_num, String(node->get_name()));
-				sync_data_with_node(node, SyncDataInfo(trans, visible, albedo_vec, albedo_tex_map));
-			}
-			break;
-		}
-		default:
-			break;
-		}
-	}
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::handle_server_msg(const Variant **p_inputs) {
 
 	// Server, broadcast sync data
 	if (is_server_flag) {
@@ -2718,7 +2624,7 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 			Variant varTmp = var.duplicate();
 			Array arr = var;
 			int protocol = arr.pop_front();
-	
+
 			switch (protocol) {
 			case C2S_CLIENT_VERIFY_PW: {
 				int pw = *p_inputs[4];
@@ -2734,13 +2640,13 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 				break;
 			}
 			case C2S_CLIENT_DATA_CHANGE: {
-// 				os->print("server recv client data change, id[%d]\n", e->key());
+				//os->print("server recv client data change, id[%d]\n", e->key());
 
 				// sync server
 				{
 					int data_num = arr.pop_front();
 					//os->print("get changed data, protocol[%d], data_num[%d]\n", protocol, data_num);
-	
+
 					for (int i = 0; i < data_num; ++i) {
 						uint64_t instance_id = arr.pop_front();
 						String name = arr.pop_front();
@@ -2798,6 +2704,135 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 			server_clients_map.erase(delete_clients_vec[i]);
 		}
 	}
+}
+
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::handle_client_msg(Variant::CallError &r_error, String &r_error_str) {
+
+	// Client, sync data
+	if (!is_server_flag && client->is_connected_to_host() && client->get_available_bytes()) {
+		Array arr = client->get_var();
+		int protocol = arr.pop_front();
+
+		switch (protocol) {
+		case S2C_SERVER_VERIFY_PW_FAILED: {
+			client_disconnected_flag = true;
+			client->disconnect_from_host();
+			//r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+			//r_error_str = "[GDI]multiplayer password wrong";
+			break;
+		}
+		case S2C_CLIENT_ID: {
+			client_unique_id = arr.pop_front();
+			os->print("[GDI]set client unique id[%d]\n", client_unique_id);
+			break;
+		}
+		case S2C_DATA_SYNC: {
+			int data_num = arr.pop_front();
+			os->print("--------client sync data, protocol[%d], data_num[%d]\n", protocol, data_num);
+
+			for (int i = 0; i < data_num; ++i) {
+				uint64_t instance_id = arr.pop_front();
+				String name = arr.pop_front();
+				Transform trans = arr.pop_front();
+				bool visible = arr.pop_front();
+				os->print("sync data id[%d], name[%S]\n", instance_id, name);
+				// albedo
+				Vector<Color> albedo_vec;
+				int mat_num = arr.pop_front();
+				for (int j = 0; j < mat_num; ++j) {
+					albedo_vec.push_back(arr.pop_front());
+					//os->print("sync color:[%f][%f][%f]\n", colorVec[j].r, colorVec[j].g, colorVec[j].b);
+				}
+				// albedo tex
+				Map<int, String> albedo_tex_map;
+				int albedo_tex_num = arr.pop_front();
+				for (int j = 0; j < albedo_tex_num; ++j) {
+					int idx = arr.pop_front();
+					String tex_path = arr.pop_front();
+					albedo_tex_map.insert(idx, tex_path);
+				}
+
+				// use id and name to find the matched node
+				Node *node = find_node_with_id_and_name(instance_id, name);
+				if (nullptr == node) {
+					os->print("server sync data failed, not found matched node, id[%d], name[%S]\n", instance_id, name);
+					continue;
+				}
+
+				os->print("albedo tex num[%d], mat num[%d], node[%S]\n", albedo_tex_num, mat_num, String(node->get_name()));
+				sync_data_with_node(node, SyncDataInfo(trans, visible, albedo_vec, albedo_tex_map));
+			}
+			break;
+		}
+		default:
+			break;
+		}
+	}
+}
+
+int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) {
+
+	is_server_flag = (bool)*p_inputs[0];
+	if (!is_server_flag && client_disconnected_flag) {
+		os->print("client password wrong, disconnected...\n");
+		return 0;
+	}
+
+	static Node *node = Object::cast_to<Node>(instance->get_owner_ptr());
+	if (nullptr == node) {
+		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+		r_error_str = "[GDI]can't get instance node";
+		return 0;
+	}
+
+	static Node *root = node->get_tree()->get_current_scene();
+	if (nullptr == root) {
+		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+		r_error_str = "[GDI]can't get root node";
+		return 0;
+	}
+
+	if (!already_create_flag) {
+		// init all nodes data info at the create time
+		generate_all_nodes_sync_data_info(root);
+
+		// for test, output all nodes info
+		//for (auto e = stored_sync_data_info_map.front(); e; e = e->next()) {
+		//	os->print("[Node info]name[%S], id[%d]\n", e->value().name, e->value().instance_id);
+		//}
+
+		// Server----
+		if (is_server_flag) {
+			server_create_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
+		}
+		// Client----
+		else {
+			client_create_func(p_inputs, p_outputs, p_start_mode, p_working_mem, r_error, r_error_str);
+		}
+
+		already_create_flag = true;
+	}
+
+	// Server, accept new client
+	if (is_server_flag) {
+		if (server->is_listening()) {
+			auto new_client = server->take_connection();
+
+			if (nullptr != *new_client) {
+				server_clients_map.insert(new_client->get_instance_id(), new_client);
+				os->print("[GDI]new client connected[%d]\n", new_client->get_instance_id());
+
+				Array arr;
+				arr.push_back((int)S2C_CLIENT_ID);
+				arr.push_back(new_client->get_instance_id());
+				new_client->put_var(arr);
+			}
+		}
+	}
+
+	handle_data_change(root);
+	handle_client_msg(r_error, r_error_str);
+	handle_server_msg(p_inputs);
 
 	*p_outputs[0] = create_succeed_flag;
 	return 0;
@@ -2830,7 +2865,7 @@ int GDIVisualScriptCustomNodeMultiPlayer::get_input_value_port_count() const {
 }
 
 int GDIVisualScriptCustomNodeMultiPlayer::get_output_value_port_count() const {
-	return 1;
+	return 0;
 }
 
 PropertyInfo GDIVisualScriptCustomNodeMultiPlayer::get_input_value_port_info(int p_idx) const {
@@ -3054,14 +3089,14 @@ bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(cons
 					String left_path = nullptr == e ? "" : e->value();
 	
 					if (left_path != right_path) {
-						OS::get_singleton()->print("albedo tex changed1............\n");
+						//OS::get_singleton()->print("albedo tex changed1............\n");
 						same_mat_flag = false;
 						break;
 					}
 				}
 				else {
 					if (nullptr != e) {
-						OS::get_singleton()->print("albedo tex changed2............\n");
+						//OS::get_singleton()->print("albedo tex changed2............\n");
 						same_mat_flag = false;
 						break;
 					}

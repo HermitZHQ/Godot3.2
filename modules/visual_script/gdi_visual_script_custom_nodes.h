@@ -292,6 +292,7 @@ class GDIVisualScriptNodeInstanceCustomMultiPlayer
 		S2C_NEW_INSTANCE_SYNC,// preserve
 		C2S_CLIENT_VERIFY_PW,
 		S2C_SERVER_VERIFY_PW_FAILED,
+		S2C_CLIENT_ID,
 
 		MAX_COUNT
 	};
@@ -313,12 +314,14 @@ public:
 	// ----multi player sync relevant
 	bool already_create_flag = false;
 	bool create_succeed_flag = false;
+	bool client_disconnected_flag = false;
 	bool is_server_flag = false;
 	Ref<NetworkedMultiplayerENet> multi_player_enet;
 	Ref<TCP_Server> server;
 	Map<uint64_t, Ref<StreamPeerTCP>> server_clients_map;// (instance_id, tcp_peer)
 	Vector<uint64_t> delete_clients_vec;
 	Ref<StreamPeerTCP> client;
+	uint64_t client_unique_id;
 	struct SyncDataInfo 
 	{		
 		uint64_t							instance_id;
@@ -364,6 +367,9 @@ public:
 	void update_stored_nodes_info(SyncDataInfo &stored, SyncDataInfo &changed);
 	Node* find_node_with_id_and_name(uint64_t id, const String &name);
 	void sync_data_with_node(Node *node, SyncDataInfo sdi);
+	void handle_data_change(Node *root);
+	void handle_server_msg(const Variant **p_inputs);
+	void handle_client_msg(Variant::CallError &r_error, String &r_error_str);
 
 	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) override;
 
