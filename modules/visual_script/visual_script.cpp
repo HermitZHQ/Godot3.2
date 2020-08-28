@@ -35,6 +35,7 @@
 #include "core/project_settings.h"
 #include "scene/main/node.h"
 #include "visual_script_nodes.h"
+#include "core/os/input.h"
 
 //used by editor, this is not really saved
 void VisualScriptNode::set_breakpoint(bool p_breakpoint) {
@@ -1863,6 +1864,10 @@ Variant VisualScriptInstance::_call_internal(const StringName &p_method, void *p
 			node = next; //stackless mode, simply assign next node
 		}
 	}
+
+	// reset gdi mouse wheel flag, after all visual nodes executed
+	static Input *input = Input::get_singleton();
+	input->gdi_reset_mouse_button_mask();
 
 	if (error) {
 

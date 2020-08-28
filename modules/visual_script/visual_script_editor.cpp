@@ -2494,36 +2494,6 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 				Ref<GDIVisualScriptCustomNodeMultiPlayer> node;
 				node.instance();
 				_gdi_create_new_visual_node(node, ofs);
-// 				_gdi_create_new_visual_node(node, ofs, "rpc_call_test_func");
-				already_create_visual_node_flag = true;
-
-// 				undo_redo->create_action(TTR("Add Function"));
-// 				undo_redo->add_do_method(script.ptr(), "add_function", "rpc_call_test_func");
-// 				undo_redo->add_undo_method(script.ptr(), "remove_function", "rpc_call_test_func");
-
-// 				String name = "rpc_call_test_func";
-// 				if (script->has_function(name)) {
-// 					EditorNode::get_singleton()->show_warning(L"该任务模块已存在，且只能存在一个");
-// 					return;
-// 				}
-
-// 				selected = name;
-// 				Ref<GDIVisualScriptCustomNodeMultiPlayer> func_node;
-// 				func_node.instance();
-// 
-// 
-// 				undo_redo->create_action(TTR("Add Function"));
-// 				undo_redo->add_do_method(script.ptr(), "add_function", name);
-// 				undo_redo->add_do_method(script.ptr(), "add_node", name, script->get_available_id(), func_node, ofs);
-// 				undo_redo->add_undo_method(script.ptr(), "remove_function", name);
-// 				undo_redo->add_do_method(this, "_update_members");
-// 				undo_redo->add_undo_method(this, "_update_members");
-// 				undo_redo->add_do_method(this, "_update_graph");
-// 				undo_redo->add_undo_method(this, "_update_graph");
-// 
-// 				undo_redo->commit_action();
-// 				_update_graph();
-
 				already_create_visual_node_flag = true;
 			} 
 			else {

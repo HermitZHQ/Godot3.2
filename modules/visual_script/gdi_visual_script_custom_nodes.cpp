@@ -39,7 +39,7 @@ int GDIVisualScriptCustomNode::get_output_sequence_port_count() const {
 	case GDIVisualScriptCustomNode::COMBINATION:
 		return 2;
 	case GDIVisualScriptCustomNode::KEYBOARD:
-		return 3;
+		return 4;
 	case GDIVisualScriptCustomNode::MOUSE:
 		return 5;
 	case GDIVisualScriptCustomNode::TASK_SPLIT:
@@ -234,6 +234,9 @@ String GDIVisualScriptCustomNode::get_output_sequence_port_text(int p_port) cons
 		}
 		case 2: {
 			return L"释放时";
+		}
+		case 3: {
+			return L"无操作时";
 		}
 		default:
 			return String();
@@ -1009,6 +1012,8 @@ public:
 	VisualScriptInstance *instance;
 
 	// keyboard relevant----
+	String key;
+	int scan_code = -1;
 	bool keyboard_already_pressed_flag = false;
 
 	// timer relevant----
@@ -1035,6 +1040,7 @@ public:
 
 		// record the objs state
 		if (sub_task_objs_state_vec.size() < node->get_task_split_num()) {
+			os->print("multi task test point0\n");
 			Object *object = instance->get_owner_ptr();
 			Node *node = Object::cast_to<Node>(object);
 			if (nullptr == node) {
@@ -1108,15 +1114,19 @@ public:
 
 	int keyboard_handle_func(const Variant **p_inputs, Variant **p_outputs, Variant* p_working_mem, Variant::CallError &r_error, String &r_error_str) {
 
-		String key = *p_inputs[0];
+		if (key == String()) {
+			key = *p_inputs[0];
+		}
 		if (nullptr == p_working_mem) {
 			r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
 			r_error_str = "[GDI]keyboard, working mem error";
 			return 0;
 		}
 
-		auto sc = _os->find_scancode_from_string(key);
-		auto pressedFlag = input->is_key_pressed(sc);
+		if (-1 == scan_code) {
+			scan_code = _os->find_scancode_from_string(key);
+		}
+		auto pressedFlag = input->is_key_pressed(scan_code);
 		*p_outputs[0] = pressedFlag;
 
 		if (!keyboard_already_pressed_flag && pressedFlag) {
@@ -1131,10 +1141,12 @@ public:
 			return 2;
 		}
 
-		p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
-		return STEP_EXIT_FUNCTION_BIT;
+		return 3;
+		// don't use this exit bit...., it has performance issue
+		//p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
+		//return STEP_EXIT_FUNCTION_BIT;
 	}
-	
+
 	void manual_generate_area(Spatial *target, const Vector3 min_pos, const Vector3 max_pos, bool dirty_flag) {
 
 		Vector3 target_pos = target->get_global_transform().origin;
@@ -1438,11 +1450,11 @@ public:
 			int ret = keyboard_handle_func(p_inputs, p_outputs, p_working_mem, r_error, r_error_str);
 			return ret;
 		}
-		//case GDIVisualScriptCustomNode::MOUSE: {
+												  //case GDIVisualScriptCustomNode::MOUSE: {
 
-		//	int ret = mouse_handle_func(p_inputs, p_outputs, p_working_mem, p_start_mode, r_error, r_error_str);
-		//	return ret;
-		//}
+												  //	int ret = mouse_handle_func(p_inputs, p_outputs, p_working_mem, p_start_mode, r_error, r_error_str);
+												  //	return ret;
+												  //}
 		case GDIVisualScriptCustomNode::AREA_TIGGER: {
 
 			int ret = area_trigger_handle_func(p_inputs, p_outputs, r_error, r_error_str);
@@ -1464,17 +1476,17 @@ public:
 			Node *node = Object::cast_to<Node>(object);
 			if (nullptr != node) {
 				node->get_tree()->reload_current_scene();
- 				//os->print("reload cur scene.......\n");
+				//os->print("reload cur scene.......\n");
 			}
 
- 			//auto size = objs_init_trans_vec.size();
- 			//for (int i = 0; i < size; ++i) {
- 			//	auto restInfo = objs_init_trans_vec[i];
- 			//	Spatial *spa = Object::cast_to<Spatial>(restInfo.node);
- 			//	if (nullptr != spa) {
- 			//		spa->set_global_transform(restInfo.trans);
- 			//	}
- 			//}
+			//auto size = objs_init_trans_vec.size();
+			//for (int i = 0; i < size; ++i) {
+			//	auto restInfo = objs_init_trans_vec[i];
+			//	Spatial *spa = Object::cast_to<Spatial>(restInfo.node);
+			//	if (nullptr != spa) {
+			//		spa->set_global_transform(restInfo.trans);
+			//	}
+			//}
 			break;
 		}
 		case GDIVisualScriptCustomNode::INIT_PARTIAL: {
@@ -1491,61 +1503,61 @@ public:
 
 			break;
 		}
-		// 先保留下，很有可能后面又会加入这种简化版的节点
- 		//case GDIVisualScriptCustomNode::MAT_ALBEDO: {
- 		//	Object *object = instance->get_owner_ptr();
- 		//	Node *node = Object::cast_to<Node>(object);
- 		//	if (nullptr == node) {
-  	//			os->print("[GDI]Material albedo node, can not convert obj to node\n");
- 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
- 		//		r_error_str = "[GDI]Material albedo node, can not convert obj to node";
- 		//		return 0;
- 		//	}
- 
- 		//	NodePath path = *p_inputs[0];
- 		//	Node *target_node = node->get_node(path);
- 		//	if (nullptr == target_node) {
-  	//			os->print("[GDI]Material albedo node, target node is null\n");
- 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
- 		//		r_error_str = "[GDI]Material albedo node, target node is null";
- 		//		return 0;
- 		//	}
- 
- 		//	MeshInstance *mesh = Object::cast_to<MeshInstance>(target_node);
- 		//	if (nullptr == mesh) {
-  	//			os->print("[GDI]Material albedo node, can not convert to mesh inst\n");
- 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
- 		//		r_error_str = "[GDI]Material albedo node, can not convert to mesh inst";
- 		//		return 0;
- 		//	}
- 		//	if (mesh->get_surface_material_count() == 0) {
-  	//			os->print("[GDI]Material albedo node, surface is null\n");
- 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
- 		//		r_error_str = "[GDI]Material albedo node, surface is null";
- 		//		return 0;
- 		//	}
- 
- 		//	unsigned int surface_index = *p_inputs[2];
- 		//	if (surface_index > mesh->get_surface_material_count() - 1) {
-  	//			os->print("[GDI]Material albedo node, invalid surface index\n");
- 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
- 		//		r_error_str = "[GDI]Material albedo node, invalid surface index";
- 		//		return 0;
- 		//	}
- 
- 		//	auto mat = Object::cast_to<SpatialMaterial>(*(mesh->get_surface_material(surface_index)));
- 		//	if (nullptr == mat) {
-  	//			os->print("[GDI]Material albedo node, can not find material with index[%d]\n", surface_index);
- 		//		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
- 		//		r_error_str = "[GDI]Material albedo node, can not find material with index";
- 		//		return 0;
- 		//	}
- 
- 		//	mat->set_albedo(*p_inputs[1]);
- 		//	mesh->set_surface_material(surface_index, mat);
- 
- 		//	break;
- 		//}
+													  // 先保留下，很有可能后面又会加入这种简化版的节点
+													  //case GDIVisualScriptCustomNode::MAT_ALBEDO: {
+													  //	Object *object = instance->get_owner_ptr();
+													  //	Node *node = Object::cast_to<Node>(object);
+													  //	if (nullptr == node) {
+												  //			os->print("[GDI]Material albedo node, can not convert obj to node\n");
+													  //		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+													  //		r_error_str = "[GDI]Material albedo node, can not convert obj to node";
+													  //		return 0;
+													  //	}
+
+													  //	NodePath path = *p_inputs[0];
+													  //	Node *target_node = node->get_node(path);
+													  //	if (nullptr == target_node) {
+												  //			os->print("[GDI]Material albedo node, target node is null\n");
+													  //		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+													  //		r_error_str = "[GDI]Material albedo node, target node is null";
+													  //		return 0;
+													  //	}
+
+													  //	MeshInstance *mesh = Object::cast_to<MeshInstance>(target_node);
+													  //	if (nullptr == mesh) {
+												  //			os->print("[GDI]Material albedo node, can not convert to mesh inst\n");
+													  //		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+													  //		r_error_str = "[GDI]Material albedo node, can not convert to mesh inst";
+													  //		return 0;
+													  //	}
+													  //	if (mesh->get_surface_material_count() == 0) {
+												  //			os->print("[GDI]Material albedo node, surface is null\n");
+													  //		r_error.error = Variant::CallError::CALL_ERROR_INVALID_METHOD;
+													  //		r_error_str = "[GDI]Material albedo node, surface is null";
+													  //		return 0;
+													  //	}
+
+													  //	unsigned int surface_index = *p_inputs[2];
+													  //	if (surface_index > mesh->get_surface_material_count() - 1) {
+												  //			os->print("[GDI]Material albedo node, invalid surface index\n");
+													  //		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+													  //		r_error_str = "[GDI]Material albedo node, invalid surface index";
+													  //		return 0;
+													  //	}
+
+													  //	auto mat = Object::cast_to<SpatialMaterial>(*(mesh->get_surface_material(surface_index)));
+													  //	if (nullptr == mat) {
+												  //			os->print("[GDI]Material albedo node, can not find material with index[%d]\n", surface_index);
+													  //		r_error.error = Variant::CallError::CALL_ERROR_INVALID_ARGUMENT;
+													  //		r_error_str = "[GDI]Material albedo node, can not find material with index";
+													  //		return 0;
+													  //	}
+
+													  //	mat->set_albedo(*p_inputs[1]);
+													  //	mesh->set_surface_material(surface_index, mat);
+
+													  //	break;
+													  //}
 		}
 
 		if (!validate) {
@@ -1899,7 +1911,7 @@ public:
 
 		// ----mouse wheel
 		if (mouse_btn_mask != 0) {
-			input->gdi_reset_mouse_button_mask();
+			//input->gdi_reset_mouse_button_mask();
 			if ((mouse_btn_mask & (1 << (BUTTON_WHEEL_UP - 1))) != 0 ||
 				(mouse_btn_mask & (1 << (BUTTON_WHEEL_DOWN - 1))) != 0) {
 				return 3;
@@ -2102,11 +2114,12 @@ public:
 			}
 		}
 
-		p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
-		return STEP_EXIT_FUNCTION_BIT;
+		return 4;
+		//p_working_mem[0] = STEP_EXIT_FUNCTION_BIT;
+		//return STEP_EXIT_FUNCTION_BIT;
 	}
 
-	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) override	{
+	virtual int step(const Variant **p_inputs, Variant **p_outputs, StartMode p_start_mode, Variant *p_working_mem, Variant::CallError &r_error, String &r_error_str) override {
 
 		int ret = mouse_handle_func(p_inputs, p_outputs, p_working_mem, p_start_mode, r_error, r_error_str);
 		return ret;
@@ -2132,7 +2145,7 @@ String GDIVisualScriptCustomNodeMouse::get_mouse_key_string(MouseKey key) const 
 
 int GDIVisualScriptCustomNodeMouse::get_output_sequence_port_count() const {
 
-	return 4;
+	return 5;
 }
 
 bool GDIVisualScriptCustomNodeMouse::has_input_sequence_port() const {
@@ -2155,6 +2168,9 @@ String GDIVisualScriptCustomNodeMouse::get_output_sequence_port_text(int p_port)
 	}
 	case 3: {
 		return L"滚轮";
+	}
+	case 4: {
+		return L"无操作时";
 	}
 	default:
 		return L"未处理索引";
@@ -2286,9 +2302,9 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("client_server_disconnected"), &GDIVisualScriptNodeInstanceCustomMultiPlayer::client_server_disconnected);
 
 	ClassDB::bind_method(D_METHOD("rpc_call_test_func"), &GDIVisualScriptNodeInstanceCustomMultiPlayer::rpc_call_test_func);
-// 	ClassDB::add_virtual_method("GDIVisualScriptNodeInstanceCustomMultiPlayer", MethodInfo(Variant::NIL, "rpc_call_test_func"));
-// 	ClassDB::add_virtual_method("Node", MethodInfo(Variant::NIL, "rpc_call_test_func"));
-// 	ClassDB::add_virtual_method("VisualScriptInstance", MethodInfo(Variant::NIL, "rpc_call_test_func"));
+	// 	ClassDB::add_virtual_method("GDIVisualScriptNodeInstanceCustomMultiPlayer", MethodInfo(Variant::NIL, "rpc_call_test_func"));
+	// 	ClassDB::add_virtual_method("Node", MethodInfo(Variant::NIL, "rpc_call_test_func"));
+	// 	ClassDB::add_virtual_method("VisualScriptInstance", MethodInfo(Variant::NIL, "rpc_call_test_func"));
 }
 
 GDIVisualScriptNodeInstanceCustomMultiPlayer::GDIVisualScriptNodeInstanceCustomMultiPlayer()
@@ -2329,7 +2345,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::client_connected_to_server() 
 		return;
 	}
 
-// 	node->rpc("rpc_call_test_func");
+	// 	node->rpc("rpc_call_test_func");
 }
 
 void GDIVisualScriptNodeInstanceCustomMultiPlayer::client_connection_failed() {
@@ -2454,7 +2470,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::generate_all_nodes_sync_data_
 }
 
 void GDIVisualScriptNodeInstanceCustomMultiPlayer::update_all_nodes_sync_data_info(Node *node) {
-	
+
 	SyncDataInfo sdi(node);
 	auto e = stored_sync_data_info_map.find(node);
 	if (nullptr != e && !(e->value() == sdi)) {
@@ -2581,9 +2597,9 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::handle_data_change(Node *root
 			arr.push_back(data.transform);
 			arr.push_back(data.visible);
 			// mat num
-			auto mat_num = data.sync_albedo ? data.surf_mat_vec.size() : 0;
-			arr.push_back(mat_num);
-			for (int j = 0; j < mat_num; ++j) {
+			auto albedo_num = data.sync_albedo ? data.albedo_vec.size() : 0;
+			arr.push_back(albedo_num);
+			for (int j = 0; j < albedo_num; ++j) {
 				arr.push_back(data.albedo_vec[j]);
 			}
 			// albedo tex
@@ -2593,7 +2609,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::handle_data_change(Node *root
 				arr.push_back(e->key());
 				arr.push_back(e->value());
 			}
-			os->print("push back changed data, tex num[%d], mat num[%d], node[%S]\n", albedo_tex_num, mat_num, data.name);
+			os->print("push back changed data, tex num[%d], albedo num[%d], node[%S]\n", albedo_tex_num, albedo_num, data.name);
 		}
 
 		if (is_server_flag) {
@@ -2798,7 +2814,7 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::step(const Variant **p_inputs,
 
 		// for test, output all nodes info
 		//for (auto e = stored_sync_data_info_map.front(); e; e = e->next()) {
-		//	os->print("[Node info]name[%S], id[%d]\n", e->value().name, e->value().instance_id);
+		//	os->print("[Sync Node info]name[%S], id[%d], mat num[%d]\n", e->value().name, e->value().instance_id, e->value().surf_mat_vec.size());
 		//}
 
 		// Server----
@@ -2844,8 +2860,8 @@ int GDIVisualScriptNodeInstanceCustomMultiPlayer::get_working_memory_size() cons
 
 void GDIVisualScriptCustomNodeMultiPlayer::_bind_methods() {
 
-// 	ClassDB::add_virtual_method("GDIVisualScriptCustomNodeMultiPlayer", MethodInfo(Variant::NIL, "rpc_call_test_func"));
-// 	ClassDB::bind_method(D_METHOD("rpc_call_test_func"), &GDIVisualScriptCustomNodeMultiPlayer::rpc_call_test_func);
+	// 	ClassDB::add_virtual_method("GDIVisualScriptCustomNodeMultiPlayer", MethodInfo(Variant::NIL, "rpc_call_test_func"));
+	// 	ClassDB::bind_method(D_METHOD("rpc_call_test_func"), &GDIVisualScriptCustomNodeMultiPlayer::rpc_call_test_func);
 }
 
 int GDIVisualScriptCustomNodeMultiPlayer::get_output_sequence_port_count() const {
@@ -2930,14 +2946,14 @@ String GDIVisualScriptCustomNodeMultiPlayer::get_text() const {
 
 VisualScriptNodeInstance * GDIVisualScriptCustomNodeMultiPlayer::instance(VisualScriptInstance *p_instance) {
 
-// 	VisualScript *vs = p_instance->get_script_ptr();
-// 	if (nullptr != vs) {
-// 		vs->add_function("rpc_call_test_func");
-// 		os->print("add rpc_call_test_func\n");
-// 	}
+	// 	VisualScript *vs = p_instance->get_script_ptr();
+	// 	if (nullptr != vs) {
+	// 		vs->add_function("rpc_call_test_func");
+	// 		os->print("add rpc_call_test_func\n");
+	// 	}
 
-// 	os->print("create multi player instance.....\n");
-	// keep multi player singleton(also limit the create num in visual_script_editor)
+	// 	os->print("create multi player instance.....\n");
+		// keep multi player singleton(also limit the create num in visual_script_editor)
 	GDIVisualScriptNodeInstanceCustomMultiPlayer *instance = &GDIVisualScriptNodeInstanceCustomMultiPlayer::get_singleton();
 	instance->node = this;
 	instance->instance = p_instance;
@@ -2991,10 +3007,10 @@ GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(Node *n
 	sync_albedo = node->gdi_get_multiplayer_sync_albedo_enable();
 	sync_albedo_tex = node->gdi_get_multiplayer_sync_albedo_tex_enable();
 
-// 	printf("class name[%S], sync type[%S]\n", class_name, sync_type);
-// 	if (sync_type == Node::gdi_sync_type_str_list[1]) {
-// 		OS::get_singleton()->print("check res same sync.....\n");
-// 	}
+	// 	printf("class name[%S], sync type[%S]\n", class_name, sync_type);
+	// 	if (sync_type == Node::gdi_sync_type_str_list[1]) {
+	// 		OS::get_singleton()->print("check res same sync.....\n");
+	// 	}
 
 	Spatial *spatial = Object::cast_to<Spatial>(node);
 	if (nullptr != spatial) {
@@ -3071,7 +3087,7 @@ bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(cons
 			if (sync_albedo) {
 				auto left_albedo = albedo_vec[i];
 				auto right_albedo = other.surf_mat_vec[i]->get_albedo();
-	
+
 				if (left_albedo != right_albedo) {
 					//OS::get_singleton()->print("albedo changed............\n");
 					same_mat_flag = false;
@@ -3087,7 +3103,7 @@ bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(cons
 					String right_path = right_tex->get_import_path();
 					//OS::get_singleton()->print("left path[%S], right paht[%S]\n", left_path, right_path);
 					String left_path = nullptr == e ? "" : e->value();
-	
+
 					if (left_path != right_path) {
 						//OS::get_singleton()->print("albedo tex changed1............\n");
 						same_mat_flag = false;
