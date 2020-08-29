@@ -106,6 +106,7 @@ Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_f
 	importer.SetPropertyBool(AI_CONFIG_PP_FD_REMOVE, true);
 	// Cannot remove pivot points because the static mesh will be in the wrong place
 	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
+	importer.SetPropertyBool(AI_CONFIG_GLOBAL_SCALE_FACTOR_KEY, false);
 	int32_t max_bone_weights = 4;
 	//if (p_flags & IMPORT_ANIMATION_EIGHT_WEIGHTS) {
 	//	const int eight_bones = 8;
@@ -327,7 +328,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	if (scene->mRootNode) {
 		state.nodes.push_back(scene->mRootNode);
 
-		// 注释点：生成所有节点数据，父节点为非Bone，而本身为Bone的，父节点转化为Armature节点（可以和Armature处理流程中得到的指针对应）
+		// 注释点：生成所有节点数据，内部主要处理了如何生成Armature节点（生成方式见函数内部）
 		// make flat node tree - in order to make processing deterministic
 		for (unsigned int i = 0; i < scene->mRootNode->mNumChildren; i++) {
 			_generate_node(state, scene->mRootNode->mChildren[i]);
@@ -368,7 +369,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			String node_name = AssimpUtils::get_assimp_string(element_assimp_node->mName);
 			//print_verbose("node: " + node_name);
 
-			if (element_assimp_node->mName == aiString("mixamorig:Head")) {
+			if (element_assimp_node->mName == aiString("Maca")) {
 				int i = 0;
 				++i;
 			}
@@ -524,6 +525,11 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			const aiNode *assimp_node = key_value_pair->key();
 			Spatial *mesh_template = key_value_pair->value();
 
+			if (assimp_node->mName == aiString("Maca")) {
+				int i = 0;
+				++i;
+			}
+
 			ERR_CONTINUE(assimp_node == NULL);
 			ERR_CONTINUE(mesh_template == NULL);
 
@@ -542,6 +548,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			Transform node_transform = AssimpUtils::assimp_matrix_transform(assimp_node->mTransformation);
 
 			if (assimp_node->mNumMeshes > 0) {
+				// 注释点：这里要格外注意，有些节点会因为有mesh，而被转换为meshInstance，之前的Spatial节点会被删除，且同名的话会被加上2，3这样的后缀
 				MeshInstance *mesh = create_mesh(state, assimp_node, node_name, parent_node, node_transform);
 				if (mesh) {
 
@@ -642,7 +649,7 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::CreateAnimNodes(const aiScene *sc
 	animNode->isBone = get_bone_by_name(scene, node->mName) ? true : false;
 	animNode->localTransform = AssimpUtils::assimp_matrix_transform(node->mTransformation);
 
-	if (node->mName == aiString("mixamorig:Head")) {
+	if (node->mName == aiString("Maca")) {
 		int i = 0;
 		++i;
 	}
@@ -650,6 +657,7 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::CreateAnimNodes(const aiScene *sc
 	// default to use animation 0, for now(todo)
 	if (scene->mNumAnimations > 0) {
 		if (scene->mNumAnimations > 1) {
+			// 这里我们是应该创建多套不同的AnimNodes吗？还需要验证，比如Piety这种动画
 			OS::get_singleton()->print("[Warning!!!animation num over 1......, what you handled before is wrong\n");
 		}
 		aiAnimation *anim = scene->mAnimations[0];
@@ -929,7 +937,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 
 	for (size_t i = 0; i < anim->mNumMorphMeshChannels; i++) {
 
-		printf("[Skeleton]:enter morph mesh animation.....(TODO)\n");
+		//printf("[Skeleton]:enter morph mesh animation.....(TODO)\n");
 		const aiMeshMorphAnim *anim_mesh = anim->mMorphMeshChannels[i];
 
 		const String prop_name = AssimpUtils::get_assimp_string(anim_mesh->mName);
@@ -1010,6 +1018,9 @@ EditorSceneImporterAssimp::_generate_mesh_from_surface_indices(ImportState &stat
 		const unsigned int mesh_idx = p_surface_indices[i];
 		const aiMesh *ai_mesh = state.assimp_scene->mMeshes[mesh_idx];
 		multi_surf_name += ai_mesh->mName.data;
+		if (i < p_surface_indices.size() - 1) {
+			multi_surf_name += "-";
+		}
 
 		Map<uint32_t, Vector<BoneInfo> > vertex_weights;
 
@@ -1645,7 +1656,7 @@ void EditorSceneImporterAssimp::_generate_node(
 	state.nodes.push_back(assimp_node);
 	String parent_name = AssimpUtils::get_assimp_string(assimp_node->mParent->mName);
 
-	if (assimp_node->mName == aiString("Armature")) {
+	if (assimp_node->mName == aiString("Maca")) {
 		int i = 0;
 		++i;
 	}
@@ -1681,8 +1692,7 @@ void EditorSceneImporterAssimp::_generate_node(
 // 		print_verbose("found valid armature: " + parent_name);
 // 	}
 
-	// 测试点：使用rootNode充当唯一的armature节点
-	// 由于需要对多Mesh对应一个animation做处理，而不同mesh的bone对应顺序并不一样，必须单独分开处理，所以Armature可以创立到有mesh的节点下
+	// 由于需要对多Mesh对应一个animation player做处理，而不同mesh的bone对应顺序并不一样，必须单独分开处理，所以Armature可以创立到有mesh的节点下
 	if (/*state.armature_nodes.size() == 0 &&*/ assimp_node->mNumMeshes > 0 /*&& assimp_node->mName == aiString("Bip001")*/) {
 		// 伪造和mesh节点同级的新aiNode用作Armature节点
 		if (assimp_node->mNumMeshes > 1) {

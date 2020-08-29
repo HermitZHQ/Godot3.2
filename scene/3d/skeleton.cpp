@@ -358,9 +358,6 @@ void Skeleton::_notification(int p_what) {
 
 			// 修改点：update所有非bone节点的global transform，否则有些节点不会转变
 			anim_node_root = (NodeAnim*)get_anim_root_node_addr();
-			if (anim_node_root) {
-				UpdateAllNoneBoneAnimNodes(anim_node_root);
-			}
 
 			// 修改点：检测是anim_node_root为null，是的话，从load的anim node vec中重新组合出tree
 			if (nullptr == anim_node_root) {
@@ -412,7 +409,7 @@ void Skeleton::_notification(int p_what) {
 								pose = b.custom_pose * pose;
 							}
 
-							// 修改点：尝试使用assimp-viewer的处理流程，它这里的处理流程完全意义不明，注释掉了原有处理流程
+							// 修改点：尝试使用assimp-viewer的处理流程，它这里的处理流程意义不明，注释掉了原有处理流程
 // 							if (b.parent >= 0) {
 // 
 // 								b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
@@ -449,6 +446,12 @@ void Skeleton::_notification(int p_what) {
 							while (nullptr != parent) {
 								b.pose_global = parent->localTransform * b.pose_global;
 
+								//if (parent->name == String("Maca")) {
+								//	OS::get_singleton()->print("find maca.........\n");
+								//}
+								//if (parent->name == String("Maca2")) {
+								//	OS::get_singleton()->print("find maca2.........\n");
+								//}
 								// 测试点：对比每次生成的global矩阵
 // 								if (b.name == "Bip001 L Forearm")
 // 								{
@@ -491,6 +494,10 @@ void Skeleton::_notification(int p_what) {
 					sp->set_transform(b.pose_global);
 				}
 			}
+
+// 			if (anim_node_root) {
+// 				UpdateAllNoneBoneAnimNodes(anim_node_root);
+// 			}
 
 			// 测试点：只更新一个skin，观察差异
 			int iTest = 0;
@@ -668,6 +675,11 @@ void Skeleton::FindAnimNodeRecursive(NodeAnim *nodeAnim, String boneName, NodeAn
 
 void Skeleton::UpdateAllNoneBoneAnimNodes(NodeAnim *node)
 {
+	if (node->name == String("Maca")) {
+		int i = 0;
+		++i;
+	}
+
 	node->globalTransform = node->localTransform;
 	NodeAnim *parentNode = node->parent;
 	while (parentNode)
