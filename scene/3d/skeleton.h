@@ -183,13 +183,6 @@ public:
 	int find_bone(const String &p_name) const;
 	String get_bone_name(int p_bone) const;
 
-	// 修改点，添加函数，用于记录animNode的root节点，由于add_bone耦合性较高，无法直接使用
-// 	void SetNodeAnimRoot(int64_t rootAddr);
-// 	int64_t GetNodeAnimRoot() const;
-	NodeAnim* FindAnimNodeByName(NodeAnim *root, String boneName);
-	void FindAnimNodeRecursive(NodeAnim *nodeAnim, String boneName, NodeAnim **node);
-	void UpdateAllNoneBoneAnimNodes(NodeAnim *node);
-
 	bool is_bone_parent_of(int p_bone_id, int p_parent_bone_id) const;
 
 	void set_bone_parent(int p_bone, int p_parent);
@@ -226,11 +219,21 @@ public:
 	// 修改点：增加接口处理非bone节点的channel trans更新
 	void set_none_bone_pose(StringName name, const Transform &p_pose);
 
+	// 修改点，添加函数，用于记录animNode的root节点，由于add_bone耦合性较高，无法直接使用
+// 	void SetNodeAnimRoot(int64_t rootAddr);
+// 	int64_t GetNodeAnimRoot() const;
+	NodeAnim* gdi_find_anim_node_by_name(NodeAnim *root, String boneName);
+	void _gdi_find_anim_node_recursive(NodeAnim *nodeAnim, String boneName, NodeAnim **node);
+	void gdi_update_all_none_bone_anim_node(NodeAnim *node);
+
 	// 增加animNode root的set get接口
-	int64_t get_anim_root_node_addr() const;
-	void set_anim_root_node_addr(int64_t addr);
-	NodeAnim* get_bone_anim_node(int p_bone) const;
-	void set_bone_anim_node(int p_bone, int64_t addr);
+	int64_t gdi_get_anim_root_node_addr() const;
+	void gdi_set_anim_root_node_addr(int64_t addr);
+	NodeAnim* gdi_get_bone_anim_node(int p_bone) const;
+	void gdi_set_bone_anim_node(int p_bone, int64_t addr);
+	void gdi_set_editor_scene_root(Node *root);
+	Node* gdi_get_editor_scene_root() const;
+	Transform gdi_get_bone_pose_by_name(const String &name, bool &find_flag) const;
 
 	void set_bone_custom_pose(int p_bone, const Transform &p_custom_pose);
 	Transform get_bone_custom_pose(int p_bone) const;
@@ -270,10 +273,11 @@ public:
 	~Skeleton();
 
 private:
-	NodeAnim *anim_node_root;
-	int64_t anim_node_addr;
-	Vector<NodeAnim*> anim_node_save_vec;
-	Vector<NodeAnim*> anim_node_load_vec;
+	NodeAnim *gdi_anim_node_root;
+	int64_t gdi_anim_node_addr;
+	Vector<NodeAnim*> gdi_anim_node_save_vec;
+	Vector<NodeAnim*> gdi_anim_node_load_vec;
+	Node *gdi_editor_root;
 };
 
 #endif

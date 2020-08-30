@@ -393,7 +393,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				// create skeleton
 				print_verbose("Making skeleton: " + node_name);
 				Skeleton *skeleton = memnew(Skeleton);
-				skeleton->set_anim_root_node_addr((int64_t)nodeAnimRoot);
+				skeleton->gdi_set_anim_root_node_addr((int64_t)nodeAnimRoot);
 				skeleton->set_name("just test");
 				spatial = skeleton;
 				if (!state.armature_skeletons.has(element_assimp_node)) {
@@ -1656,7 +1656,7 @@ void EditorSceneImporterAssimp::_generate_node(
 	state.nodes.push_back(assimp_node);
 	String parent_name = AssimpUtils::get_assimp_string(assimp_node->mParent->mName);
 
-	if (assimp_node->mName == aiString("Maca")) {
+	if (assimp_node->mName == aiString("Escudo")) {
 		int i = 0;
 		++i;
 	}

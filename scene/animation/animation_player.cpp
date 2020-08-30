@@ -859,15 +859,12 @@ void AnimationPlayer::_animation_process2(float p_delta, bool p_started) {
 
 void AnimationPlayer::_animation_update_transforms() {
 	{
-		Skeleton *g_test_skeleton = nullptr;
+		Skeleton *gdi_skeleton = nullptr;
+		Node *gdi_scene_root = nullptr;
 		Transform t;
 		for (int i = 0; i < cache_update_size; i++) {
 
 			TrackNodeCache *nc = cache_update[i];
-			if (nc->node->get_name() == String("Maca")) {
-				int i = 0;
-				++i;
-			}
 
 			ERR_CONTINUE(nc->accum_pass != accum_pass);
 
@@ -883,23 +880,27 @@ void AnimationPlayer::_animation_update_transforms() {
 
 				// 修改点：确保非Bone的channel节点也必须进行更新，否则动画不能完全正常
 				// 这里需要注意的是，后期应该是支持更新多Skeleton，目前测试写死了一个??（再次来看的时候已经不知道什么意思了，再看看吧）
-				if (nullptr == g_test_skeleton) {
+				if (nullptr == gdi_skeleton) {
 					for (int a = 0; a < cache_update_size; a++) {
 						TrackNodeCache *tnc = cache_update[a];
 						if (tnc->skeleton) {
-							g_test_skeleton = tnc->skeleton;
+							gdi_skeleton = tnc->skeleton;
 							break;
 						}
 					}
 				}
 				// 存在找不到skeleton的情况，仍然可能为空
-				if (nullptr == g_test_skeleton) {
+				if (nullptr == gdi_skeleton) {
 					OS::get_singleton()->print("[GDI]warnning, couldn't find valid skeleton");
 					continue;
 				}
 
+				if (nullptr == gdi_scene_root) {
+					gdi_scene_root = nc->spatial->get_tree()->get_edited_scene_root();
+					gdi_skeleton->gdi_set_editor_scene_root(gdi_scene_root);
+				}
 				auto name = nc->spatial->get_name();
-				g_test_skeleton->set_none_bone_pose(name, t);
+				gdi_skeleton->set_none_bone_pose(name, t);
 			}
 		}
 	}
