@@ -38,6 +38,7 @@
 #include "scene/main/node.h"
 #include "scene/resources/material.h"
 #include "scene/resources/surface_tool.h"
+#include "editor/plugins/animation_player_editor_plugin.h"
 
 #include <assimp/matrix4x4.h>
 #include <assimp/postprocess.h>
@@ -602,6 +603,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	if (p_flags & IMPORT_ANIMATION && scene->mNumAnimations) {
 
 			// 修改点：尝试不创建多anim，在同一anim下插入不同skeleton的track
+			// 初始化为N个动画播放器，每个播放器内置N个Mesh Track
 			for (uint32_t i = 0; i < scene->mNumAnimations; i++) {
 				state.animation_player = memnew(AnimationPlayer);
 				String anim_player_name = "AnimPlayer-" + String(scene->mAnimations[i]->mName.data);
@@ -609,6 +611,10 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 
 				state.root->add_child(state.animation_player);
 				state.animation_player->set_owner(state.root);
+
+				if (nullptr != AnimationPlayerEditor::singleton) {
+
+				}
 
 				for (int a = 0; a < state.armature_skeletons.size(); ++a) {
 					_import_animation(state, i, p_bake_fps, a);
@@ -841,7 +847,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 
 	const aiAnimation *anim = state.assimp_scene->mAnimations[p_animation_index];
 	String name = AssimpUtils::get_anim_string_from_assimp(anim->mName);
-	// 修改点：尝试根据不同mesh id，改变不同的anim name
+	// 修改点：尝试根据不同mesh id，改变不同的anim mesh track name
 	aiMesh *mesh = state.assimp_scene->mMeshes[mesh_id];
 	name = name + "-" + "tracks-" + mesh->mName.data + "-" + itos(mesh_id);
 

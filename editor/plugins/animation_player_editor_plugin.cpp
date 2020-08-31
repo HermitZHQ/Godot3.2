@@ -286,6 +286,19 @@ void AnimationPlayerEditor::_animation_selected(int p_which) {
 
 	if (current != "") {
 
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
+		auto editor_root = player->get_tree()->get_edited_scene_root();
+		if (nullptr != editor_root) {
+			auto num_child = editor_root->get_child_count();
+			for (int i = 0; i < num_child; ++i) {
+				AnimationPlayer *ap = Object::cast_to<AnimationPlayer>(editor_root->get_child(i));
+				if (nullptr != ap) {
+					ap->gdi_reset_and_stop_all_animation_play();
+				}
+			}
+		}
+#endif
+
 		player->set_assigned_animation(current);
 
 		Ref<Animation> anim = player->get_animation(current);

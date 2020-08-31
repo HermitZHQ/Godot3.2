@@ -980,7 +980,7 @@ void AnimationPlayer::_animation_process(float p_delta) {
 			auto v = e->value();
 
 			// 检测playback是否存在，不存在的话新建
-			auto res = playback_map.find(anim_name);
+			auto res = gdi_playback_map.find(anim_name);
 			if (nullptr == res) {
 				Playback *pb = new Playback;
 				pb->assigned = anim_name;
@@ -994,9 +994,9 @@ void AnimationPlayer::_animation_process(float p_delta) {
 				pb->seeked = false;
 				pb->started = false;
 
-				playback_map.insert(anim_name, pb);
+				gdi_playback_map.insert(anim_name, pb);
 			}
-			res = playback_map.find(anim_name);
+			res = gdi_playback_map.find(anim_name);
 
 			end_reached = false;
 			end_notify = false;
@@ -1364,10 +1364,10 @@ void AnimationPlayer::set_current_animation(const String &p_anim) {
 	}
 }
 
-void AnimationPlayer::gdi_play_all_animation_set(const String &p_anim)
+void AnimationPlayer::gdi_play_all_animation_set(const String &p_anim_play_type)
 {
-	gdi_play_all_anim_flag = (p_anim == L"play") ? true : ((p_anim == L"play-loop") ? true : false);
-	gdi_play_all_anim_loop_flag = (p_anim == L"play-loop") ? true : false;
+	gdi_play_all_anim_flag = (p_anim_play_type == L"play") ? true : ((p_anim_play_type == L"play-loop") ? true : false);
+	gdi_play_all_anim_loop_flag = (p_anim_play_type == L"play-loop") ? true : false;
 	if (gdi_play_all_anim_flag) {
 		_set_process(true, true);
 	}
@@ -1375,6 +1375,13 @@ void AnimationPlayer::gdi_play_all_animation_set(const String &p_anim)
 		_set_process(false, true);
 		_gdi_reset_all_animation_playback();
 	}
+}
+
+void AnimationPlayer::gdi_reset_and_stop_all_animation_play() {
+
+	_set_process(false, true);
+	gdi_play_all_anim_flag = false;
+	_gdi_reset_all_animation_playback();
 }
 
 void AnimationPlayer::_gdi_animation_process2_play_all(float p_delta, bool p_started, Playback &p_playback)
@@ -1562,7 +1569,7 @@ void AnimationPlayer::_gdi_animation_process_data_play_all(PlaybackData &cd, flo
 
 void AnimationPlayer::_gdi_reset_all_animation_playback()
 {
-	for (auto e = playback_map.front(); e; e = e->next()) {
+	for (auto e = gdi_playback_map.front(); e; e = e->next()) {
 		e->value()->started = false;
 		e->value()->current.pos = 0;
 	}

@@ -241,7 +241,7 @@ private:
 		bool started;
 	} playback;
 	// 修改点：需要一个playback的map支持同时播放所有动画
-	Map<StringName, Playback*> playback_map;
+	Map<StringName, Playback*> gdi_playback_map;
 
 	List<StringName> queued;
 
@@ -327,7 +327,8 @@ public:
 	String get_current_animation() const;
 	void set_current_animation(const String &p_anim);
 	// 修改点：加入播放所有动画的选项
-	void gdi_play_all_animation_set(const String &p_anim);
+	void gdi_play_all_animation_set(const String &p_anim_play_type);
+	void gdi_reset_and_stop_all_animation_play();
 private:
 	void _gdi_animation_process2_play_all(float p_delta, bool p_started, Playback &p_playback);
 	void _gdi_animation_update_transforms_play_all();
