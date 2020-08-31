@@ -256,6 +256,9 @@ if env_base["no_editor_splash"]:
 
 if not env_base["deprecated"]:
     env_base.Append(CPPDEFINES=["DISABLE_DEPRECATED"])
+    
+# add GDI assimp modification support, to handle the fbx skeleton animation
+env_base.Append(CPPDEFINES=["GDI_ENABLE_ASSIMP_MODIFICATION"])
 
 env_base.platforms = {}
 

@@ -116,8 +116,8 @@ private:
 	Spatial *_generate_scene(const String &p_path, aiScene *scene, const uint32_t p_flags, int p_bake_fps, const int32_t p_max_bone_weights);
 
 	// 修改点：加入创建animNode的函数
-	void CreateAnimNodeFromScene(const aiScene *scene, Skeleton::NodeAnim **root);
-	Skeleton::NodeAnim* CreateAnimNodes(const aiScene *scene, const aiNode *node, Skeleton::NodeAnim *parent);
+	void gdi_create_anim_node_from_scene(const aiScene *scene, Skeleton::NodeAnim **root);
+	Skeleton::NodeAnim* gdi_create_anim_nodes(const aiScene *scene, const aiNode *node, Skeleton::NodeAnim *parent);
 
 	template <class T>
 	T _interpolate_track(const Vector<float> &p_times, const Vector<T> &p_values, float p_time, AssetImportAnimation::Interpolation p_interp);

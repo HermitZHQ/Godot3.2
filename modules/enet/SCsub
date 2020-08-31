@@ -3,7 +3,8 @@
 Import("env")
 Import("env_modules")
 
-env_enet = env_modules.Clone()
+#env_enet = env_modules.Clone()
+env_enet = env_modules
 
 # Thirdparty source files
 

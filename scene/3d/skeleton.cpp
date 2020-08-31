@@ -38,6 +38,8 @@
 #include "core/os/os.h"
 #include <functional>
 
+// #define GDI_ENABLE_ASSIMP_MODIFICATION
+
 void SkinReference::_skin_changed() {
 	if (skeleton_node) {
 		skeleton_node->_make_dirty();
@@ -126,10 +128,6 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 	else if (what == "pose")
 		set_bone_pose(which, p_value);
 	// 修改点：增加属性存储
-// 	else if (what == "anim_node")
-// 		set_bone_anim_node(which, p_value);
-// 	else if (what == "anim_node_root_addr")
-// 		set_anim_root_node_addr(p_value);
 	else if (what == "anim_node_name") {
 		_check_load_vec_func(pos);
 		gdi_anim_node_load_vec.ptrw()[pos]->name = p_value;
@@ -143,24 +141,38 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 		for (int64_t i = 1; i < id_vec.size(); ++i)
 		{
 			// 先按照数量填充无效child，后面再进行组合
+			// 其实也不是无效，只是相当于先把ID转换为无效的指针保存了起来
+			// 后面重新生成时，再把指针转化为索引即可
 			gdi_anim_node_load_vec.ptrw()[pos]->childs.push_back((NodeAnim*)id_vec[i]);
 		}
 	}
 	else if (what == "anim_node_local_transform") {
 		_check_load_vec_func(pos);
-		gdi_anim_node_load_vec.ptrw()[pos]->localTransform = p_value;
+		gdi_anim_node_load_vec.ptrw()[pos]->local_transform = p_value;
 	}
 	else if (what == "anim_node_global_transform") {
 		_check_load_vec_func(pos);
-		gdi_anim_node_load_vec.ptrw()[pos]->globalTransform = p_value;
+		gdi_anim_node_load_vec.ptrw()[pos]->global_transform = p_value;
 	}
 	else if (what == "anim_node_channel_id") {
 		_check_load_vec_func(pos);
-		gdi_anim_node_load_vec.ptrw()[pos]->channelId = p_value;
+		gdi_anim_node_load_vec.ptrw()[pos]->channel_id = p_value;
 	}
 	else if (what == "anim_node_is_bone") {
 		_check_load_vec_func(pos);
-		gdi_anim_node_load_vec.ptrw()[pos]->isBone = p_value;
+		gdi_anim_node_load_vec.ptrw()[pos]->is_bone = p_value;
+	}
+	else if (what == "anim_node_bone_num") {
+		_check_load_vec_func(pos);
+		gdi_anim_node_load_vec.ptrw()[pos]->bone_num = p_value;
+	}
+	else if (what == "anim_node_is_mesh") {
+		_check_load_vec_func(pos);
+		gdi_anim_node_load_vec.ptrw()[pos]->is_mesh = p_value;
+	}
+	else if (what == "anim_node_mesh_num") {
+		_check_load_vec_func(pos);
+		gdi_anim_node_load_vec.ptrw()[pos]->mesh_num = p_value;
 	}
 	else if (what == "bound_children") {
 		Array children = p_value;
@@ -208,10 +220,6 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 	else if (what == "pose")
 		r_ret = get_bone_pose(which);
 	// 修改点：增加animNode相关属性存储
-// 	else if (what == "anim_node")
-// 		r_ret = (int64_t)get_bone_anim_node(which);
-// 	else if (what == "anim_node_root_addr")
-// 		r_ret = get_anim_root_node_addr();
 	else if (what == "anim_node_name") {
 		r_ret = gdi_anim_node_save_vec.ptr()[pos]->name;
 	}
@@ -219,27 +227,36 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 		PoolVector<int> id_vec;
 		// parent id
 		id_vec.push_back((int)(gdi_anim_node_save_vec.ptr()[pos]->parent ?
-			gdi_anim_node_save_vec.ptr()[pos]->parent->nodeId :
+			gdi_anim_node_save_vec.ptr()[pos]->parent->node_id :
 			-1));
 		// child ids
 		for (int i = 0; i < gdi_anim_node_save_vec.ptr()[pos]->childs.size(); ++i)
 		{
-			id_vec.push_back(gdi_anim_node_save_vec.ptr()[pos]->childs[i]->nodeId);
+			id_vec.push_back(gdi_anim_node_save_vec.ptr()[pos]->childs[i]->node_id);
 		}
 
 		r_ret = id_vec;
 	}
 	else if (what == "anim_node_local_transform") {
-		r_ret = gdi_anim_node_save_vec.ptr()[pos]->localTransform;
+		r_ret = gdi_anim_node_save_vec.ptr()[pos]->local_transform;
 	}
 	else if (what == "anim_node_global_transform") {
-		r_ret = gdi_anim_node_save_vec.ptr()[pos]->globalTransform;
+		r_ret = gdi_anim_node_save_vec.ptr()[pos]->global_transform;
 	}
 	else if (what == "anim_node_channel_id") {
-		r_ret = (int64_t)gdi_anim_node_save_vec.ptr()[pos]->channelId;
+		r_ret = (int64_t)gdi_anim_node_save_vec.ptr()[pos]->channel_id;
 	}
 	else if (what == "anim_node_is_bone") {
-		r_ret = gdi_anim_node_save_vec.ptr()[pos]->isBone;
+		r_ret = gdi_anim_node_save_vec.ptr()[pos]->is_bone;
+	}
+	else if (what == "anim_node_bone_num") {
+		r_ret = gdi_anim_node_save_vec.ptr()[pos]->bone_num;
+	}
+	else if (what == "anim_node_is_mesh") {
+		r_ret = gdi_anim_node_save_vec.ptr()[pos]->is_mesh;
+	}
+	else if (what == "anim_node_mesh_num") {
+		r_ret = gdi_anim_node_save_vec.ptr()[pos]->mesh_num;
 	}
 	else if (what == "bound_children") {
 		Array children;
@@ -274,12 +291,8 @@ void Skeleton::_get_property_list(List<PropertyInfo> *p_list) const {
 		p_list->push_back(PropertyInfo(Variant::ARRAY, prep + "bound_children"));
 
 		// 修改点：增加animNode相关属性
-// 		p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node", PROPERTY_HINT_NONE, ""));
 		if (0 == i) {
-// 			p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_root_addr", PROPERTY_HINT_NONE, ""));
-
-			for (int a = 0; a < gdi_anim_node_save_vec.size(); ++a)
-			{
+			for (int a = 0; a < gdi_anim_node_save_vec.size(); ++a) {
 				NodeAnim *node = gdi_anim_node_save_vec[a];
 
 				p_list->push_back(PropertyInfo(Variant::STRING, prep + "anim_node_name/" + itos(a)));
@@ -288,6 +301,9 @@ void Skeleton::_get_property_list(List<PropertyInfo> *p_list) const {
 				p_list->push_back(PropertyInfo(Variant::TRANSFORM, prep + "anim_node_global_transform/" + itos(a)));
 				p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_channel_id/" + itos(a)));
 				p_list->push_back(PropertyInfo(Variant::BOOL, prep + "anim_node_is_bone/" + itos(a)));
+				p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_bone_num/" + itos(a)));
+				p_list->push_back(PropertyInfo(Variant::BOOL, prep + "anim_node_is_mesh/" + itos(a)));
+				p_list->push_back(PropertyInfo(Variant::INT, prep + "anim_node_mesh_num/" + itos(a)));
 			}
 		}
 	}
@@ -356,13 +372,17 @@ void Skeleton::_notification(int p_what) {
 			Bone *bonesptr = bones.ptrw();
 			int len = bones.size();
 
-			// 修改点：update所有非bone节点的global transform，否则有些节点不会转变
-			gdi_anim_node_root = (NodeAnim*)gdi_get_anim_root_node_addr();
-
-			// 修改点：检测是anim_node_root为null，是的话，从load的anim node vec中重新组合出tree
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 			if (nullptr == gdi_anim_node_root) {
-				_regenerate_anim_node_tree();
+				// 修改点：update所有非bone节点的global transform，否则有些节点不会转变
+				gdi_anim_node_root = (NodeAnim*)gdi_get_anim_root_node_addr();
+	
+				// 修改点：检测是anim_node_root为null，是的话，从load的anim node vec中重新组合出tree
+				if (nullptr == gdi_anim_node_root) {
+					_regenerate_anim_node_tree();
+				}
 			}
+#endif
 
 			_update_process_order();
 			const int *order = process_order.ptr();
@@ -410,13 +430,15 @@ void Skeleton::_notification(int p_what) {
 							}
 
 							// 修改点：尝试使用assimp-viewer的处理流程，它这里的处理流程意义不明，注释掉了原有处理流程
-// 							if (b.parent >= 0) {
-// 
-// 								b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
-// 							} else {
-// 
-// 								b.pose_global = b.rest * pose;
-// 							}
+#ifndef GDI_ENABLE_ASSIMP_MODIFICATION
+							if (b.parent >= 0) {
+
+								b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
+							} else {
+
+								b.pose_global = b.rest * pose;
+							}
+#else
 
 							NodeAnim *node = b.nodeAnim ? b.nodeAnim : 
 								(gdi_anim_node_root ?
@@ -424,10 +446,9 @@ void Skeleton::_notification(int p_what) {
 							if (nullptr == b.nodeAnim && node) {
 								b.nodeAnim = node;
 							}
+
 							// 这个pose还不能随意设置，否则不能兼容其他tscn
-// 							if (anim_node_root) {
-								b.pose_global = b.nodeAnim ? b.nodeAnim->localTransform : b.rest;
-// 							}
+							b.pose_global = b.nodeAnim ? b.nodeAnim->local_transform : b.rest;
 
 							NodeAnim *parent = nullptr;
 							if (node) {
@@ -436,6 +457,7 @@ void Skeleton::_notification(int p_what) {
 
 							// 兼容处理其他tscn过来的模型，如果没有从nodeAnim中找到parent（不正常情况）
 							// 那么我们采用原有流程的global计算，进行兼容
+							// 主要兼容的是gdi_anim_node_root，因为其他版本的文件是读取不到这个东西的
 							if (nullptr == parent && -1 != b.parent && !gdi_anim_node_root) {
 								b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
 							}
@@ -444,14 +466,9 @@ void Skeleton::_notification(int p_what) {
 							}
 
 							while (nullptr != parent) {
-								b.pose_global = parent->localTransform * b.pose_global;
+								b.pose_global = parent->local_transform * b.pose_global;
+								parent = parent->parent;
 
-								//if (parent->name == String("Maca")) {
-								//	OS::get_singleton()->print("find maca.........\n");
-								//}
-								//if (parent->name == String("Maca2")) {
-								//	OS::get_singleton()->print("find maca2.........\n");
-								//}
 								// 测试点：对比每次生成的global矩阵
 // 								if (b.name == "Bip001 L Forearm")
 // 								{
@@ -461,8 +478,8 @@ void Skeleton::_notification(int p_what) {
 // 										b.pose_global.basis.elements[0].y,
 // 										b.pose_global.basis.elements[0].z);
 // 								}
-								parent = parent->parent;
 							}
+#endif
 						}
 						else {
 
@@ -495,29 +512,11 @@ void Skeleton::_notification(int p_what) {
 				}
 			}
 
-// 			if (gdi_anim_node_root) {
-// 				UpdateAllNoneBoneAnimNodes(gdi_anim_node_root);
-// 			}
-
-			// 尝试更新maca节点的测试--------------------
-			if (nullptr != gdi_editor_root) {
-				Node *instNode = gdi_editor_root->find_node("Maca2");
-				NodeAnim *node = gdi_find_anim_node_by_name(gdi_anim_node_root, "Maca");
-				NodeAnim *parent = node->parent;
-				node->globalTransform = node->localTransform;
-				bool find_flag = false;
-				while (nullptr != parent) {
-
-// 					Transform tmp_t = gdi_get_bone_pose_by_name(parent->, find_flag);
-// 					if (find_flag) {
-// 						parent_t = tmp_t;
-// 					}
-
-					node->globalTransform = parent->localTransform * node->globalTransform;
-					parent = parent->parent;
-				}
-				((Spatial*)instNode)->set_global_transform(node->globalTransform);
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
+			if (gdi_anim_node_root) {
+				gdi_update_all_none_bone_anim_node(gdi_anim_node_root);
 			}
+#endif
 
 			// 测试点：只更新一个skin，观察差异
 			int iTest = 0;
@@ -680,38 +679,52 @@ Skeleton::NodeAnim* Skeleton::gdi_find_anim_node_by_name(NodeAnim *root, String 
 	return node;
 }
 
-void Skeleton::_gdi_find_anim_node_recursive(NodeAnim *nodeAnim, String boneName, NodeAnim **node)
-{
+void Skeleton::_gdi_find_anim_node_recursive(NodeAnim *nodeAnim, String boneName, NodeAnim **node) {
+
 	if (nodeAnim->name == boneName) {
 		*node = nodeAnim;
 		return;
 	}
 
-	for (int i = 0; i < nodeAnim->childs.size(); ++i)
-	{
+	for (int i = 0; i < nodeAnim->childs.size(); ++i) {
 		_gdi_find_anim_node_recursive(nodeAnim->childs[i], boneName, node);
 	}
 }
 
-void Skeleton::gdi_update_all_none_bone_anim_node(NodeAnim *node)
-{
-	if (node->name == String("Maca")) {
-		int i = 0;
-		++i;
-	}
+void Skeleton::gdi_update_all_none_bone_anim_node(NodeAnim *node) {
 
-	node->globalTransform = node->localTransform;
-	NodeAnim *parentNode = node->parent;
-	while (parentNode)
-	{
-		node->globalTransform = parentNode->localTransform * node->globalTransform;
-		parentNode = parentNode->parent;
-	}
+// 	if (!node->is_bone) {
+		node->global_transform = node->local_transform;
+		NodeAnim *parentNode = node->parent;
+		while (parentNode) {
+			node->global_transform = parentNode->local_transform * node->global_transform;
+			parentNode = parentNode->parent;
+		}
 
-	for (int i = 0; i < node->childs.size(); ++i)
-	{
+		if (nullptr != gdi_editor_root && node->is_mesh && 0 == node->bone_num) {
+			Spatial *spa = Object::cast_to<Spatial>(gdi_editor_root->find_node(node->name));
+			if (nullptr != spa) {
+				spa->set_global_transform(node->global_transform);
+			}
+		}
+// 	}
+
+	for (int i = 0; i < node->childs.size(); ++i) {
 		gdi_update_all_none_bone_anim_node(node->childs[i]);
 	}
+}
+
+bool Skeleton::gdi_update_mesh_anim_node(const String &p_old_name, const String &p_new_name) {
+
+	int size = gdi_anim_node_save_vec.size();
+	for (int i = 0; i < size; ++i) {
+		if (gdi_anim_node_save_vec[i]->name == p_old_name) {
+			gdi_anim_node_save_vec.ptrw()[i]->name = p_new_name;
+			return true;
+		}
+	}
+
+	return false;
 }
 
 bool Skeleton::is_bone_parent_of(int p_bone, int p_parent_bone_id) const {
@@ -870,7 +883,7 @@ void Skeleton::set_bone_pose(int p_bone, const Transform &p_pose) {
 
 	NodeAnim *nodeAnim = bones.write[p_bone].nodeAnim;
 	if (nodeAnim /*&& nodeAnim->channelId != -1*/) {
-		nodeAnim->localTransform = p_pose;
+		nodeAnim->local_transform = p_pose;
 
 		// 更新global trans
 // 		nodeAnim->globalTransform = nodeAnim->localTransform;
@@ -894,13 +907,13 @@ Transform Skeleton::get_bone_pose(int p_bone) const {
 	return bones[p_bone].pose;
 }
 
-void Skeleton::set_none_bone_pose(StringName name, const Transform &p_pose)
+void Skeleton::gdi_set_none_bone_pose(StringName name, const Transform &p_pose)
 {
 	NodeAnim *root = (NodeAnim*)gdi_get_anim_root_node_addr();
 	NodeAnim *nodeAnim = (nullptr == root) ? nullptr : gdi_find_anim_node_by_name(root, name);
 
 	if (nodeAnim) {
-		nodeAnim->localTransform = p_pose;
+		nodeAnim->local_transform = p_pose;
 	}
 }
 
@@ -915,7 +928,7 @@ void Skeleton::gdi_set_anim_root_node_addr(int64_t addr)
 	gdi_anim_node_root = (NodeAnim *)addr;
 
 	static std::function<void(NodeAnim *, unsigned int &, Vector<NodeAnim*> &)> gen_anim_node_tree_id_func = [&](NodeAnim *node, unsigned int &startId, Vector<NodeAnim*> &animNodeVec) {
-		node->nodeId = startId++;
+		node->node_id = startId++;
 		animNodeVec.push_back(node);
 
 		for (int i = 0; i < node->childs.size(); ++i)

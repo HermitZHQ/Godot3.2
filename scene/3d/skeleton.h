@@ -83,14 +83,18 @@ public:
 		String					name;
 		NodeAnim				*parent;
 		Vector<NodeAnim*>		childs;
-		Transform				localTransform;
-		Transform				globalTransform;
-		int						channelId;
-		bool					isBone;
-		int						nodeId;// 为了存储在tsn文件中还原时使用
+		Transform				local_transform;
+		Transform				global_transform;
+		int						channel_id;
+		bool					is_bone;
+		int						bone_num;
+		bool					is_mesh;
+		int						mesh_num;
+		int						node_id;// 为了存储在tsn文件中还原时使用
 
 		NodeAnim()
-			:channelId(-1), parent(NULL), isBone(false), nodeId(-1)
+			:channel_id(-1), parent(NULL), is_bone(false), bone_num(0), is_mesh(false), mesh_num(0)
+			, node_id(-1)
 		{}
 	};
 private:
@@ -217,14 +221,14 @@ public:
 	Transform get_bone_pose(int p_bone) const;
 
 	// 修改点：增加接口处理非bone节点的channel trans更新
-	void set_none_bone_pose(StringName name, const Transform &p_pose);
+	void gdi_set_none_bone_pose(StringName name, const Transform &p_pose);
 
 	// 修改点，添加函数，用于记录animNode的root节点，由于add_bone耦合性较高，无法直接使用
-// 	void SetNodeAnimRoot(int64_t rootAddr);
-// 	int64_t GetNodeAnimRoot() const;
 	NodeAnim* gdi_find_anim_node_by_name(NodeAnim *root, String boneName);
 	void _gdi_find_anim_node_recursive(NodeAnim *nodeAnim, String boneName, NodeAnim **node);
 	void gdi_update_all_none_bone_anim_node(NodeAnim *node);
+	// 因为流程的关系，assimp的mesh节点，会在中间处理过程中从Spatial转化为MeshInstance，且名称会变化（因为删除是延迟的）
+	bool gdi_update_mesh_anim_node(const String &p_old_name, const String &p_new_name);
 
 	// 增加animNode root的set get接口
 	int64_t gdi_get_anim_root_node_addr() const;

@@ -859,8 +859,10 @@ void AnimationPlayer::_animation_process2(float p_delta, bool p_started) {
 
 void AnimationPlayer::_animation_update_transforms() {
 	{
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 		Skeleton *gdi_skeleton = nullptr;
 		Node *gdi_scene_root = nullptr;
+#endif
 		Transform t;
 		for (int i = 0; i < cache_update_size; i++) {
 
@@ -878,6 +880,7 @@ void AnimationPlayer::_animation_update_transforms() {
 
 				nc->spatial->set_transform(t);
 
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 				// 修改点：确保非Bone的channel节点也必须进行更新，否则动画不能完全正常
 				// 这里需要注意的是，后期应该是支持更新多Skeleton，目前测试写死了一个??（再次来看的时候已经不知道什么意思了，再看看吧）
 				if (nullptr == gdi_skeleton) {
@@ -900,7 +903,8 @@ void AnimationPlayer::_animation_update_transforms() {
 					gdi_skeleton->gdi_set_editor_scene_root(gdi_scene_root);
 				}
 				auto name = nc->spatial->get_name();
-				gdi_skeleton->set_none_bone_pose(name, t);
+				gdi_skeleton->gdi_set_none_bone_pose(name, t);
+#endif
 			}
 		}
 	}
@@ -1435,7 +1439,7 @@ void AnimationPlayer::_gdi_animation_update_transforms_play_all()
 					}
 				}
 				auto name = nc->spatial->get_name();
-				g_test_skeleton->set_none_bone_pose(name, t);
+				g_test_skeleton->gdi_set_none_bone_pose(name, t);
 			}
 		}
 	}
