@@ -90,6 +90,7 @@ struct ImportState {
 	List<aiBone *> bone_stack;
 	// 修改点：需要记录aiBone对应的mesh，每个mesh的bone应该是分开处理的
 	List<unsigned int> gdi_bone_stack_mesh_index;
+	Map<const aiNode*, unsigned int> gdi_armature_index_map;
 
 	// EditorSceneImporter::ImportFlags
 	uint32_t import_flags;

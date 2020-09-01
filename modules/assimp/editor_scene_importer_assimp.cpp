@@ -309,6 +309,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	state.max_bone_weights = p_max_bone_weights;
 	state.animation_player = NULL;
 	state.import_flags = p_flags;
+	state.gdi_armature_index_map.clear();
 
 	// populate light map
 	for (unsigned int l = 0; l < scene->mNumLights; l++) {
@@ -380,7 +381,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			// retrieve this node bone
 			aiBone *bone = get_bone_from_stack(state, element_assimp_node->mName);
 			// 修改点：如果mesh不匹配的话，bone应该重置为0
-			// TODO：这里修改的不正确，应该还需要匹配mesh是否一致（因为bone也存在重名的情况）
+			// TODO：这里修改的不完善，应该还需要匹配mesh是否一致（因为bone也存在重名的情况）
 // 			bone = (element_assimp_node->mNumMeshes == 0) ? nullptr : bone;
 
 			// 修改点：尝试设置任意节点为skeleton，不要给其增加父节点
@@ -394,7 +395,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				print_verbose("Making skeleton: " + node_name);
 				Skeleton *skeleton = memnew(Skeleton);
 				skeleton->gdi_set_anim_root_node_addr((int64_t)nodeAnimRoot);
-				skeleton->set_name("just test");
+				//skeleton->set_name("just test");
 				spatial = skeleton;
 				if (!state.armature_skeletons.has(element_assimp_node)) {
 // 					bSkeletonFlag = true;
@@ -611,8 +612,18 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				state.root->add_child(state.animation_player);
 				state.animation_player->set_owner(state.root);
 
-				for (int a = 0; a < state.armature_skeletons.size(); ++a) {
-					_import_animation(state, i, p_bake_fps, a);
+				//for (int a = 0; a < state.armature_skeletons.size(); ++a) {
+				//	_import_animation(state, i, p_bake_fps, a);
+				//}
+				for (auto e = state.armature_skeletons.front(); e; e = e->next()) {
+					auto arm_index = state.gdi_armature_index_map.find(e->key());
+					if (nullptr != arm_index) {
+						_import_animation(state, i, p_bake_fps, arm_index->value());
+					}
+					else {
+						_import_animation(state, i, p_bake_fps, 0);
+						print_error("[GDI]assimp import anim, wrong case");
+					}
 				}
 			}
 	}
@@ -890,9 +901,10 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	// 修改点：使用mesh指定的bone生成接口
 	// generate bone stack for animation import
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
-// 	RegenerateBoneStack(state);
+	// 使用所有meshes来生成的bone信息的会有问题，最大的问题就是重名覆盖，而引擎又会去通过名称找bone，所以肯定是有问题的
+	//RegenerateBoneStack(state);
 	// 此处如果不设置正确的对应mesh来产生bones信息的话，是无法正常驱动动画的
-	RegenerateBoneStack(state, state.assimp_scene->mMeshes[mesh_id]);
+ 	RegenerateBoneStack(state, state.assimp_scene->mMeshes[mesh_id]);
 #else
 	RegenerateBoneStack(state);
 #endif
@@ -955,8 +967,8 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		else if (bone == nullptr) {
 			printf("[GDI-Error:Skeleton]:Miss track[%s], can't find it in the normal node, mesh id[%d], track id[%d]\n", track->mNodeName.data, mesh_id, (int)i);
 
-			_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
-				NodePath(), node_name, nullptr);
+			//_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
+			//	NodePath(), node_name, nullptr);
 		}
 	}
 
@@ -1750,6 +1762,7 @@ void EditorSceneImporterAssimp::_generate_node(
 			parent->addChildren(1, &newMeshNode);
 	
 			state.armature_nodes.push_back((aiNode *const)newMeshNode);
+			state.gdi_armature_index_map.insert((aiNode *const)newMeshNode, assimp_node->mMeshes[i]);
 		}
 		print_verbose("use root node be the only one armature node");
 	}
