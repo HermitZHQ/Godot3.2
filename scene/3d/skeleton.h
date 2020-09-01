@@ -120,7 +120,8 @@ private:
 		bool global_pose_override_reset;
 		Transform global_pose_override;
 
-		NodeAnim *nodeAnim;
+		// 修改点：
+		NodeAnim *gdi_node_anim;
 
 #ifndef _3D_DISABLED
 		PhysicalBone *physical_bone;
@@ -140,7 +141,7 @@ private:
 			physical_bone = NULL;
 			cache_parent_physical_bone = NULL;
 #endif // _3D_DISABLED
-			nodeAnim = NULL;
+			gdi_node_anim = NULL;
 		}
 	};
 

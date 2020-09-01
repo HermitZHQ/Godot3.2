@@ -38,7 +38,6 @@
 #include "scene/main/node.h"
 #include "scene/resources/material.h"
 #include "scene/resources/surface_tool.h"
-#include "editor/plugins/animation_player_editor_plugin.h"
 
 #include <assimp/matrix4x4.h>
 #include <assimp/postprocess.h>
@@ -345,12 +344,10 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 		// 修改点：手动赋值总的armature节点给所有bone node，并给mNode赋值有效地址
 		// 修改2：分开处理不同的mesh中的bone，绑定不同的armature
 		int bone_stack_size = state.bone_stack.size();
-		for (int i = 0; i < bone_stack_size; ++i)
-		{
+		for (int i = 0; i < bone_stack_size; ++i) {
 			state.bone_stack[i]->mArmature = state.armature_nodes[state.gdi_bone_stack_mesh_index[i]];
 
-			for (auto n = state.nodes.front(); n; n = n->next())
-			{
+			for (auto n = state.nodes.front(); n; n = n->next()) {
 				if (n->get()->mName == state.bone_stack[i]->mName) {
 					state.bone_stack[i]->mNode = (aiNode*)n->get();
 					break;
@@ -363,6 +360,8 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 		List<const aiNode *>::Element *iter;
 		// 循环创建所有节点，之前创建为Armature的节点转换为Skeleton（空间节点）节点（该节点中可以存放子bones）
 		// 有父节点的会把子节点加入父节点的显示中
+		// 之前不为armature的都会先生成spatial节点，后面的代码会进一步检测是否为mesh，是的话则转换为MeshInstance，之前的spatial节点会延迟删除
+		// 要注意的是，新转换的mesh，可能名称会发生变化，这是之前导致bug的一个原因
 		for (iter = state.nodes.front(); iter; iter = iter->next()) {
 			const aiNode *element_assimp_node = iter->get();
 			const aiNode *parent_assimp_node = element_assimp_node->mParent;
@@ -370,10 +369,10 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			String node_name = AssimpUtils::get_assimp_string(element_assimp_node->mName);
 			//print_verbose("node: " + node_name);
 
-			if (element_assimp_node->mName == aiString("Maca")) {
-				int i = 0;
-				++i;
-			}
+			//if (element_assimp_node->mName == aiString("Maca")) {
+			//	int i = 0;
+			//	++i;
+			//}
 
 			Spatial *spatial = NULL;
 			Transform transform = AssimpUtils::assimp_matrix_transform(element_assimp_node->mTransformation);
@@ -382,7 +381,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			aiBone *bone = get_bone_from_stack(state, element_assimp_node->mName);
 			// 修改点：如果mesh不匹配的话，bone应该重置为0
 			// TODO：这里修改的不正确，应该还需要匹配mesh是否一致（因为bone也存在重名的情况）
-			bone = (element_assimp_node->mNumMeshes == 0) ? nullptr : bone;
+// 			bone = (element_assimp_node->mNumMeshes == 0) ? nullptr : bone;
 
 			// 修改点：尝试设置任意节点为skeleton，不要给其增加父节点
 // 			bool bSkeletonFlag = false;
@@ -526,10 +525,10 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			const aiNode *assimp_node = key_value_pair->key();
 			Spatial *mesh_template = key_value_pair->value();
 
-			if (assimp_node->mName == aiString("Maca")) {
-				int i = 0;
-				++i;
-			}
+			//if (assimp_node->mName == aiString("Maca")) {
+			//	int i = 0;
+			//	++i;
+			//}
 
 			ERR_CONTINUE(assimp_node == NULL);
 			ERR_CONTINUE(mesh_template == NULL);
@@ -612,10 +611,6 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				state.root->add_child(state.animation_player);
 				state.animation_player->set_owner(state.root);
 
-				if (nullptr != AnimationPlayerEditor::singleton) {
-
-				}
-
 				for (int a = 0; a < state.armature_skeletons.size(); ++a) {
 					_import_animation(state, i, p_bake_fps, a);
 				}
@@ -663,7 +658,7 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::gdi_create_anim_nodes(const aiSce
 	animNode->mesh_num = animNode->is_mesh ? node->mNumMeshes : 0;
 	animNode->local_transform = AssimpUtils::assimp_matrix_transform(node->mTransformation);
 
-	if (node->mName == aiString("Maca")) {
+	if (node->mName == aiString("renwu_1")) {
 		int i = 0;
 		++i;
 	}
@@ -809,19 +804,30 @@ void EditorSceneImporterAssimp::RegenerateBoneStack(ImportState &state) {
 
 	state.bone_stack.clear();
 	state.gdi_bone_stack_mesh_index.clear();
+	auto num_armature = state.armature_nodes.size();
+
 	// build bone stack list
 	for (unsigned int mesh_id = 0; mesh_id < state.assimp_scene->mNumMeshes; ++mesh_id) {
 		aiMesh *mesh = state.assimp_scene->mMeshes[mesh_id];
 
+		aiString str_tmp_mesh_name = mesh->mName;
+		str_tmp_mesh_name.Append("_ArmatureNode");
 		// iterate over all the bones on the mesh for this node only!
 		for (unsigned int boneIndex = 0; boneIndex < mesh->mNumBones; boneIndex++) {
 			aiBone *bone = mesh->mBones[boneIndex];
 
 			// doubtful this is required right now but best to check
 			if (!state.bone_stack.find(bone)) {
-				//print_verbose("[assimp] bone stack added: " + String(bone->mName.C_Str()) );
 				state.bone_stack.push_back(bone);
-				state.gdi_bone_stack_mesh_index.push_back(mesh_id);
+
+				// 修改点：把bone在对应mesh armature的索引存入
+				// 后面需要
+				for (int arm_index = 0; arm_index < num_armature; ++arm_index) {
+					if (state.armature_nodes[arm_index]->mName == str_tmp_mesh_name) {
+						state.gdi_bone_stack_mesh_index.push_back(arm_index);
+						break;
+					}
+				}
 			}
 		}
 	}
@@ -883,8 +889,13 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 
 	// 修改点：使用mesh指定的bone生成接口
 	// generate bone stack for animation import
-	RegenerateBoneStack(state, state.assimp_scene->mMeshes[mesh_id]);
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 // 	RegenerateBoneStack(state);
+	// 此处如果不设置正确的对应mesh来产生bones信息的话，是无法正常驱动动画的
+	RegenerateBoneStack(state, state.assimp_scene->mMeshes[mesh_id]);
+#else
+	RegenerateBoneStack(state);
+#endif
 
 	//regular tracks
 	for (size_t i = 0; i < anim->mNumChannels; i++) {
@@ -1672,7 +1683,7 @@ void EditorSceneImporterAssimp::_generate_node(
 	state.nodes.push_back(assimp_node);
 	String parent_name = AssimpUtils::get_assimp_string(assimp_node->mParent->mName);
 
-	if (assimp_node->mName == aiString("Escudo")) {
+	if (assimp_node->mName == aiString("Bone001")) {
 		int i = 0;
 		++i;
 	}
@@ -1720,6 +1731,12 @@ void EditorSceneImporterAssimp::_generate_node(
 			if (mesh->mNumBones <= 0) {
 				continue;
 			}
+
+			// test code: check the bones info
+			//Vector<aiString> str_vec;
+			//for (int i = 0; i < mesh->mNumBones; ++i) {
+			//	str_vec.push_back(mesh->mBones[i]->mName);
+			//}
 
 			aiNode *parent = assimp_node->mParent;
 			aiNode *newMeshNode = new aiNode();

@@ -440,15 +440,15 @@ void Skeleton::_notification(int p_what) {
 							}
 #else
 
-							NodeAnim *node = b.nodeAnim ? b.nodeAnim : 
+							NodeAnim *node = b.gdi_node_anim ? b.gdi_node_anim : 
 								(gdi_anim_node_root ?
 									gdi_find_anim_node_by_name(gdi_anim_node_root, b.name) : nullptr);
-							if (nullptr == b.nodeAnim && node) {
-								b.nodeAnim = node;
+							if (nullptr == b.gdi_node_anim && node) {
+								b.gdi_node_anim = node;
 							}
 
 							// 这个pose还不能随意设置，否则不能兼容其他tscn
-							b.pose_global = b.nodeAnim ? b.nodeAnim->local_transform : b.rest;
+							b.pose_global = b.gdi_node_anim ? b.gdi_node_anim->local_transform : b.rest;
 
 							NodeAnim *parent = nullptr;
 							if (node) {
@@ -693,6 +693,11 @@ void Skeleton::_gdi_find_anim_node_recursive(NodeAnim *nodeAnim, String boneName
 
 void Skeleton::gdi_update_all_none_bone_anim_node(NodeAnim *node) {
 
+	if (node->name == String("renwu_1")) {
+		int i = 0;
+		++i;
+	}
+
 // 	if (!node->is_bone) {
 		node->global_transform = node->local_transform;
 		NodeAnim *parentNode = node->parent;
@@ -876,12 +881,12 @@ void Skeleton::set_bone_pose(int p_bone, const Transform &p_pose) {
 		int i = 0;
 		++i;
 	}
-	if (nullptr == bones.write[p_bone].nodeAnim) {
+	if (nullptr == bones.write[p_bone].gdi_node_anim) {
 		NodeAnim *root = (NodeAnim*)gdi_get_anim_root_node_addr();
-		bones.write[p_bone].nodeAnim = (nullptr == root) ? nullptr : gdi_find_anim_node_by_name(root, bones.write[p_bone].name);
+		bones.write[p_bone].gdi_node_anim = (nullptr == root) ? nullptr : gdi_find_anim_node_by_name(root, bones.write[p_bone].name);
 	}
 
-	NodeAnim *nodeAnim = bones.write[p_bone].nodeAnim;
+	NodeAnim *nodeAnim = bones.write[p_bone].gdi_node_anim;
 	if (nodeAnim /*&& nodeAnim->channelId != -1*/) {
 		nodeAnim->local_transform = p_pose;
 
@@ -907,8 +912,8 @@ Transform Skeleton::get_bone_pose(int p_bone) const {
 	return bones[p_bone].pose;
 }
 
-void Skeleton::gdi_set_none_bone_pose(StringName name, const Transform &p_pose)
-{
+void Skeleton::gdi_set_none_bone_pose(StringName name, const Transform &p_pose) {
+
 	NodeAnim *root = (NodeAnim*)gdi_get_anim_root_node_addr();
 	NodeAnim *nodeAnim = (nullptr == root) ? nullptr : gdi_find_anim_node_by_name(root, name);
 
@@ -917,13 +922,13 @@ void Skeleton::gdi_set_none_bone_pose(StringName name, const Transform &p_pose)
 	}
 }
 
-int64_t Skeleton::gdi_get_anim_root_node_addr() const
-{
+int64_t Skeleton::gdi_get_anim_root_node_addr() const {
+
 	return gdi_anim_node_addr;
 }
 
-void Skeleton::gdi_set_anim_root_node_addr(int64_t addr)
-{
+void Skeleton::gdi_set_anim_root_node_addr(int64_t addr) {
+
 	gdi_anim_node_addr = addr;
 	gdi_anim_node_root = (NodeAnim *)addr;
 
@@ -944,14 +949,14 @@ void Skeleton::gdi_set_anim_root_node_addr(int64_t addr)
 	}
 }
 
-Skeleton::NodeAnim* Skeleton::gdi_get_bone_anim_node(int p_bone) const
-{
-	return bones.ptr()[p_bone].nodeAnim;
+Skeleton::NodeAnim* Skeleton::gdi_get_bone_anim_node(int p_bone) const {
+
+	return bones.ptr()[p_bone].gdi_node_anim;
 }
 
-void Skeleton::gdi_set_bone_anim_node(int p_bone, int64_t addr)
-{
-	bones.ptrw()[p_bone].nodeAnim = (NodeAnim *)addr;
+void Skeleton::gdi_set_bone_anim_node(int p_bone, int64_t addr) {
+
+	bones.ptrw()[p_bone].gdi_node_anim = (NodeAnim *)addr;
 }
 
 void Skeleton::gdi_set_editor_scene_root(Node *root) {

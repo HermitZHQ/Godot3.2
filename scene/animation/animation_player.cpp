@@ -383,9 +383,9 @@ void AnimationPlayer::_animation_process_animation(AnimationData *p_anim, float 
 				//ERR_CONTINUE(err!=OK); //used for testing, should be removed
 
 				// 测试点：测试混合后的矩阵结果
-				Transform t;
-				t.origin = loc;
-				t.basis.set_quat_scale(rot, scale);
+				//Transform t;
+				//t.origin = loc;
+				//t.basis.set_quat_scale(rot, scale);
 
 				if (err != OK)
 					continue;
@@ -398,10 +398,10 @@ void AnimationPlayer::_animation_process_animation(AnimationData *p_anim, float 
 					nc->rot_accum = rot;
 					nc->scale_accum = scale;
 
-					// 测试矩阵结果
-					Transform t;
-					t.origin = nc->loc_accum;
-					t.basis.set_quat_scale(rot, scale);
+					// 测试点：测试混合后的矩阵结果
+					//Transform t;
+					//t.origin = nc->loc_accum;
+					//t.basis.set_quat_scale(rot, scale);
 
 				} else {
 
@@ -1415,7 +1415,7 @@ void AnimationPlayer::_gdi_animation_process2_play_all(float p_delta, bool p_sta
 void AnimationPlayer::_gdi_animation_update_transforms_play_all()
 {
 	{
-		Skeleton *g_test_skeleton = nullptr;
+		Skeleton *gdi_skeleton = nullptr;
 		Transform t;
 		for (int i = 0; i < cache_update_size; i++) {
 
@@ -1436,17 +1436,23 @@ void AnimationPlayer::_gdi_animation_update_transforms_play_all()
 
 				// 修改点：确保非Bone的channel节点也必须进行更新，否则动画不能完全正常
 				// 这里需要注意的是，后期应该是支持更新多Skeleton，目前测试写死了一个
-				if (nullptr == g_test_skeleton) {
+				if (nullptr == gdi_skeleton) {
 					for (int a = 0; a < cache_update_size; a++) {
 						TrackNodeCache *tnc = cache_update[a];
 						if (tnc->skeleton) {
-							g_test_skeleton = tnc->skeleton;
+							gdi_skeleton = tnc->skeleton;
 							break;
 						}
 					}
 				}
+
+				// 存在始终找不到骨骼的情况
+				if (nullptr == gdi_skeleton) {
+					continue;
+				}
+
 				auto name = nc->spatial->get_name();
-				g_test_skeleton->gdi_set_none_bone_pose(name, t);
+				gdi_skeleton->gdi_set_none_bone_pose(name, t);
 			}
 		}
 	}
