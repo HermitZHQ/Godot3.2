@@ -106,7 +106,7 @@ Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_f
 	importer.SetPropertyBool(AI_CONFIG_PP_FD_REMOVE, true);
 	// Cannot remove pivot points because the static mesh will be in the wrong place
 	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
-// 	importer.SetPropertyBool(AI_CONFIG_GLOBAL_SCALE_FACTOR_KEY, true);
+	importer.SetPropertyBool(AI_CONFIG_GLOBAL_SCALE_FACTOR_KEY, true);
 	int32_t max_bone_weights = 4;
 	//if (p_flags & IMPORT_ANIMATION_EIGHT_WEIGHTS) {
 	//	const int eight_bones = 8;
@@ -669,9 +669,9 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::gdi_create_anim_nodes(const aiSce
 	animNode->mesh_num = animNode->is_mesh ? node->mNumMeshes : 0;
 	animNode->local_transform = AssimpUtils::assimp_matrix_transform(node->mTransformation);
 
-	if (node->mName == aiString("renwu_1")) {
+	if (node->mName == aiString("Dummy33_end")) {
 		int i = 0;
-		++i;
+		++i; 
 	}
 
 	// default to use animation 0, for now(todo)
@@ -1695,7 +1695,7 @@ void EditorSceneImporterAssimp::_generate_node(
 	state.nodes.push_back(assimp_node);
 	String parent_name = AssimpUtils::get_assimp_string(assimp_node->mParent->mName);
 
-	if (assimp_node->mName == aiString("Bone001")) {
+	if (assimp_node->mName == aiString("Dummy33_end")) {
 		int i = 0;
 		++i;
 	}
