@@ -909,6 +909,21 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	RegenerateBoneStack(state);
 #endif
 
+	// 修改点：首先get到有效的armature，因为目前处理是不同的mesh有不同的armature，所以都是同一个arm
+	//Skeleton *skeleton = NULL;
+	//for (size_t i = 0; i < anim->mNumChannels; i++) {
+	//	const aiNodeAnim *track = anim->mChannels[i];
+	//	String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
+
+	//	aiBone *bone = get_bone_from_stack(state, track->mNodeName);
+
+	//	if (bone) {
+	//		// get skeleton by bone
+	//		skeleton = state.armature_skeletons[bone->mArmature];
+	//		break;// get到有效arm就可以退出循环了
+	//	}
+	//}
+
 	//regular tracks
 	for (size_t i = 0; i < anim->mNumChannels; i++) {
 		const aiNodeAnim *track = anim->mChannels[i];
@@ -967,8 +982,14 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		else if (bone == nullptr) {
 			printf("[GDI-Error:Skeleton]:Miss track[%s], can't find it in the normal node, mesh id[%d], track id[%d]\n", track->mNodeName.data, mesh_id, (int)i);
 
-			//_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
-			//	NodePath(), node_name, nullptr);
+			//String path = state.root->get_path_to(skeleton);
+			//path += ":" + node_name;
+			//node_path = path;
+
+			//if (node_path != NodePath()) {
+			//	_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
+			//		node_path, node_name, nullptr);
+			//}
 		}
 	}
 
