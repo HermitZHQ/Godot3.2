@@ -284,6 +284,7 @@ T EditorSceneImporterAssimp::_interpolate_track(const Vector<float> &p_times, co
 }
 
 aiBone *EditorSceneImporterAssimp::get_bone_from_stack(ImportState &state, aiString name) {
+
 	List<aiBone *>::Element *iter;
 	aiBone *bone = NULL;
 	for (iter = state.bone_stack.front(); iter; iter = iter->next()) {
@@ -296,6 +297,21 @@ aiBone *EditorSceneImporterAssimp::get_bone_from_stack(ImportState &state, aiStr
 	}
 
 	return NULL;
+}
+
+aiBone* EditorSceneImporterAssimp::gdi_find_bone_from_stack(ImportState &state, const aiString &name) {
+
+	List<aiBone *>::Element *iter;
+	aiBone *bone = NULL;
+	for (iter = state.bone_stack.front(); iter; iter = iter->next()) {
+		bone = (aiBone *)iter->get();
+
+		if (bone && bone->mName == name) {			
+			return bone;
+		}
+	}
+
+	return nullptr;
 }
 
 Spatial *
@@ -382,7 +398,11 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			aiBone *bone = get_bone_from_stack(state, element_assimp_node->mName);
 			// 修改点：如果mesh不匹配的话，bone应该重置为0
 			// TODO：这里修改的不完善，应该还需要匹配mesh是否一致（因为bone也存在重名的情况）
-// 			bone = (element_assimp_node->mNumMeshes == 0) ? nullptr : bone;
+			// 总结：这里其实不需要去get_bone，因为这个阶段的bone获取没有意义，可能是错误的
+			// 全部添加到场景树用于更新即可
+			// 此处的改动需要后续流程的支持，比如非BoneTrack的改动支持，以及Skeleton中update所有非bone的animNode的支持
+			bone = (element_assimp_node->mNumMeshes == 0) ? nullptr : bone;
+			bone = nullptr;
 
 			// 修改点：尝试设置任意节点为skeleton，不要给其增加父节点
 // 			bool bSkeletonFlag = false;
@@ -770,6 +790,7 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 				// 修改点：取消此矩阵计算，意义不明
 				// 此矩阵的注释，在目前看来是必须的，否则会导致后面的骨骼动画不正常
 				// 此处修改，应该只会影响到骨骼动画流程，不会影响到其他地方
+				xform = skeleton->get_bone_pose(skeleton_bone).inverse() * xform;
 #ifndef GDI_ENABLE_ASSIMP_MODIFICATION
 				xform = skeleton->get_bone_pose(skeleton_bone).inverse() * xform;
 #endif
@@ -779,7 +800,18 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 				scale = xform.basis.get_scale();
 				pos = xform.origin;
 			} else {
+#ifndef GDI_ENABLE_ASSIMP_MODIFICATION
 				ERR_FAIL_MSG("Skeleton bone lookup failed for skeleton: " + skeleton->get_name());
+#else
+				Transform xform;
+				xform.basis.set_quat_scale(rot, scale);
+				xform.origin = pos;
+
+				rot = xform.basis.get_rotation_quat();
+				rot.normalize();
+				scale = xform.basis.get_scale();
+				pos = xform.origin;
+#endif
 			}
 		}
 
@@ -798,6 +830,7 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 
 // I really do not like this but need to figure out a better way of removing it later.
 Node *EditorSceneImporterAssimp::get_node_by_name(ImportState &state, String name) {
+
 	for (Map<const aiNode *, Spatial *>::Element *key_value_pair = state.flat_node_map.front(); key_value_pair; key_value_pair = key_value_pair->next()) {
 		const aiNode *assimp_node = key_value_pair->key();
 		Spatial *node = key_value_pair->value();
@@ -904,25 +937,24 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	// 使用所有meshes来生成的bone信息的会有问题，最大的问题就是重名覆盖，而引擎又会去通过名称找bone，所以肯定是有问题的
 	//RegenerateBoneStack(state);
 	// 此处如果不设置正确的对应mesh来产生bones信息的话，是无法正常驱动动画的
- 	RegenerateBoneStack(state, state.assimp_scene->mMeshes[mesh_id]);
+	RegenerateBoneStack(state, state.assimp_scene->mMeshes[mesh_id]);
+
+	// 修改点：首先get到有效的armature，因为目前处理是不同的mesh有不同的armature，所以都是同一个arm
+	Skeleton *skeleton = NULL;
+	for (size_t i = 0; i < anim->mNumChannels; i++) {
+		const aiNodeAnim *track = anim->mChannels[i];
+		String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
+		aiBone *bone = gdi_find_bone_from_stack(state, track->mNodeName);
+
+		if (bone) {
+			// get skeleton by bone
+			skeleton = state.armature_skeletons[bone->mArmature];
+			break;// get到有效arm就可以退出循环了
+		}
+	}
 #else
 	RegenerateBoneStack(state);
 #endif
-
-	// 修改点：首先get到有效的armature，因为目前处理是不同的mesh有不同的armature，所以都是同一个arm
-	//Skeleton *skeleton = NULL;
-	//for (size_t i = 0; i < anim->mNumChannels; i++) {
-	//	const aiNodeAnim *track = anim->mChannels[i];
-	//	String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
-
-	//	aiBone *bone = get_bone_from_stack(state, track->mNodeName);
-
-	//	if (bone) {
-	//		// get skeleton by bone
-	//		skeleton = state.armature_skeletons[bone->mArmature];
-	//		break;// get到有效arm就可以退出循环了
-	//	}
-	//}
 
 	//regular tracks
 	for (size_t i = 0; i < anim->mNumChannels; i++) {
@@ -933,7 +965,9 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 			continue; //do not bother
 		}
 
+#ifndef GDI_ENABLE_ASSIMP_MODIFICATION
 		Skeleton *skeleton = NULL;
+#endif
 		NodePath node_path;
 		aiBone *bone = NULL;
 
@@ -943,8 +977,10 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 			bone = get_bone_from_stack(state, track->mNodeName);
 
 			if (bone) {
+#ifndef GDI_ENABLE_ASSIMP_MODIFICATION
 				// get skeleton by bone
 				skeleton = state.armature_skeletons[bone->mArmature];
+#endif
 
 				if (skeleton) {
 					String path = state.root->get_path_to(skeleton);
@@ -958,9 +994,6 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 						print_error("Failed to find valid node path for animation");
 					}
 				}
-			}
-			else {
-// 				printf("[GDI-Error:Skeleton]:Miss track[%s], can't find bone, mesh id[%d], track id[%d]\n", track->mNodeName.data, mesh_id, i);
 			}
 		}
 
@@ -979,18 +1012,22 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 						node_path, node_name, nullptr);
 			}
 		}
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 		else if (bone == nullptr) {
 			printf("[GDI-Error:Skeleton]:Miss track[%s], can't find it in the normal node, mesh id[%d], track id[%d]\n", track->mNodeName.data, mesh_id, (int)i);
 
 			//String path = state.root->get_path_to(skeleton);
+			//path = "TestNoneBone";
 			//path += ":" + node_name;
 			//node_path = path;
+			//node_path = state.root->get_path_to(allocated_node);
 
 			//if (node_path != NodePath()) {
 			//	_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
 			//		node_path, node_name, nullptr);
 			//}
 		}
+#endif
 	}
 
 	//blend shape tracks
@@ -1103,7 +1140,7 @@ EditorSceneImporterAssimp::_generate_mesh_from_surface_indices(ImportState &stat
 						print_verbose("Reusing existing skin!");
 					}
 				}
-				//                skeleton_assigned =
+				
 				String bone_name = AssimpUtils::get_assimp_string(bone->mName);
 				int bone_index = skeleton_assigned->find_bone(bone_name);
 				ERR_CONTINUE(bone_index == -1);
@@ -1766,10 +1803,14 @@ void EditorSceneImporterAssimp::_generate_node(
 			}
 
 			// test code: check the bones info
-			//Vector<aiString> str_vec;
-			//for (int i = 0; i < mesh->mNumBones; ++i) {
-			//	str_vec.push_back(mesh->mBones[i]->mName);
-			//}
+			Vector<aiString> str_vec;
+			for (int i = 0; i < mesh->mNumBones; ++i) {
+				str_vec.push_back(mesh->mBones[i]->mName);
+				if (mesh->mBones[i]->mName == aiString("Bone001")) {
+					int i = 0;
+					++i;
+				}
+			}
 
 			aiNode *parent = assimp_node->mParent;
 			aiNode *newMeshNode = new aiNode();

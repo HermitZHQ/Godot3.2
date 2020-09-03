@@ -882,7 +882,7 @@ void AnimationPlayer::_animation_update_transforms() {
 
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 				// 修改点：确保非Bone的channel节点也必须进行更新，否则动画不能完全正常
-				// 这里需要注意的是，后期应该是支持更新多Skeleton，目前测试写死了一个??（再次来看的时候已经不知道什么意思了，再看看吧）
+				// 这里需要注意的是，后期应该是支持更新多Skeleton，目前测试写死了一个??（再次来看的时候已经不知道什么意思了.....再看看吧）
 				if (nullptr == gdi_skeleton) {
 					for (int a = 0; a < cache_update_size; a++) {
 						TrackNodeCache *tnc = cache_update[a];
@@ -894,12 +894,15 @@ void AnimationPlayer::_animation_update_transforms() {
 				}
 				// 存在找不到skeleton的情况，仍然可能为空
 				if (nullptr == gdi_skeleton) {
-					OS::get_singleton()->print("[GDI]warnning, couldn't find valid skeleton");
+					OS::get_singleton()->print("[GDI]warnning, couldn't find valid skeleton\n");
 					continue;
 				}
 
 				if (nullptr == gdi_scene_root) {
 					gdi_scene_root = nc->spatial->get_tree()->get_edited_scene_root();
+					if (nullptr == gdi_scene_root) {
+						gdi_scene_root = nc->spatial->get_tree()->get_current_scene();
+					}
 					gdi_skeleton->gdi_set_editor_scene_root(gdi_scene_root);
 				}
 				auto name = nc->spatial->get_name();
