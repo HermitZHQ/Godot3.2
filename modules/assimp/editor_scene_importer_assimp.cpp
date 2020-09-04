@@ -44,6 +44,7 @@
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
 #include <assimp/LogStream.hpp>
+#include "thirdparty/assimp/code/FBX/FBXCommon.h"
 
 // move into assimp
 aiBone *get_bone_by_name(const aiScene *scene, aiString bone_name) {
@@ -317,6 +318,7 @@ aiBone* EditorSceneImporterAssimp::gdi_find_bone_from_stack(ImportState &state, 
 Spatial *
 EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene, const uint32_t p_flags, int p_bake_fps,
 		const int32_t p_max_bone_weights) {
+
 	ERR_FAIL_COND_V(scene == NULL, NULL);
 
 	ImportState state;
@@ -572,10 +574,9 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				// 注释点：这里要格外注意，有些节点会因为有mesh，而被转换为meshInstance，之前的Spatial节点会被删除，且同名的话会被加上2，3这样的后缀
 				MeshInstance *mesh = create_mesh(state, assimp_node, node_name, parent_node, node_transform);
 				// 出现这种情况时，应该更新所有skeleton中保存的节点信息，否则无法对该mesh进行实时的更新
-				for (auto e = state.armature_skeletons.front(); e; e = e->next()) {
-					if (!e->value()->gdi_update_mesh_anim_node(node_name, mesh->get_name())) {
-						print_error("[GDI]assimp update mesh anim node failed");
-					}
+				auto e = state.armature_skeletons.front();
+				if (!e->value()->gdi_update_mesh_anim_node(node_name, mesh->get_name())) {
+					printf("[GDI]assimp update mesh anim node failed, mesh[%S], should not happen\n", String(mesh->get_name()));
 				}
 
 				if (mesh) {
@@ -665,21 +666,21 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	return state.root;
 }
 
-void EditorSceneImporterAssimp::gdi_create_anim_node_from_scene(const aiScene *scene, Skeleton::NodeAnim **root)
-{
+void EditorSceneImporterAssimp::gdi_create_anim_node_from_scene(const aiScene *scene, Skeleton::NodeAnim **root) {
 	*root = new Skeleton::NodeAnim();
 	(*root)->name = AssimpUtils::get_assimp_string(scene->mRootNode->mName);
 	(*root)->parent = nullptr;
 	(*root)->local_transform = AssimpUtils::assimp_matrix_transform(scene->mRootNode->mTransformation);
 
-	for (int i = 0; i < scene->mRootNode->mNumChildren; ++i)
-	{
+	for (int i = 0; i < scene->mRootNode->mNumChildren; ++i) {
 		(*root)->childs.push_back(gdi_create_anim_nodes(scene, scene->mRootNode->mChildren[i], *root));
 	}
 }
 
-Skeleton::NodeAnim* EditorSceneImporterAssimp::gdi_create_anim_nodes(const aiScene *scene, const aiNode *node, Skeleton::NodeAnim *parent)
-{
+Skeleton::NodeAnim* EditorSceneImporterAssimp::gdi_create_anim_nodes(const aiScene *scene,
+	const aiNode *node,
+	Skeleton::NodeAnim *parent) {
+
 	Skeleton::NodeAnim *animNode = new Skeleton::NodeAnim;
 	animNode->name = AssimpUtils::get_assimp_string(node->mName);
 	animNode->parent = parent;
@@ -689,10 +690,10 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::gdi_create_anim_nodes(const aiSce
 	animNode->mesh_num = animNode->is_mesh ? node->mNumMeshes : 0;
 	animNode->local_transform = AssimpUtils::assimp_matrix_transform(node->mTransformation);
 
-	if (node->mName == aiString("Dummy33_end")) {
-		int i = 0;
-		++i; 
-	}
+	//if (node->mName == aiString("Dummy33_end")) {
+	//	int i = 0;
+	//	++i;
+	//}
 
 	// default to use animation 0, for now(todo)
 	if (scene->mNumAnimations > 0) {
@@ -709,8 +710,7 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::gdi_create_anim_nodes(const aiSce
 		}
 	}
 
-	for (int i = 0; i < node->mNumChildren; ++i)
-	{
+	for (int i = 0; i < node->mNumChildren; ++i) {
 		auto childNode = gdi_create_anim_nodes(scene, node->mChildren[i], animNode);
 		animNode->childs.push_back(childNode);
 	}
@@ -899,7 +899,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	String name = AssimpUtils::get_anim_string_from_assimp(anim->mName);
 	// 修改点：尝试根据不同mesh id，改变不同的anim mesh track name
 	aiMesh *mesh = state.assimp_scene->mMeshes[mesh_id];
-	name = name + "-" + "tracks-" + mesh->mName.data + "-" + itos(mesh_id);
+	//name = name + "-" + "tracks-" + mesh->mName.data + "-" + itos(mesh_id);
 
 	if (name == String()) {
 		name = "Animation " + itos(p_animation_index + 1);
@@ -923,9 +923,15 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	}
 
 	Ref<Animation> animation;
-	animation.instance();
-	animation->set_name(name);
-	animation->set_length(anim->mDuration / ticks_per_second);
+	bool anim_existed_flag = state.animation_player->has_animation(name);
+	if (!anim_existed_flag) {
+		animation.instance();
+		animation->set_name(name);
+		animation->set_length(anim->mDuration / ticks_per_second);
+	}
+	else {
+		animation = state.animation_player->get_animation(name);
+	}
 
 	if (name.begins_with("loop") || name.ends_with("loop") || name.begins_with("cycle") || name.ends_with("cycle")) {
 		animation->set_loop(true);
@@ -944,7 +950,14 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	for (size_t i = 0; i < anim->mNumChannels; i++) {
 		const aiNodeAnim *track = anim->mChannels[i];
 		String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
-		aiBone *bone = gdi_find_bone_from_stack(state, track->mNodeName);
+		// check magic node
+		bool magic_flag = false;
+		int magic_pos = node_name.find(Assimp::FBX::MAGIC_NODE_TAG.c_str());
+		if (-1 != magic_pos) {
+			magic_flag = true;
+			node_name = node_name.substr(0, magic_pos);
+		}
+		aiBone *bone = gdi_find_bone_from_stack(state, magic_flag ? aiString(node_name.ascii().get_data()) : track->mNodeName);
 
 		if (bone) {
 			// get skeleton by bone
@@ -960,6 +973,14 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	for (size_t i = 0; i < anim->mNumChannels; i++) {
 		const aiNodeAnim *track = anim->mChannels[i];
 		String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
+		// check magic node
+		bool magic_flag = false;
+		int magic_pos = node_name.find(Assimp::FBX::MAGIC_NODE_TAG.c_str());
+		if (-1 != magic_pos) {
+			magic_flag = true;
+			node_name = node_name.substr(0, magic_pos);
+		}
+
 		print_verbose("track name import: " + node_name);
 		if (track->mNumRotationKeys == 0 && track->mNumPositionKeys == 0 && track->mNumScalingKeys == 0) {
 			continue; //do not bother
@@ -974,7 +995,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		// Import skeleton bone animation for this track
 		// Any bone will do, no point in processing more than just what is in the skeleton
 		{
-			bone = get_bone_from_stack(state, track->mNodeName);
+			bone = get_bone_from_stack(state, magic_flag ? aiString(node_name.ascii().get_data()) : track->mNodeName);
 
 			if (bone) {
 #ifndef GDI_ENABLE_ASSIMP_MODIFICATION
@@ -1004,7 +1025,9 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		// check if node exists, if it does then also apply animation track for node and bones above are all handled.
 		// this is now inclusive animation handling so that
 		// we import all the data and do not miss anything.
-		if (allocated_node) {
+		// 公共非BoneTrack只添加第一次
+		// 因为加入了非Bone的Track支持，所以这里需要判断一下bone，获取不到的才添加
+		if (allocated_node /*&& !bone && !anim_existed_flag*/) {
 			node_path = state.root->get_path_to(allocated_node);
 
 			if (node_path != NodePath()) {
@@ -1071,7 +1094,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		}
 	}
 
-	if (animation->get_track_count()) {
+	if (animation->get_track_count() && !anim_existed_flag) {
 		state.animation_player->add_animation(name, animation);
 	}
 }
@@ -1784,7 +1807,7 @@ void EditorSceneImporterAssimp::_generate_node(
 	// is this an armature
 	// parent null
 	// and this is the first bone :)
-// 	if (parent_bone == NULL && current_bone) {		
+// 	if (parent_bone == NULL && current_bone) {
 // 		state.armature_nodes.push_back(assimp_node->mParent);
 // 		print_verbose("found valid armature: " + parent_name);
 // 	}
@@ -1817,6 +1840,7 @@ void EditorSceneImporterAssimp::_generate_node(
 			newMeshNode->mParent = parent;
 			newMeshNode->mNumChildren = 0;
 			aiString name = assimp_node->mName;
+			name = mesh->mName;
 			name.Append("_ArmatureNode");
 			newMeshNode->mName = name;
 			newMeshNode->mNumMeshes = 0;

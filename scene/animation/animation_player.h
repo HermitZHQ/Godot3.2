@@ -262,6 +262,7 @@ private:
 	void _animation_process_data(PlaybackData &cd, float p_delta, float p_blend, bool p_seeked, bool p_started);
 	void _animation_process2(float p_delta, bool p_started);
 	void _animation_update_transforms();
+	void _gdi_animation_get_update_skeleton_vec();
 	void _animation_process(float p_delta);
 
 	void _node_removed(Node *p_node);
@@ -382,6 +383,8 @@ public:
 private:
 	bool gdi_play_all_anim_flag;
 	bool gdi_play_all_anim_loop_flag;
+	Node *gdi_scene_root;
+	Vector<Skeleton*> gdi_update_skeleton_vec;
 };
 
 VARIANT_ENUM_CAST(AnimationPlayer::AnimationProcessMode);

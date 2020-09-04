@@ -877,10 +877,11 @@ void Skeleton::set_bone_pose(int p_bone, const Transform &p_pose) {
 	// 修改点：同时更新animNode的tranfrom（local和global）
 	// 错误：经过测试后发现不能在这里进行更新global，因为这里所有的channels没有更新完毕，这样的话有些父节点的local trans就没有更新
 	// 这里只能更新对应nodeAnim的local trans
-	if (bones.write[p_bone].name == "weapon sub") {
-		int i = 0;
-		++i;
-	}
+	//if (bones.write[p_bone].name == "weapon sub") {
+	//	int i = 0;
+	//	++i;
+	//}
+
 	if (nullptr == bones.write[p_bone].gdi_node_anim) {
 		NodeAnim *root = (NodeAnim*)gdi_get_anim_root_node_addr();
 		bones.write[p_bone].gdi_node_anim = (nullptr == root) ? nullptr : gdi_find_anim_node_by_name(root, bones.write[p_bone].name);
@@ -936,15 +937,13 @@ void Skeleton::gdi_set_anim_root_node_addr(int64_t addr) {
 		node->node_id = startId++;
 		animNodeVec.push_back(node);
 
-		for (int i = 0; i < node->childs.size(); ++i)
-		{
+		for (int i = 0; i < node->childs.size(); ++i) {
 			gen_anim_node_tree_id_func(node->childs[i], startId, animNodeVec);
 		}
 	};
 	unsigned int Id = 0;
 	gdi_anim_node_save_vec.clear();
-	if (gdi_anim_node_root)
-	{
+	if (gdi_anim_node_root) {
 		gen_anim_node_tree_id_func(gdi_anim_node_root, Id, gdi_anim_node_save_vec);
 	}
 }

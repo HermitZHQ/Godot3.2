@@ -286,6 +286,18 @@ void AnimationPlayer::_ensure_node_caches(AnimationData *p_anim) {
 			p_anim->node_cache[i]->spatial = Object::cast_to<Spatial>(child);
 			// cache skeleton
 			p_anim->node_cache[i]->skeleton = Object::cast_to<Skeleton>(child);
+			// gdi cache update skeleton vec
+			if (nullptr == gdi_scene_root && nullptr != p_anim->node_cache[i]->spatial) {
+				gdi_scene_root = p_anim->node_cache[i]->spatial->get_tree()->get_edited_scene_root();
+				if (nullptr == gdi_scene_root) {
+					gdi_scene_root = p_anim->node_cache[i]->spatial->get_tree()->get_current_scene();
+				}
+			}
+			if (p_anim->node_cache[i]->skeleton && -1 == gdi_update_skeleton_vec.find(p_anim->node_cache[i]->skeleton)) {
+				gdi_update_skeleton_vec.push_back(p_anim->node_cache[i]->skeleton);
+				p_anim->node_cache[i]->skeleton->gdi_set_editor_scene_root(gdi_scene_root);
+			}
+
 			if (p_anim->node_cache[i]->skeleton) {
 				if (a->track_get_path(i).get_subname_count() == 1) {
 					StringName bone_name = a->track_get_path(i).get_subname(0);
@@ -859,10 +871,6 @@ void AnimationPlayer::_animation_process2(float p_delta, bool p_started) {
 
 void AnimationPlayer::_animation_update_transforms() {
 	{
-#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
-		Skeleton *gdi_skeleton = nullptr;
-		Node *gdi_scene_root = nullptr;
-#endif
 		Transform t;
 		for (int i = 0; i < cache_update_size; i++) {
 
@@ -878,35 +886,22 @@ void AnimationPlayer::_animation_update_transforms() {
 
 			} else if (nc->spatial) {
 
-				nc->spatial->set_transform(t);
+				nc->spatial->set_transform(t);  
 
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
-				// 修改点：确保非Bone的channel节点也必须进行更新，否则动画不能完全正常
-				// 这里需要注意的是，后期应该是支持更新多Skeleton，目前测试写死了一个??（再次来看的时候已经不知道什么意思了.....再看看吧）
-				if (nullptr == gdi_skeleton) {
-					for (int a = 0; a < cache_update_size; a++) {
-						TrackNodeCache *tnc = cache_update[a];
-						if (tnc->skeleton) {
-							gdi_skeleton = tnc->skeleton;
-							break;
-						}
-					}
-				}
+// 				_gdi_animation_get_update_skeleton_vec();
+				
 				// 存在找不到skeleton的情况，仍然可能为空
-				if (nullptr == gdi_skeleton) {
+				if (0 == gdi_update_skeleton_vec.size()) {
 					OS::get_singleton()->print("[GDI]warnning, couldn't find valid skeleton\n");
 					continue;
 				}
 
-				if (nullptr == gdi_scene_root) {
-					gdi_scene_root = nc->spatial->get_tree()->get_edited_scene_root();
-					if (nullptr == gdi_scene_root) {
-						gdi_scene_root = nc->spatial->get_tree()->get_current_scene();
-					}
-					gdi_skeleton->gdi_set_editor_scene_root(gdi_scene_root);
-				}
 				auto name = nc->spatial->get_name();
-				gdi_skeleton->gdi_set_none_bone_pose(name, t);
+				int size = gdi_update_skeleton_vec.size();
+				for (int i = 0; i < size; ++i) {
+					gdi_update_skeleton_vec[i]->gdi_set_none_bone_pose(name, t);
+				}
 #endif
 			}
 		}
@@ -972,6 +967,25 @@ void AnimationPlayer::_animation_update_transforms() {
 	}
 
 	cache_update_bezier_size = 0;
+}
+
+void AnimationPlayer::_gdi_animation_get_update_skeleton_vec() {
+
+	if (0 != gdi_update_skeleton_vec.size()) {
+		return;
+	}
+
+	for (int i = 0; i < cache_update_size; i++) {
+
+		TrackNodeCache *nc = cache_update[i];
+
+		if (nc->skeleton) {
+			int res = gdi_update_skeleton_vec.find(nc->skeleton);
+			if (-1 == res) {
+				gdi_update_skeleton_vec.push_back(nc->skeleton);
+			}
+		}
+	}
 }
 
 void AnimationPlayer::_animation_process(float p_delta) {
@@ -2051,6 +2065,8 @@ AnimationPlayer::AnimationPlayer() {
 	// 修改点：
 	gdi_play_all_anim_flag = false;
 	gdi_play_all_anim_loop_flag = false;
+	gdi_scene_root = nullptr;
+	gdi_update_skeleton_vec.clear();
 }
 
 AnimationPlayer::~AnimationPlayer() {
