@@ -296,6 +296,7 @@ void AnimationPlayer::_ensure_node_caches(AnimationData *p_anim) {
 			if (p_anim->node_cache[i]->skeleton && -1 == gdi_update_skeleton_vec.find(p_anim->node_cache[i]->skeleton)) {
 				gdi_update_skeleton_vec.push_back(p_anim->node_cache[i]->skeleton);
 				p_anim->node_cache[i]->skeleton->gdi_set_editor_scene_root(gdi_scene_root);
+				gdi_update_skeleton_size = gdi_update_skeleton_vec.size();
 			}
 
 			if (p_anim->node_cache[i]->skeleton) {
@@ -872,6 +873,10 @@ void AnimationPlayer::_animation_process2(float p_delta, bool p_started) {
 void AnimationPlayer::_animation_update_transforms() {
 	{
 		Transform t;
+		static int iTest = 0;
+		static int iTest1 = 0;
+		static int iTest2 = 0;
+
 		for (int i = 0; i < cache_update_size; i++) {
 
 			TrackNodeCache *nc = cache_update[i];
@@ -880,27 +885,32 @@ void AnimationPlayer::_animation_update_transforms() {
 
 			t.origin = nc->loc_accum;
 			t.basis.set_quat_scale(nc->rot_accum, nc->scale_accum);
+
 			if (nc->skeleton && nc->bone_idx >= 0) {
 
-				nc->skeleton->set_bone_pose(nc->bone_idx, t);
+				if (0 == iTest2) {
+					nc->skeleton->set_bone_pose(nc->bone_idx, t);
+				}
 
 			} else if (nc->spatial) {
 
-				nc->spatial->set_transform(t);  
+				if (0 == iTest1) {
+					nc->spatial->set_transform(t);
+				}
 
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
-// 				_gdi_animation_get_update_skeleton_vec();
 				
 				// 存在找不到skeleton的情况，仍然可能为空
 				if (0 == gdi_update_skeleton_vec.size()) {
-					OS::get_singleton()->print("[GDI]warnning, couldn't find valid skeleton\n");
+					OS::get_singleton()->print("[GDI-anim_player]warnning, couldn't find valid skeleton\n");
 					continue;
 				}
 
 				auto name = nc->spatial->get_name();
-				int size = gdi_update_skeleton_vec.size();
-				for (int i = 0; i < size; ++i) {
-					gdi_update_skeleton_vec[i]->gdi_set_none_bone_pose(name, t);
+				for (int j = 0; j < gdi_update_skeleton_size; ++j) {
+					if (0 == iTest) {
+						gdi_update_skeleton_vec[j]->gdi_set_none_bone_pose(name, t);
+					}
 				}
 #endif
 			}
@@ -967,25 +977,6 @@ void AnimationPlayer::_animation_update_transforms() {
 	}
 
 	cache_update_bezier_size = 0;
-}
-
-void AnimationPlayer::_gdi_animation_get_update_skeleton_vec() {
-
-	if (0 != gdi_update_skeleton_vec.size()) {
-		return;
-	}
-
-	for (int i = 0; i < cache_update_size; i++) {
-
-		TrackNodeCache *nc = cache_update[i];
-
-		if (nc->skeleton) {
-			int res = gdi_update_skeleton_vec.find(nc->skeleton);
-			if (-1 == res) {
-				gdi_update_skeleton_vec.push_back(nc->skeleton);
-			}
-		}
-	}
 }
 
 void AnimationPlayer::_animation_process(float p_delta) {
@@ -2067,6 +2058,7 @@ AnimationPlayer::AnimationPlayer() {
 	gdi_play_all_anim_loop_flag = false;
 	gdi_scene_root = nullptr;
 	gdi_update_skeleton_vec.clear();
+	gdi_update_skeleton_size = 0;
 }
 
 AnimationPlayer::~AnimationPlayer() {

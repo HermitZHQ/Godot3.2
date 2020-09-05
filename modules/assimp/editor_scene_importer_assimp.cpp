@@ -790,7 +790,7 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 				// 修改点：取消此矩阵计算，意义不明
 				// 此矩阵的注释，在目前看来是必须的，否则会导致后面的骨骼动画不正常
 				// 此处修改，应该只会影响到骨骼动画流程，不会影响到其他地方
-				xform = skeleton->get_bone_pose(skeleton_bone).inverse() * xform;
+// 				xform = skeleton->get_bone_pose(skeleton_bone).inverse() * xform;// ?????加入这个后，计算的结果不一致了，不能加...
 #ifndef GDI_ENABLE_ASSIMP_MODIFICATION
 				xform = skeleton->get_bone_pose(skeleton_bone).inverse() * xform;
 #endif
@@ -894,11 +894,16 @@ void EditorSceneImporterAssimp::RegenerateBoneStack(ImportState &state, aiMesh *
 void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_animation_index, int p_bake_fps, unsigned int mesh_id) {
 
 	ERR_FAIL_INDEX(p_animation_index, (int)state.assimp_scene->mNumAnimations);
+	// for test
+	//if (0 != mesh_id) {
+	//	return;
+	//}
 
 	const aiAnimation *anim = state.assimp_scene->mAnimations[p_animation_index];
 	String name = AssimpUtils::get_anim_string_from_assimp(anim->mName);
 	// 修改点：尝试根据不同mesh id，改变不同的anim mesh track name
 	aiMesh *mesh = state.assimp_scene->mMeshes[mesh_id];
+	// 多mesh轨道分离操作，使用不同的anim名称，就可以建立多条轨道
 	//name = name + "-" + "tracks-" + mesh->mName.data + "-" + itos(mesh_id);
 
 	if (name == String()) {
@@ -1027,7 +1032,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		// we import all the data and do not miss anything.
 		// 公共非BoneTrack只添加第一次
 		// 因为加入了非Bone的Track支持，所以这里需要判断一下bone，获取不到的才添加
-		if (allocated_node /*&& !bone && !anim_existed_flag*/) {
+		if (allocated_node && !bone && !anim_existed_flag) {
 			node_path = state.root->get_path_to(allocated_node);
 
 			if (node_path != NodePath()) {
@@ -1653,6 +1658,7 @@ EditorSceneImporterAssimp::create_mesh(ImportState &state, const aiNode *assimp_
 						print_verbose("Set bind bone: mesh: " + itos(mesh_index) + " bone index: " + itos(id));
 						Transform t = AssimpUtils::assimp_matrix_transform(iterBone->mOffsetMatrix);
 
+						// 注释点：add_bind会调用set_bind_pose，也就是offset mat
 						skin->add_bind(bind_count, t);
 						skin->set_bind_bone(bind_count, id);
 						bind_count++;

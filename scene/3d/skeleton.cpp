@@ -514,7 +514,7 @@ void Skeleton::_notification(int p_what) {
 
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 			if (gdi_anim_node_root) {
-				gdi_update_all_none_bone_anim_node(gdi_anim_node_root);
+// 				gdi_update_all_none_bone_anim_node(gdi_anim_node_root);
 			}
 #endif
 
@@ -890,17 +890,6 @@ void Skeleton::set_bone_pose(int p_bone, const Transform &p_pose) {
 	NodeAnim *nodeAnim = bones.write[p_bone].gdi_node_anim;
 	if (nodeAnim /*&& nodeAnim->channelId != -1*/) {
 		nodeAnim->local_transform = p_pose;
-
-		// 更新global trans
-// 		nodeAnim->globalTransform = nodeAnim->localTransform;
-// 		NodeAnim *parent = nodeAnim->parent;
-// 		while (parent)
-// 		{
-// 			nodeAnim->globalTransform = parent->localTransform * nodeAnim->globalTransform;
-// 			parent = parent->parent;
-// 		}
-// 
-// 		bones.write[p_bone].pose_global = nodeAnim->globalTransform;
 	}
 
 	if (is_inside_tree()) {
