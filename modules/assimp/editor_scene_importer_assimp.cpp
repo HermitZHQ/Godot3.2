@@ -107,7 +107,7 @@ Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_f
 	importer.SetPropertyBool(AI_CONFIG_PP_FD_REMOVE, true);
 	// Cannot remove pivot points because the static mesh will be in the wrong place
 	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
-	importer.SetPropertyBool(AI_CONFIG_GLOBAL_SCALE_FACTOR_KEY, true);
+// 	importer.SetPropertyBool(AI_CONFIG_GLOBAL_SCALE_FACTOR_KEY, true);
 	int32_t max_bone_weights = 4;
 	//if (p_flags & IMPORT_ANIMATION_EIGHT_WEIGHTS) {
 	//	const int eight_bones = 8;
@@ -356,6 +356,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 		// 注释点：根据scene重新获取所有bone节点，存入stack_bone下
 		RegenerateBoneStack(state);
 
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 		// 修改点：创建animNode的所有节点链表用于动画寻找父节点
 		Skeleton::NodeAnim *nodeAnimRoot = nullptr;
 		gdi_create_anim_node_from_scene(scene, &nodeAnimRoot);
@@ -373,6 +374,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				}
 			}
 		}
+#endif
 
 		Node *last_valid_parent = NULL;
 
@@ -398,6 +400,8 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 
 			// retrieve this node bone
 			aiBone *bone = get_bone_from_stack(state, element_assimp_node->mName);
+
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 			// 修改点：如果mesh不匹配的话，bone应该重置为0
 			// TODO：这里修改的不完善，应该还需要匹配mesh是否一致（因为bone也存在重名的情况）
 			// 总结：这里其实不需要去get_bone，因为这个阶段的bone获取没有意义，可能是错误的
@@ -405,9 +409,8 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			// 此处的改动需要后续流程的支持，比如非BoneTrack的改动支持，以及Skeleton中update所有非bone的animNode的支持
 			bone = (element_assimp_node->mNumMeshes == 0) ? nullptr : bone;
 			bone = nullptr;
+#endif
 
-			// 修改点：尝试设置任意节点为skeleton，不要给其增加父节点
-// 			bool bSkeletonFlag = false;
 			if (state.light_cache.has(node_name)) {
 				spatial = create_light(state, node_name, transform);
 			} else if (state.camera_cache.has(node_name)) {
@@ -416,11 +419,13 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				// create skeleton
 				print_verbose("Making skeleton: " + node_name);
 				Skeleton *skeleton = memnew(Skeleton);
-				skeleton->gdi_set_anim_root_node_addr((int64_t)nodeAnimRoot);
-				//skeleton->set_name("just test");
 				spatial = skeleton;
+
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
+				skeleton->gdi_set_anim_root_node_addr((int64_t)nodeAnimRoot);
+#endif
+
 				if (!state.armature_skeletons.has(element_assimp_node)) {
-// 					bSkeletonFlag = true;
 					state.armature_skeletons.insert(element_assimp_node, skeleton);
 				}
 
@@ -459,10 +464,6 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 					parent_node->add_child(spatial);
 					spatial->set_owner(state.root);
 				}
-// 				else if (bSkeletonFlag) {
-// 					state.root->add_child(spatial);
-// // 					spatial->set_owner(state.root);
-// 				}
 				else {
 					// required - think about it root never has a parent yet is valid, anything else without a parent is not valid.
 				}
@@ -504,9 +505,9 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			aiNode *parent_node = bone_node->mParent;
 
 			String bone_name = AssimpUtils::get_anim_string_from_assimp(bone->mName);
-			if (armature_for_bone == NULL) {
-				ai_assert(0);
-			}
+			//if (armature_for_bone == NULL) {
+			//	ai_assert(0);
+			//}
 			ERR_CONTINUE_MSG(armature_for_bone == NULL, "Armature for bone invalid: " + bone_name);
 			Skeleton *skeleton = state.armature_skeletons[armature_for_bone];
 
@@ -527,7 +528,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				skeleton->set_bone_rest(boneIdx, pform);
 				skeleton->set_bone_pose(boneIdx, pform);
 
-				ai_assert(skeleton->get_bone_count() <= 110);
+				//ai_assert(skeleton->get_bone_count() <= 110);
 
 				if (parent_node != NULL) {
 					int parent_bone_id = skeleton->find_bone(AssimpUtils::get_anim_string_from_assimp(parent_node->mName));
@@ -575,7 +576,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				MeshInstance *mesh = create_mesh(state, assimp_node, node_name, parent_node, node_transform);
 				// 出现这种情况时，应该更新所有skeleton中保存的节点信息，否则无法对该mesh进行实时的更新
 				auto e = state.armature_skeletons.front();
-				if (!e->value()->gdi_update_mesh_anim_node(node_name, mesh->get_name())) {
+				if (nullptr != e && !e->value()->gdi_update_mesh_anim_node(node_name, mesh->get_name())) {
 					printf("[GDI]assimp update mesh anim node failed, mesh[%S], should not happen\n", String(mesh->get_name()));
 				}
 
@@ -621,6 +622,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	}
 
 	// ---------------------------------------Handle Animation infos
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 	if (p_flags & IMPORT_ANIMATION && scene->mNumAnimations) {
 
 			// 修改点：尝试不创建多anim，在同一anim下插入不同skeleton的track
@@ -648,6 +650,19 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				}
 			}
 	}
+#else
+	if (p_flags & IMPORT_ANIMATION && scene->mNumAnimations) {
+
+		state.animation_player = memnew(AnimationPlayer);
+		state.root->add_child(state.animation_player);
+		state.animation_player->set_owner(state.root);
+
+		for (uint32_t i = 0; i < scene->mNumAnimations; i++) {
+			_import_animation(state, i, p_bake_fps);
+		}
+	}
+#endif
+
 
 	//
 	// Cleanup operations
@@ -790,8 +805,8 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 				// 修改点：取消此矩阵计算，意义不明
 				// 此矩阵的注释，在目前看来是必须的，否则会导致后面的骨骼动画不正常
 				// 此处修改，应该只会影响到骨骼动画流程，不会影响到其他地方
-// 				xform = skeleton->get_bone_pose(skeleton_bone).inverse() * xform;// ?????加入这个后，计算的结果不一致了，不能加...
 #ifndef GDI_ENABLE_ASSIMP_MODIFICATION
+				// 加入此矩阵计算后会消除平移的效果
 				xform = skeleton->get_bone_pose(skeleton_bone).inverse() * xform;
 #endif
 
@@ -895,9 +910,9 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 
 	ERR_FAIL_INDEX(p_animation_index, (int)state.assimp_scene->mNumAnimations);
 	// for test
-	//if (0 != mesh_id) {
-	//	return;
-	//}
+	if (0 != mesh_id) {
+		return;
+	}
 
 	const aiAnimation *anim = state.assimp_scene->mAnimations[p_animation_index];
 	String name = AssimpUtils::get_anim_string_from_assimp(anim->mName);
@@ -986,6 +1001,12 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 			node_name = node_name.substr(0, magic_pos);
 		}
 
+		// for test
+		if (node_name.find("Finger") != -1) {
+			int i = 0;
+			++i;
+		}
+
 		print_verbose("track name import: " + node_name);
 		if (track->mNumRotationKeys == 0 && track->mNumPositionKeys == 0 && track->mNumScalingKeys == 0) {
 			continue; //do not bother
@@ -1042,7 +1063,13 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		}
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 		else if (bone == nullptr) {
-			printf("[GDI-Error:Skeleton]:Miss track[%s], can't find it in the normal node, mesh id[%d], track id[%d]\n", track->mNodeName.data, mesh_id, (int)i);
+			printf("[GDI-Error:Skeleton]:Miss track[%s], can't find it in the nodes vec, mesh id[%d], track id[%d]\n", track->mNodeName.data, mesh_id, (int)i);
+
+			// for test
+			if (String(track->mNodeName.data) == String("Bip001 L Finger1Nub")) {
+				int i = 0;
+				++i;
+			}
 
 			//String path = state.root->get_path_to(skeleton);
 			//path = "TestNoneBone";
@@ -1782,10 +1809,10 @@ void EditorSceneImporterAssimp::_generate_node(
 	state.nodes.push_back(assimp_node);
 	String parent_name = AssimpUtils::get_assimp_string(assimp_node->mParent->mName);
 
-	if (assimp_node->mName == aiString("Dummy33_end")) {
-		int i = 0;
-		++i;
-	}
+	//if (assimp_node->mName == aiString("Dummy33_end")) {
+	//	int i = 0;
+	//	++i;
+	//}
 
 	// please note
 	// duplicate bone names exist
@@ -1795,28 +1822,16 @@ void EditorSceneImporterAssimp::_generate_node(
 	aiBone *parent_bone = get_bone_by_name(state.assimp_scene, assimp_node->mParent->mName);
 	aiBone *current_bone = get_bone_by_name(state.assimp_scene, assimp_node->mName);
 
-	// 测试点：我们应该检测到最root节点，如果只是parent_bone为空，但是上层父节点还有bone不为空的话也不能算为armature节点
-// 	if (nullptr == parent_bone && current_bone)
-// 	{
-// 		aiNode *parentNode = assimp_node->mParent;
-// 		while (parentNode)
-// 		{
-// 			parent_bone = get_bone_by_name(state.assimp_scene, parentNode->mName);
-// 			if (nullptr != parent_bone) {
-// 				break;
-// 			}
-// 
-// 			parentNode = parentNode->mParent;
-// 		}
-// 	}
+#ifndef GDI_ENABLE_ASSIMP_MODIFICATION
 
 	// is this an armature
 	// parent null
 	// and this is the first bone :)
-// 	if (parent_bone == NULL && current_bone) {
-// 		state.armature_nodes.push_back(assimp_node->mParent);
-// 		print_verbose("found valid armature: " + parent_name);
-// 	}
+	if (parent_bone == NULL && current_bone) {
+		state.armature_nodes.push_back(assimp_node->mParent);
+		print_verbose("found valid armature: " + parent_name);
+	}
+#else
 
 	// 由于需要对多Mesh对应一个animation player做处理，而不同mesh的bone对应顺序并不一样，必须单独分开处理，所以Armature可以创立到有mesh的节点下
 	if (/*state.armature_nodes.size() == 0 &&*/ assimp_node->mNumMeshes > 0 /*&& assimp_node->mName == aiString("Bip001")*/) {
@@ -1852,12 +1867,13 @@ void EditorSceneImporterAssimp::_generate_node(
 			newMeshNode->mNumMeshes = 0;
 			newMeshNode->mTransformation = aiMatrix4x4();
 			parent->addChildren(1, &newMeshNode);
-	
+
 			state.armature_nodes.push_back((aiNode *const)newMeshNode);
 			state.gdi_armature_index_map.insert((aiNode *const)newMeshNode, assimp_node->mMeshes[i]);
 		}
 		print_verbose("use root node be the only one armature node");
 	}
+#endif
 
 	for (size_t i = 0; i < assimp_node->mNumChildren; i++) {
 		_generate_node(state, assimp_node->mChildren[i]);

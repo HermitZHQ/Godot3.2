@@ -514,7 +514,7 @@ void Skeleton::_notification(int p_what) {
 
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 			if (gdi_anim_node_root) {
-// 				gdi_update_all_none_bone_anim_node(gdi_anim_node_root);
+				gdi_update_all_none_bone_anim_node(gdi_anim_node_root);
 			}
 #endif
 
@@ -582,11 +582,15 @@ void Skeleton::_notification(int p_what) {
 				for (uint32_t i = 0; i < bind_count; i++) {
 					uint32_t bone_index = E->get()->skin_bone_indices_ptrs[i];
 					ERR_CONTINUE(bone_index >= (uint32_t)len);
+#ifndef GDI_ENABLE_ASSIMP_MODIFICATION
+					vs->skeleton_bone_set_transform(skeleton, i, bonesptr[bone_index].pose_global * skin->get_bind_pose(i));
+#else
 					// 测试点：查看这里的骨骼transform影响
 					auto pose = skin->get_bind_pose(i);
-					auto globalPose = bonesptr[bone_index].pose_global;
-					auto finalPose = globalPose * pose;
-					vs->skeleton_bone_set_transform(skeleton, i, finalPose);
+					auto global_pose = bonesptr[bone_index].pose_global;
+					auto final_pose = global_pose * pose;
+					vs->skeleton_bone_set_transform(skeleton, i, final_pose);
+#endif
 				}
 			}
 
@@ -693,10 +697,10 @@ void Skeleton::_gdi_find_anim_node_recursive(NodeAnim *nodeAnim, String boneName
 
 void Skeleton::gdi_update_all_none_bone_anim_node(NodeAnim *node) {
 
-	if (node->name == String("renwu_1")) {
-		int i = 0;
-		++i;
-	}
+	//if (node->name == String("renwu_1")) {
+	//	int i = 0;
+	//	++i;
+	//}
 
 // 	if (!node->is_bone) {
 		node->global_transform = node->local_transform;

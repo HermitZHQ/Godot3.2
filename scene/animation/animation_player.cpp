@@ -286,6 +286,7 @@ void AnimationPlayer::_ensure_node_caches(AnimationData *p_anim) {
 			p_anim->node_cache[i]->spatial = Object::cast_to<Spatial>(child);
 			// cache skeleton
 			p_anim->node_cache[i]->skeleton = Object::cast_to<Skeleton>(child);
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 			// gdi cache update skeleton vec
 			if (nullptr == gdi_scene_root && nullptr != p_anim->node_cache[i]->spatial) {
 				gdi_scene_root = p_anim->node_cache[i]->spatial->get_tree()->get_edited_scene_root();
@@ -298,6 +299,7 @@ void AnimationPlayer::_ensure_node_caches(AnimationData *p_anim) {
 				p_anim->node_cache[i]->skeleton->gdi_set_editor_scene_root(gdi_scene_root);
 				gdi_update_skeleton_size = gdi_update_skeleton_vec.size();
 			}
+#endif
 
 			if (p_anim->node_cache[i]->skeleton) {
 				if (a->track_get_path(i).get_subname_count() == 1) {
@@ -873,9 +875,6 @@ void AnimationPlayer::_animation_process2(float p_delta, bool p_started) {
 void AnimationPlayer::_animation_update_transforms() {
 	{
 		Transform t;
-		static int iTest = 0;
-		static int iTest1 = 0;
-		static int iTest2 = 0;
 
 		for (int i = 0; i < cache_update_size; i++) {
 
@@ -888,29 +887,23 @@ void AnimationPlayer::_animation_update_transforms() {
 
 			if (nc->skeleton && nc->bone_idx >= 0) {
 
-				if (0 == iTest2) {
-					nc->skeleton->set_bone_pose(nc->bone_idx, t);
-				}
+				nc->skeleton->set_bone_pose(nc->bone_idx, t);
 
 			} else if (nc->spatial) {
 
-				if (0 == iTest1) {
-					nc->spatial->set_transform(t);
-				}
-
-#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
+#ifndef GDI_ENABLE_ASSIMP_MODIFICATION
+				nc->spatial->set_transform(t);
+#else
 				
 				// 存在找不到skeleton的情况，仍然可能为空
 				if (0 == gdi_update_skeleton_vec.size()) {
-					OS::get_singleton()->print("[GDI-anim_player]warnning, couldn't find valid skeleton\n");
+					OS::get_singleton()->print("[GDI-anim_player]warning, couldn't find valid skeleton\n");
 					continue;
 				}
 
 				auto name = nc->spatial->get_name();
 				for (int j = 0; j < gdi_update_skeleton_size; ++j) {
-					if (0 == iTest) {
-						gdi_update_skeleton_vec[j]->gdi_set_none_bone_pose(name, t);
-					}
+					gdi_update_skeleton_vec[j]->gdi_set_none_bone_pose(name, t);
 				}
 #endif
 			}
