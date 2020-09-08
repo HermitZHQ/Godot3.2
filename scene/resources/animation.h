@@ -372,6 +372,9 @@ public:
 
 	Animation();
 	~Animation();
+
+private:
+	ImportFileFormat						gdi_import_file_format;
 };
 
 VARIANT_ENUM_CAST(Animation::TrackType);

@@ -278,11 +278,12 @@ public:
 	~Skeleton();
 
 private:
-	NodeAnim *gdi_anim_node_root;
-	int64_t gdi_anim_node_addr;
-	Vector<NodeAnim*> gdi_anim_node_save_vec;
-	Vector<NodeAnim*> gdi_anim_node_load_vec;
-	Node *gdi_editor_root;
+	NodeAnim						*gdi_anim_node_root;
+	int64_t							gdi_anim_node_addr;
+	Vector<NodeAnim*>				gdi_anim_node_save_vec;
+	Vector<NodeAnim*>				gdi_anim_node_load_vec;
+	Node							*gdi_editor_root;
+	ImportFileFormat				gdi_import_file_format;
 };
 
 #endif

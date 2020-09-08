@@ -125,6 +125,8 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 		set_bone_enabled(which, p_value);
 	else if (what == "pose")
 		set_bone_pose(which, p_value);
+	else if (what == "import_file_format")
+		gdi_import_file_format = (ImportFileFormat)((int)p_value);
 	// 修改点：增加属性存储
 	else if (what == "anim_node_name") {
 		_check_load_vec_func(pos);
@@ -217,6 +219,8 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 		r_ret = is_bone_enabled(which);
 	else if (what == "pose")
 		r_ret = get_bone_pose(which);
+	else if (what == "import_file_format")
+		r_ret = (int)gdi_get_import_file_format();
 	// 修改点：增加animNode相关属性存储
 	else if (what == "anim_node_name") {
 		r_ret = gdi_anim_node_save_vec.ptr()[pos]->name;
@@ -228,8 +232,7 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 			gdi_anim_node_save_vec.ptr()[pos]->parent->node_id :
 			-1));
 		// child ids
-		for (int i = 0; i < gdi_anim_node_save_vec.ptr()[pos]->childs.size(); ++i)
-		{
+		for (int i = 0; i < gdi_anim_node_save_vec.ptr()[pos]->childs.size(); ++i) {
 			id_vec.push_back(gdi_anim_node_save_vec.ptr()[pos]->childs[i]->node_id);
 		}
 
@@ -290,6 +293,9 @@ void Skeleton::_get_property_list(List<PropertyInfo> *p_list) const {
 
 		// 修改点：增加animNode相关属性
 		if (0 == i) {
+			// save import file format
+			p_list->push_back(PropertyInfo(Variant::INT, prep + "import_file_format"));
+
 			for (int a = 0; a < gdi_anim_node_save_vec.size(); ++a) {
 				NodeAnim *node = gdi_anim_node_save_vec[a];
 
@@ -369,9 +375,8 @@ void Skeleton::_notification(int p_what) {
 			VisualServer *vs = VisualServer::get_singleton();
 			Bone *bonesptr = bones.ptrw();
 			int len = bones.size();
-			ImportFileFormat import_file_format = gdi_get_import_file_format();
 
-			if (ImportFileFormat::ASSIMP_FBX == import_file_format) {
+			if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format) {
 				if (nullptr == gdi_anim_node_root) {
 					// 修改点：update所有非bone节点的global transform，否则有些节点不会转变
 					gdi_anim_node_root = (NodeAnim*)gdi_get_anim_root_node_addr();
@@ -430,7 +435,7 @@ void Skeleton::_notification(int p_what) {
 							}
 
 							// 修改点：尝试使用assimp-viewer的处理流程，它这里的处理流程意义不明，注释掉了原有处理流程
-							if (ImportFileFormat::DEFAULT == import_file_format) {
+							if (ImportFileFormat::DEFAULT == gdi_import_file_format) {
 								if (b.parent >= 0) {
 	
 									b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
@@ -439,7 +444,7 @@ void Skeleton::_notification(int p_what) {
 									b.pose_global = b.rest * pose;
 								}
 							}
-							else if (ImportFileFormat::ASSIMP_FBX == import_file_format) {
+							else if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format) {
 
 								NodeAnim *node = b.gdi_node_anim ? b.gdi_node_anim :
 									(gdi_anim_node_root ?
@@ -514,7 +519,7 @@ void Skeleton::_notification(int p_what) {
 				}
 			}
 
-			if (ImportFileFormat::ASSIMP_FBX == import_file_format && gdi_anim_node_root) {
+			if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format && gdi_anim_node_root) {
 				gdi_update_all_none_bone_anim_node(gdi_anim_node_root);
 			}
 
@@ -583,10 +588,10 @@ void Skeleton::_notification(int p_what) {
 					uint32_t bone_index = E->get()->skin_bone_indices_ptrs[i];
 					ERR_CONTINUE(bone_index >= (uint32_t)len);
 
-					if (ImportFileFormat::DEFAULT == import_file_format) {
+					if (ImportFileFormat::DEFAULT == gdi_import_file_format) {
 						vs->skeleton_bone_set_transform(skeleton, i, bonesptr[bone_index].pose_global * skin->get_bind_pose(i));
 					} 
-					else if (ImportFileFormat::ASSIMP_FBX == import_file_format) {
+					else if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format) {
 						// 测试点：查看这里的骨骼transform影响
 						auto pose = skin->get_bind_pose(i);
 						auto global_pose = bonesptr[bone_index].pose_global;
@@ -1289,6 +1294,7 @@ void Skeleton::_bind_methods() {
 Skeleton::Skeleton()
 	:gdi_anim_node_root(nullptr)
 	, gdi_anim_node_addr(0)
+	, gdi_import_file_format(ImportFileFormat::DEFAULT)
 {
 
 	dirty = false;

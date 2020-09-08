@@ -324,7 +324,11 @@ bool Animation::_set(const StringName &p_name, const Variant &p_value) {
 			}
 		} else
 			return false;
-	} else
+	}
+	else if (p_name == "import_file_format") {
+		gdi_import_file_format = ImportFileFormat((int)p_value);
+	}
+	 else
 		return false;
 
 	return true;
@@ -340,6 +344,8 @@ bool Animation::_get(const StringName &p_name, Variant &r_ret) const {
 		r_ret = loop;
 	else if (name == "step")
 		r_ret = step;
+	else if (name == "import_file_format")
+		r_ret = (int)gdi_get_import_file_format();
 	else if (name.begins_with("tracks/")) {
 
 		int track = name.get_slicec('/', 1).to_int();
@@ -624,6 +630,8 @@ void Animation::_get_property_list(List<PropertyInfo> *p_list) const {
 		p_list->push_back(PropertyInfo(Variant::BOOL, "tracks/" + itos(i) + "/enabled", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL));
 		p_list->push_back(PropertyInfo(Variant::ARRAY, "tracks/" + itos(i) + "/keys", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL));
 	}
+	// gdi
+	p_list->push_back(PropertyInfo(Variant::INT, "import_file_format"));
 }
 
 int Animation::add_track(TrackType p_type, int p_at_pos) {
@@ -3090,6 +3098,8 @@ Animation::Animation() {
 	step = 0.1;
 	loop = false;
 	length = 1;
+	// gdi
+	gdi_import_file_format = ImportFileFormat::DEFAULT;
 }
 
 Animation::~Animation() {

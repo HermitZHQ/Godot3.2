@@ -89,7 +89,11 @@ bool AnimationPlayer::_set(const StringName &p_name, const Variant &p_value) {
 			set_blend_time(from, to, time);
 		}
 
-	} else
+	}
+	else if (p_name == "import_file_format") {
+		gdi_import_file_format = (ImportFileFormat)((int)p_value);
+	}
+	else
 		return false;
 
 	return true;
@@ -131,7 +135,11 @@ bool AnimationPlayer::_get(const StringName &p_name, Variant &r_ret) const {
 		}
 
 		r_ret = array;
-	} else
+	}
+	else if (name == "import_file_format") {
+		r_ret = (int)gdi_get_import_file_format();
+	}
+	else
 		return false;
 
 	return true;
@@ -177,6 +185,7 @@ void AnimationPlayer::_get_property_list(List<PropertyInfo> *p_list) const {
 	}
 
 	p_list->push_back(PropertyInfo(Variant::ARRAY, "blend_times", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL));
+	p_list->push_back(PropertyInfo(Variant::INT, "import_file_format"));
 }
 
 void AnimationPlayer::advance(float p_time) {
@@ -287,7 +296,7 @@ void AnimationPlayer::_ensure_node_caches(AnimationData *p_anim) {
 			// cache skeleton
 			p_anim->node_cache[i]->skeleton = Object::cast_to<Skeleton>(child);
 
-			gdi_import_file_format = gdi_get_import_file_format();
+			//gdi_import_file_format = (Object::ImportFileFormat)gdi_get_import_file_format();
 			if (gdi_import_file_format == Skeleton::ASSIMP_FBX) {
 				// gdi cache update skeleton vec
 				if (nullptr == gdi_scene_root && nullptr != p_anim->node_cache[i]->spatial) {
