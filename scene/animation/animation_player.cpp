@@ -286,20 +286,22 @@ void AnimationPlayer::_ensure_node_caches(AnimationData *p_anim) {
 			p_anim->node_cache[i]->spatial = Object::cast_to<Spatial>(child);
 			// cache skeleton
 			p_anim->node_cache[i]->skeleton = Object::cast_to<Skeleton>(child);
-#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
-			// gdi cache update skeleton vec
-			if (nullptr == gdi_scene_root && nullptr != p_anim->node_cache[i]->spatial) {
-				gdi_scene_root = p_anim->node_cache[i]->spatial->get_tree()->get_edited_scene_root();
-				if (nullptr == gdi_scene_root) {
-					gdi_scene_root = p_anim->node_cache[i]->spatial->get_tree()->get_current_scene();
+
+			gdi_import_file_format = gdi_get_import_file_format();
+			if (gdi_import_file_format == Skeleton::ASSIMP_FBX) {
+				// gdi cache update skeleton vec
+				if (nullptr == gdi_scene_root && nullptr != p_anim->node_cache[i]->spatial) {
+					gdi_scene_root = p_anim->node_cache[i]->spatial->get_tree()->get_edited_scene_root();
+					if (nullptr == gdi_scene_root) {
+						gdi_scene_root = p_anim->node_cache[i]->spatial->get_tree()->get_current_scene();
+					}
+				}
+				if (p_anim->node_cache[i]->skeleton && -1 == gdi_update_skeleton_vec.find(p_anim->node_cache[i]->skeleton)) {
+					gdi_update_skeleton_vec.push_back(p_anim->node_cache[i]->skeleton);
+					p_anim->node_cache[i]->skeleton->gdi_set_editor_scene_root(gdi_scene_root);
+					gdi_update_skeleton_size = gdi_update_skeleton_vec.size();
 				}
 			}
-			if (p_anim->node_cache[i]->skeleton && -1 == gdi_update_skeleton_vec.find(p_anim->node_cache[i]->skeleton)) {
-				gdi_update_skeleton_vec.push_back(p_anim->node_cache[i]->skeleton);
-				p_anim->node_cache[i]->skeleton->gdi_set_editor_scene_root(gdi_scene_root);
-				gdi_update_skeleton_size = gdi_update_skeleton_vec.size();
-			}
-#endif
 
 			if (p_anim->node_cache[i]->skeleton) {
 				if (a->track_get_path(i).get_subname_count() == 1) {
@@ -397,11 +399,6 @@ void AnimationPlayer::_animation_process_animation(AnimationData *p_anim, float 
 				Error err = a->transform_track_interpolate(i, p_time, &loc, &rot, &scale);
 				//ERR_CONTINUE(err!=OK); //used for testing, should be removed
 
-				// 测试点：测试混合后的矩阵结果
-				//Transform t;
-				//t.origin = loc;
-				//t.basis.set_quat_scale(rot, scale);
-
 				if (err != OK)
 					continue;
 
@@ -412,11 +409,6 @@ void AnimationPlayer::_animation_process_animation(AnimationData *p_anim, float 
 					nc->loc_accum = loc;
 					nc->rot_accum = rot;
 					nc->scale_accum = scale;
-
-					// 测试点：测试混合后的矩阵结果
-					//Transform t;
-					//t.origin = nc->loc_accum;
-					//t.basis.set_quat_scale(rot, scale);
 
 				} else {
 
@@ -891,21 +883,22 @@ void AnimationPlayer::_animation_update_transforms() {
 
 			} else if (nc->spatial) {
 
-#ifndef GDI_ENABLE_ASSIMP_MODIFICATION
-				nc->spatial->set_transform(t);
-#else
-				
-				// 存在找不到skeleton的情况，仍然可能为空
-				if (0 == gdi_update_skeleton_vec.size()) {
-					OS::get_singleton()->print("[GDI-anim_player]warning, couldn't find valid skeleton\n");
-					continue;
-				}
+				if (ImportFileFormat::DEFAULT == gdi_import_file_format) {
+					nc->spatial->set_transform(t);
+				} 
+				else if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format){
+					// 存在找不到skeleton的情况，仍然可能为空
+					if (0 == gdi_update_skeleton_size) {
+						nc->spatial->set_transform(t);
+						//OS::get_singleton()->print("[GDI-anim_player]warning, couldn't find valid skeleton\n");
+						//continue;
+					}
 
-				auto name = nc->spatial->get_name();
-				for (int j = 0; j < gdi_update_skeleton_size; ++j) {
-					gdi_update_skeleton_vec[j]->gdi_set_none_bone_pose(name, t);
+					auto name = nc->spatial->get_name();
+					for (int j = 0; j < gdi_update_skeleton_size; ++j) {
+						gdi_update_skeleton_vec[j]->gdi_set_none_bone_pose(name, t);
+					}
 				}
-#endif
 			}
 		}
 	}
@@ -973,62 +966,6 @@ void AnimationPlayer::_animation_update_transforms() {
 }
 
 void AnimationPlayer::_animation_process(float p_delta) {
-
-	// 修改点：如果开启了播放全部，则播放全部后return，不处理单个
-	if (gdi_play_all_anim_flag) {
-		for (auto e = animation_set.front(); e; e = e->next()) {
-			auto anim_name = e->key();
-			auto v = e->value();
-
-			// 检测playback是否存在，不存在的话新建
-			auto res = gdi_playback_map.find(anim_name);
-			if (nullptr == res) {
-				Playback *pb = new Playback;
-				pb->assigned = anim_name;
-				pb->blend.clear();
-
-				PlaybackData pbd;
-				pbd.from = &v;
-				pbd.pos = 0;
-				pbd.speed_scale = 1.0;
-				pb->current = pbd;
-				pb->seeked = false;
-				pb->started = false;
-
-				gdi_playback_map.insert(anim_name, pb);
-			}
-			res = gdi_playback_map.find(anim_name);
-
-			end_reached = false;
-			end_notify = false;
-
-			// playback需要改为多实例的，否则只能播放一个动画
-			_gdi_animation_process2_play_all(p_delta, res->value()->started, *(res->value()));
-
-			if (res->value()->started) {
-				res->value()->started = false;
-			}
-
-			_gdi_animation_update_transforms_play_all();
-
-			// 循环播放
-			if (gdi_play_all_anim_loop_flag &&
-				(res->value()->current.from->animation->get_length() - res->value()->current.pos < res->value()->current.from->animation->get_step() / 2.0)) {
-				res->value()->current.pos = 0;
-			}
-
-			// none-loop exit
-			if (!gdi_play_all_anim_loop_flag &&
-				e == animation_set.back() &&
-				(res->value()->current.from->animation->get_length() - res->value()->current.pos < res->value()->current.from->animation->get_step() / 2.0)) {
-				_set_process(false, true);
-				gdi_play_all_anim_flag = false;
-				_gdi_reset_all_animation_playback();
-			}
-		}
-
-		return;
-	}
 
 	if (playback.current.from) {
 
@@ -1362,223 +1299,6 @@ void AnimationPlayer::set_current_animation(const String &p_anim) {
 		play(p_anim);
 	} else {
 		// Same animation, do not replay from start
-	}
-}
-
-void AnimationPlayer::gdi_play_all_animation_set(const String &p_anim_play_type)
-{
-	gdi_play_all_anim_flag = (p_anim_play_type == L"play") ? true : ((p_anim_play_type == L"play-loop") ? true : false);
-	gdi_play_all_anim_loop_flag = (p_anim_play_type == L"play-loop") ? true : false;
-	if (gdi_play_all_anim_flag) {
-		_set_process(true, true);
-	}
-	else {
-		_set_process(false, true);
-		_gdi_reset_all_animation_playback();
-	}
-}
-
-void AnimationPlayer::gdi_reset_and_stop_all_animation_play() {
-
-	_set_process(false, true);
-	gdi_play_all_anim_flag = false;
-	_gdi_reset_all_animation_playback();
-}
-
-void AnimationPlayer::_gdi_animation_process2_play_all(float p_delta, bool p_started, Playback &p_playback)
-{
-	Playback &c = p_playback;
-
-	accum_pass++;
-
-	_gdi_animation_process_data_play_all(c.current, p_delta, 1.0f, c.seeked && p_delta != 0, p_started, p_playback);
-	if (p_delta != 0) {
-		c.seeked = false;
-	}
-
-	List<Blend>::Element *prev = NULL;
-	for (List<Blend>::Element *E = c.blend.back(); E; E = prev) {
-
-		Blend &b = E->get();
-		float blend = b.blend_left / b.blend_time;
-		_gdi_animation_process_data_play_all(b.data, p_delta, blend, false, false, p_playback);
-
-		b.blend_left -= Math::absf(speed_scale * p_delta);
-
-		prev = E->prev();
-		if (b.blend_left < 0) {
-
-			c.blend.erase(E);
-		}
-	}
-}
-
-void AnimationPlayer::_gdi_animation_update_transforms_play_all()
-{
-	{
-		Skeleton *gdi_skeleton = nullptr;
-		Transform t;
-		for (int i = 0; i < cache_update_size; i++) {
-
-			TrackNodeCache *nc = cache_update[i];
-
-			ERR_CONTINUE(nc->accum_pass != accum_pass);
-
-			t.origin = nc->loc_accum;
-			t.basis.set_quat_scale(nc->rot_accum, nc->scale_accum);
-			if (nc->skeleton && nc->bone_idx >= 0) {
-
-				nc->skeleton->set_bone_pose(nc->bone_idx, t);
-
-			}
-			else if (nc->spatial) {
-
-				nc->spatial->set_transform(t);
-
-				// 修改点：确保非Bone的channel节点也必须进行更新，否则动画不能完全正常
-				// 这里需要注意的是，后期应该是支持更新多Skeleton，目前测试写死了一个
-				if (nullptr == gdi_skeleton) {
-					for (int a = 0; a < cache_update_size; a++) {
-						TrackNodeCache *tnc = cache_update[a];
-						if (tnc->skeleton) {
-							gdi_skeleton = tnc->skeleton;
-							break;
-						}
-					}
-				}
-
-				// 存在始终找不到骨骼的情况
-				if (nullptr == gdi_skeleton) {
-					continue;
-				}
-
-				auto name = nc->spatial->get_name();
-				gdi_skeleton->gdi_set_none_bone_pose(name, t);
-			}
-		}
-	}
-
-	cache_update_size = 0;
-
-	for (int i = 0; i < cache_update_prop_size; i++) {
-
-		TrackNodeCache::PropertyAnim *pa = cache_update_prop[i];
-
-		ERR_CONTINUE(pa->accum_pass != accum_pass);
-
-		switch (pa->special) {
-
-		case SP_NONE: {
-			bool valid;
-			pa->object->set_indexed(pa->subpath, pa->value_accum, &valid); //you are not speshul
-#ifdef DEBUG_ENABLED
-			if (!valid) {
-				ERR_PRINTS("Failed setting key at time " + rtos(playback.current.pos) + " in Animation '" + get_current_animation() + "' at Node '" + get_path() + "', Track '" + String(pa->owner->path) + "'. Check if property exists or the type of key is right for the property");
-			}
-#endif
-
-		} break;
-		case SP_NODE2D_POS: {
-#ifdef DEBUG_ENABLED
-			if (pa->value_accum.get_type() != Variant::VECTOR2) {
-				ERR_PRINTS("Position key at time " + rtos(playback.current.pos) + " in Animation '" + get_current_animation() + "' at Node '" + get_path() + "', Track '" + String(pa->owner->path) + "' not of type Vector2()");
-			}
-#endif
-			static_cast<Node2D *>(pa->object)->set_position(pa->value_accum);
-		} break;
-		case SP_NODE2D_ROT: {
-#ifdef DEBUG_ENABLED
-			if (pa->value_accum.is_num()) {
-				ERR_PRINTS("Rotation key at time " + rtos(playback.current.pos) + " in Animation '" + get_current_animation() + "' at Node '" + get_path() + "', Track '" + String(pa->owner->path) + "' not numerical");
-			}
-#endif
-
-			static_cast<Node2D *>(pa->object)->set_rotation(Math::deg2rad((double)pa->value_accum));
-		} break;
-		case SP_NODE2D_SCALE: {
-#ifdef DEBUG_ENABLED
-			if (pa->value_accum.get_type() != Variant::VECTOR2) {
-				ERR_PRINTS("Scale key at time " + rtos(playback.current.pos) + " in Animation '" + get_current_animation() + "' at Node '" + get_path() + "', Track '" + String(pa->owner->path) + "' not of type Vector2()");
-			}
-#endif
-
-			static_cast<Node2D *>(pa->object)->set_scale(pa->value_accum);
-		} break;
-		}
-	}
-
-	cache_update_prop_size = 0;
-
-	for (int i = 0; i < cache_update_bezier_size; i++) {
-
-		TrackNodeCache::BezierAnim *ba = cache_update_bezier[i];
-
-		ERR_CONTINUE(ba->accum_pass != accum_pass);
-		ba->object->set_indexed(ba->bezier_property, ba->bezier_accum);
-	}
-
-	cache_update_bezier_size = 0;
-}
-
-void AnimationPlayer::_gdi_animation_process_data_play_all(PlaybackData &cd, float p_delta, float p_blend, bool p_seeked, bool p_started, Playback &p_playback)
-{
-	float delta = p_delta * speed_scale * cd.speed_scale;
-	float next_pos = cd.pos + delta;
-
-	float len = cd.from->animation->get_length();
-	bool loop = cd.from->animation->has_loop();
-
-	if (!loop) {
-
-		if (next_pos < 0)
-			next_pos = 0;
-		else if (next_pos > len)
-			next_pos = len;
-
-		// fix delta
-		delta = next_pos - cd.pos;
-
-		if (&cd == &p_playback.current) {
-
-			bool backwards = delta < 0;
-
-			if (!backwards && cd.pos <= len && next_pos == len /*&& p_playback.blend.empty()*/) {
-				//playback finished
-				end_reached = true;
-				end_notify = cd.pos < len; // Notify only if not already at the end
-			}
-
-			if (backwards && cd.pos >= 0 && next_pos == 0 /*&& p_playback.blend.empty()*/) {
-				//playback finished
-				end_reached = true;
-				end_notify = cd.pos > 0; // Notify only if not already at the beginning
-			}
-		}
-
-	}
-	else {
-
-		float looped_next_pos = Math::fposmod(next_pos, len);
-		if (looped_next_pos == 0 && next_pos != 0) {
-			// Loop multiples of the length to it, rather than 0
-			// so state at time=length is previewable in the editor
-			next_pos = len;
-		}
-		else {
-			next_pos = looped_next_pos;
-		}
-	}
-
-	cd.pos = next_pos;
-
-	_animation_process_animation(cd.from, cd.pos, delta, p_blend, &cd == &p_playback.current, p_seeked, p_started);
-}
-
-void AnimationPlayer::_gdi_reset_all_animation_playback()
-{
-	for (auto e = gdi_playback_map.front(); e; e = e->next()) {
-		e->value()->started = false;
-		e->value()->current.pos = 0;
 	}
 }
 
@@ -1995,13 +1715,8 @@ void AnimationPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("seek", "seconds", "update"), &AnimationPlayer::seek, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("advance", "delta"), &AnimationPlayer::advance);
 
-	// 修改点：加入绑定播放全部的函数
-	ClassDB::bind_method(D_METHOD("gdi_play_all_animation_set", "anim"), &AnimationPlayer::gdi_play_all_animation_set);
-
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "root_node"), "set_root", "get_root");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "current_animation", PROPERTY_HINT_ENUM, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_ANIMATE_AS_TRIGGER), "set_current_animation", "get_current_animation");
-	// 修改点：加入全部播放的属性
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "play_all_tracks", PROPERTY_HINT_ENUM, "stop,play,play-loop", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_ANIMATE_AS_TRIGGER), "gdi_play_all_animation_set", "");
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "assigned_animation", PROPERTY_HINT_NONE, "", 0), "set_assigned_animation", "get_assigned_animation");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "autoplay", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), "set_autoplay", "get_autoplay");
@@ -2047,11 +1762,10 @@ AnimationPlayer::AnimationPlayer() {
 	playback.seeked = false;
 	playback.started = false;
 	// 修改点：
-	gdi_play_all_anim_flag = false;
-	gdi_play_all_anim_loop_flag = false;
 	gdi_scene_root = nullptr;
 	gdi_update_skeleton_vec.clear();
 	gdi_update_skeleton_size = 0;
+	gdi_import_file_format = Object::DEFAULT;
 }
 
 AnimationPlayer::~AnimationPlayer() {

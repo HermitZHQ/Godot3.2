@@ -1793,7 +1793,11 @@ T Animation::_interpolate(const Vector<TKey<T> > &p_keys, float p_time, Interpol
 
 		if (idx >= 0) {
 
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
+			if ((idx + 1) <= len && (idx + 1) < p_keys.size()) {
+#else
 			if ((idx + 1) < len) {
+#endif
 
 				next = idx + 1;
 				float delta = p_keys[next].time - p_keys[idx].time;

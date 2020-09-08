@@ -419,6 +419,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				// create skeleton
 				print_verbose("Making skeleton: " + node_name);
 				Skeleton *skeleton = memnew(Skeleton);
+				skeleton->gdi_set_import_file_format(Object::ASSIMP_FBX);
 				spatial = skeleton;
 
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
@@ -577,7 +578,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				// 出现这种情况时，应该更新所有skeleton中保存的节点信息，否则无法对该mesh进行实时的更新
 				auto e = state.armature_skeletons.front();
 				if (nullptr != e && !e->value()->gdi_update_mesh_anim_node(node_name, mesh->get_name())) {
-					printf("[GDI]assimp update mesh anim node failed, mesh[%S], should not happen\n", String(mesh->get_name()));
+					printf("[GDI]assimp update mesh anim node failed, mesh[%S], should not happen\n", String(mesh->get_name()).c_str());
 				}
 
 				if (mesh) {
@@ -624,29 +625,31 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 	// ---------------------------------------Handle Animation infos
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 	if (p_flags & IMPORT_ANIMATION && scene->mNumAnimations) {
+		state.animation_player = memnew(AnimationPlayer);
+		state.animation_player->gdi_set_import_file_format(Object::ASSIMP_FBX);
+		//String anim_player_name = "AnimPlayer-" + String(scene->mAnimations[i]->mName.data);
+		//state.animation_player->set_name(anim_player_name);
+		state.root->add_child(state.animation_player);
+		state.animation_player->set_owner(state.root);
 
-			// 修改点：尝试不创建多anim，在同一anim下插入不同skeleton的track
-			// 初始化为N个动画播放器，每个播放器内置N个Mesh Track
+			// 修改点：导入动画时，需要映射正确的mesh idx
 			for (uint32_t i = 0; i < scene->mNumAnimations; i++) {
-				state.animation_player = memnew(AnimationPlayer);
-				String anim_player_name = "AnimPlayer-" + String(scene->mAnimations[i]->mName.data);
-				state.animation_player->set_name(anim_player_name);
-
-				state.root->add_child(state.animation_player);
-				state.animation_player->set_owner(state.root);
-
-				//for (int a = 0; a < state.armature_skeletons.size(); ++a) {
-				//	_import_animation(state, i, p_bake_fps, a);
-				//}
-				for (auto e = state.armature_skeletons.front(); e; e = e->next()) {
-					auto arm_index = state.gdi_armature_index_map.find(e->key());
-					if (nullptr != arm_index) {
-						_import_animation(state, i, p_bake_fps, arm_index->value());
+				// 骨骼动画相关
+				if (state.armature_skeletons.size() > 0) {
+					for (auto e = state.armature_skeletons.front(); e; e = e->next()) {
+						auto arm_index = state.gdi_armature_index_map.find(e->key());
+						if (nullptr != arm_index) {
+							_import_animation(state, i, p_bake_fps, arm_index->value());
+						}
+						else {
+							_import_animation(state, i, p_bake_fps, 0);
+							print_error("[GDI]assimp import anim, wrong case");
+						}
 					}
-					else {
-						_import_animation(state, i, p_bake_fps, 0);
-						print_error("[GDI]assimp import anim, wrong case");
-					}
+				} 
+				else {
+					// 路径动画相关
+					_import_animation(state, i, p_bake_fps);
 				}
 			}
 	}
@@ -714,7 +717,7 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::gdi_create_anim_nodes(const aiSce
 	if (scene->mNumAnimations > 0) {
 		if (scene->mNumAnimations > 1) {
 			// 这里我们是应该创建多套不同的AnimNodes吗？还需要验证，比如Piety这种动画
-			OS::get_singleton()->print("[Warning!!!animation num over 1......, what you handled before is wrong\n");
+			OS::get_singleton()->print("[GDI-Warning]animation num over 1..., what you handled maybe wrong\n");
 		}
 		aiAnimation *anim = scene->mAnimations[0];
 		for (int i = 0; i < anim->mNumChannels; ++i) {
@@ -894,7 +897,12 @@ void EditorSceneImporterAssimp::RegenerateBoneStack(ImportState &state) {
 
 /* Bone stack is a fifo handler for multiple armatures since armatures aren't a thing in assimp (yet) */
 void EditorSceneImporterAssimp::RegenerateBoneStack(ImportState &state, aiMesh *mesh) {
+
 	state.bone_stack.clear();
+	if (nullptr == mesh) {
+		return;
+	}
+
 	// iterate over all the bones on the mesh for this node only!
 	for (unsigned int boneIndex = 0; boneIndex < mesh->mNumBones; boneIndex++) {
 		aiBone *bone = mesh->mBones[boneIndex];
@@ -910,16 +918,19 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 
 	ERR_FAIL_INDEX(p_animation_index, (int)state.assimp_scene->mNumAnimations);
 	// for test
-	if (0 != mesh_id) {
-		return;
-	}
+// 	if (0 != mesh_id) {
+// 		return;
+// 	}
 
 	const aiAnimation *anim = state.assimp_scene->mAnimations[p_animation_index];
 	String name = AssimpUtils::get_anim_string_from_assimp(anim->mName);
+
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 	// 修改点：尝试根据不同mesh id，改变不同的anim mesh track name
-	aiMesh *mesh = state.assimp_scene->mMeshes[mesh_id];
+	aiMesh *mesh = -1 == mesh_id ? nullptr : state.assimp_scene->mMeshes[mesh_id];
 	// 多mesh轨道分离操作，使用不同的anim名称，就可以建立多条轨道
 	//name = name + "-" + "tracks-" + mesh->mName.data + "-" + itos(mesh_id);
+#endif
 
 	if (name == String()) {
 		name = "Animation " + itos(p_animation_index + 1);
@@ -952,6 +963,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	else {
 		animation = state.animation_player->get_animation(name);
 	}
+	animation->gdi_set_import_file_format(Object::ASSIMP_FBX);
 
 	if (name.begins_with("loop") || name.ends_with("loop") || name.begins_with("cycle") || name.ends_with("cycle")) {
 		animation->set_loop(true);
@@ -963,7 +975,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	// 使用所有meshes来生成的bone信息的会有问题，最大的问题就是重名覆盖，而引擎又会去通过名称找bone，所以肯定是有问题的
 	//RegenerateBoneStack(state);
 	// 此处如果不设置正确的对应mesh来产生bones信息的话，是无法正常驱动动画的
-	RegenerateBoneStack(state, state.assimp_scene->mMeshes[mesh_id]);
+	RegenerateBoneStack(state, mesh);
 
 	// 修改点：首先get到有效的armature，因为目前处理是不同的mesh有不同的armature，所以都是同一个arm
 	Skeleton *skeleton = NULL;
@@ -1063,7 +1075,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		}
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 		else if (bone == nullptr) {
-			printf("[GDI-Error:Skeleton]:Miss track[%s], can't find it in the nodes vec, mesh id[%d], track id[%d]\n", track->mNodeName.data, mesh_id, (int)i);
+			printf("[GDI-warning]:Miss track[%s], can't find it in the nodes vec, mesh id[%d], track id[%d]\n", track->mNodeName.data, mesh_id, (int)i);
 
 			// for test
 			if (String(track->mNodeName.data) == String("Bip001 L Finger1Nub")) {
@@ -1837,7 +1849,7 @@ void EditorSceneImporterAssimp::_generate_node(
 	if (/*state.armature_nodes.size() == 0 &&*/ assimp_node->mNumMeshes > 0 /*&& assimp_node->mName == aiString("Bip001")*/) {
 		// 伪造和mesh节点同级的新aiNode用作Armature节点
 		if (assimp_node->mNumMeshes > 1) {
-			OS::get_singleton()->print("[Warning]Gen node to armature with num meshes:[%d], node name[%s]\n", assimp_node->mNumMeshes, assimp_node->mName.data);
+			OS::get_singleton()->print("[GDI-Warning]Gen node to armature with num meshes:[%d], node name[%s]\n", assimp_node->mNumMeshes, assimp_node->mName.data);
 		}
 
 		for (int i = 0; i < assimp_node->mNumMeshes; ++i) {

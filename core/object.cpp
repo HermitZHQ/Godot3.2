@@ -1779,6 +1779,10 @@ void Object::_bind_methods() {
 
 	ClassDB::add_virtual_method("Object", MethodInfo("free"), false);
 
+	// 修改点：加入
+	ClassDB::bind_method(D_METHOD("gdi_get_import_file_format"), &Object::gdi_get_import_file_format);
+	ClassDB::bind_method(D_METHOD("gdi_set_import_file_format", "format"), &Object::gdi_set_import_file_format);
+
 	ADD_SIGNAL(MethodInfo("script_changed"));
 
 	BIND_VMETHOD(MethodInfo("_notification", PropertyInfo(Variant::INT, "what")));
@@ -1988,6 +1992,8 @@ Object::Object() {
 #ifdef DEBUG_ENABLED
 	_lock_index.init(1);
 #endif
+
+	gdi_import_file_format = DEFAULT;
 }
 
 Object::~Object() {
@@ -2046,6 +2052,16 @@ Object::~Object() {
 			}
 		}
 	}
+}
+
+void Object::gdi_set_import_file_format(int format) {
+
+	gdi_import_file_format = format;
+}
+
+int Object::gdi_get_import_file_format() const {
+
+	return gdi_import_file_format;
 }
 
 bool predelete_handler(Object *p_object) {

@@ -38,8 +38,6 @@
 #include "core/os/os.h"
 #include <functional>
 
-// #define GDI_ENABLE_ASSIMP_MODIFICATION
-
 void SkinReference::_skin_changed() {
 	if (skeleton_node) {
 		skeleton_node->_make_dirty();
@@ -86,11 +84,11 @@ void Skeleton::_regenerate_anim_node_tree()
 	for (int i = 0; i < gdi_anim_node_load_vec.size(); ++i)
 	{
 		gdi_anim_node_load_vec.ptrw()[i]->parent = (gdi_anim_node_load_vec.ptrw()[i]->parent == 0) ?
-			0 : gdi_anim_node_load_vec.ptrw()[(int)gdi_anim_node_load_vec.ptrw()[i]->parent];
+			0 : gdi_anim_node_load_vec.ptrw()[(int64_t)gdi_anim_node_load_vec.ptrw()[i]->parent];
 
 		for (int j = 0; j < gdi_anim_node_load_vec.ptrw()[i]->childs.size(); ++j)
 		{
-			gdi_anim_node_load_vec.ptrw()[i]->childs.ptrw()[j] = gdi_anim_node_load_vec.ptrw()[(int)gdi_anim_node_load_vec.ptrw()[i]->childs[j]];
+			gdi_anim_node_load_vec.ptrw()[i]->childs.ptrw()[j] = gdi_anim_node_load_vec.ptrw()[(int64_t)gdi_anim_node_load_vec.ptrw()[i]->childs[j]];
 		}
 	}
 
@@ -136,14 +134,14 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 		_check_load_vec_func(pos);
 		PoolVector<int> id_vec = p_value;
 		// get out the parent id
-		gdi_anim_node_load_vec.ptrw()[pos]->parent = (NodeAnim*)(id_vec[0] == -1 ? 0 : id_vec[0]);
+		gdi_anim_node_load_vec.ptrw()[pos]->parent = (NodeAnim*)(id_vec[0] == -1 ? (int64_t)0 : (int64_t)id_vec[0]);
 		// get out the childs id
 		for (int64_t i = 1; i < id_vec.size(); ++i)
 		{
 			// 先按照数量填充无效child，后面再进行组合
 			// 其实也不是无效，只是相当于先把ID转换为无效的指针保存了起来
 			// 后面重新生成时，再把指针转化为索引即可
-			gdi_anim_node_load_vec.ptrw()[pos]->childs.push_back((NodeAnim*)id_vec[i]);
+			gdi_anim_node_load_vec.ptrw()[pos]->childs.push_back((NodeAnim*)(((int64_t)id_vec[i])));
 		}
 	}
 	else if (what == "anim_node_local_transform") {
@@ -371,18 +369,20 @@ void Skeleton::_notification(int p_what) {
 			VisualServer *vs = VisualServer::get_singleton();
 			Bone *bonesptr = bones.ptrw();
 			int len = bones.size();
+			ImportFileFormat import_file_format = gdi_get_import_file_format();
 
-#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
-			if (nullptr == gdi_anim_node_root) {
-				// 修改点：update所有非bone节点的global transform，否则有些节点不会转变
-				gdi_anim_node_root = (NodeAnim*)gdi_get_anim_root_node_addr();
-	
-				// 修改点：检测是anim_node_root为null，是的话，从load的anim node vec中重新组合出tree
+			if (ImportFileFormat::ASSIMP_FBX == import_file_format) {
 				if (nullptr == gdi_anim_node_root) {
-					_regenerate_anim_node_tree();
+					// 修改点：update所有非bone节点的global transform，否则有些节点不会转变
+					gdi_anim_node_root = (NodeAnim*)gdi_get_anim_root_node_addr();
+					
+					// 修改点：检测是anim_node_root为null，是的话，从load的anim node vec中重新组合出tree
+					if (nullptr == gdi_anim_node_root) {
+						_regenerate_anim_node_tree();
+					}
 				}
 			}
-#endif
+
 
 			_update_process_order();
 			const int *order = process_order.ptr();
@@ -430,56 +430,58 @@ void Skeleton::_notification(int p_what) {
 							}
 
 							// 修改点：尝试使用assimp-viewer的处理流程，它这里的处理流程意义不明，注释掉了原有处理流程
-#ifndef GDI_ENABLE_ASSIMP_MODIFICATION
-							if (b.parent >= 0) {
-
-								b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
-							} else {
-
-								b.pose_global = b.rest * pose;
+							if (ImportFileFormat::DEFAULT == import_file_format) {
+								if (b.parent >= 0) {
+	
+									b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
+								} else {
+	
+									b.pose_global = b.rest * pose;
+								}
 							}
-#else
+							else if (ImportFileFormat::ASSIMP_FBX == import_file_format) {
 
-							NodeAnim *node = b.gdi_node_anim ? b.gdi_node_anim : 
-								(gdi_anim_node_root ?
-									gdi_find_anim_node_by_name(gdi_anim_node_root, b.name) : nullptr);
-							if (nullptr == b.gdi_node_anim && node) {
-								b.gdi_node_anim = node;
+								NodeAnim *node = b.gdi_node_anim ? b.gdi_node_anim :
+									(gdi_anim_node_root ?
+										gdi_find_anim_node_by_name(gdi_anim_node_root, b.name) : nullptr);
+								if (nullptr == b.gdi_node_anim && node) {
+									b.gdi_node_anim = node;
+								}
+
+								// 这个pose还不能随意设置，否则不能兼容其他tscn
+								b.pose_global = b.gdi_node_anim ? b.gdi_node_anim->local_transform : b.rest;
+
+								NodeAnim *parent = nullptr;
+								if (node) {
+									parent = node->parent;
+								}
+
+								// 兼容处理其他tscn过来的模型，如果没有从nodeAnim中找到parent（不正常情况）
+								// 那么我们采用原有流程的global计算，进行兼容
+								// 主要兼容的是gdi_anim_node_root，因为其他版本的文件是读取不到这个东西的
+								if (nullptr == parent && -1 != b.parent && !gdi_anim_node_root) {
+									b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
+								}
+								else if (nullptr == parent && -1 == b.parent && !gdi_anim_node_root) {
+									b.pose_global = (b.rest * pose);
+								}
+
+								while (nullptr != parent) {
+									b.pose_global = parent->local_transform * b.pose_global;
+									parent = parent->parent;
+
+									// 测试点：对比每次生成的global矩阵
+	// 								if (b.name == "Bip001 L Forearm")
+	// 								{
+	// 									OS::get_singleton()->print("test parent[%S] mat:[%f], [%f], [%f]\n",
+	// 										parent->name.ptr(),
+	// 										b.pose_global.basis.elements[0].x,
+	// 										b.pose_global.basis.elements[0].y,
+	// 										b.pose_global.basis.elements[0].z);
+	// 								}
+								}
 							}
 
-							// 这个pose还不能随意设置，否则不能兼容其他tscn
-							b.pose_global = b.gdi_node_anim ? b.gdi_node_anim->local_transform : b.rest;
-
-							NodeAnim *parent = nullptr;
-							if (node) {
-								parent = node->parent;
-							}
-
-							// 兼容处理其他tscn过来的模型，如果没有从nodeAnim中找到parent（不正常情况）
-							// 那么我们采用原有流程的global计算，进行兼容
-							// 主要兼容的是gdi_anim_node_root，因为其他版本的文件是读取不到这个东西的
-							if (nullptr == parent && -1 != b.parent && !gdi_anim_node_root) {
-								b.pose_global = bonesptr[b.parent].pose_global * (b.rest * pose);
-							}
-							else if (nullptr == parent && -1 == b.parent && !gdi_anim_node_root) {
-								b.pose_global = (b.rest * pose);
-							}
-
-							while (nullptr != parent) {
-								b.pose_global = parent->local_transform * b.pose_global;
-								parent = parent->parent;
-
-								// 测试点：对比每次生成的global矩阵
-// 								if (b.name == "Bip001 L Forearm")
-// 								{
-// 									OS::get_singleton()->print("test parent[%S] mat:[%f], [%f], [%f]\n",
-// 										parent->name.ptr(),
-// 										b.pose_global.basis.elements[0].x,
-// 										b.pose_global.basis.elements[0].y,
-// 										b.pose_global.basis.elements[0].z);
-// 								}
-							}
-#endif
 						}
 						else {
 
@@ -512,11 +514,9 @@ void Skeleton::_notification(int p_what) {
 				}
 			}
 
-#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
-			if (gdi_anim_node_root) {
+			if (ImportFileFormat::ASSIMP_FBX == import_file_format && gdi_anim_node_root) {
 				gdi_update_all_none_bone_anim_node(gdi_anim_node_root);
 			}
-#endif
 
 			// 测试点：只更新一个skin，观察差异
 			int iTest = 0;
@@ -582,15 +582,17 @@ void Skeleton::_notification(int p_what) {
 				for (uint32_t i = 0; i < bind_count; i++) {
 					uint32_t bone_index = E->get()->skin_bone_indices_ptrs[i];
 					ERR_CONTINUE(bone_index >= (uint32_t)len);
-#ifndef GDI_ENABLE_ASSIMP_MODIFICATION
-					vs->skeleton_bone_set_transform(skeleton, i, bonesptr[bone_index].pose_global * skin->get_bind_pose(i));
-#else
-					// 测试点：查看这里的骨骼transform影响
-					auto pose = skin->get_bind_pose(i);
-					auto global_pose = bonesptr[bone_index].pose_global;
-					auto final_pose = global_pose * pose;
-					vs->skeleton_bone_set_transform(skeleton, i, final_pose);
-#endif
+
+					if (ImportFileFormat::DEFAULT == import_file_format) {
+						vs->skeleton_bone_set_transform(skeleton, i, bonesptr[bone_index].pose_global * skin->get_bind_pose(i));
+					} 
+					else if (ImportFileFormat::ASSIMP_FBX == import_file_format) {
+						// 测试点：查看这里的骨骼transform影响
+						auto pose = skin->get_bind_pose(i);
+						auto global_pose = bonesptr[bone_index].pose_global;
+						auto final_pose = global_pose * pose;
+						vs->skeleton_bone_set_transform(skeleton, i, final_pose);
+					}
 				}
 			}
 

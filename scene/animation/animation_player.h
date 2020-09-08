@@ -240,8 +240,6 @@ private:
 		bool seeked;
 		bool started;
 	} playback;
-	// 修改点：需要一个playback的map支持同时播放所有动画
-	Map<StringName, Playback*> gdi_playback_map;
 
 	List<StringName> queued;
 
@@ -326,14 +324,6 @@ public:
 	bool is_playing() const;
 	String get_current_animation() const;
 	void set_current_animation(const String &p_anim);
-	// 修改点：加入播放所有动画的选项
-	void gdi_play_all_animation_set(const String &p_anim_play_type);
-	void gdi_reset_and_stop_all_animation_play();
-private:
-	void _gdi_animation_process2_play_all(float p_delta, bool p_started, Playback &p_playback);
-	void _gdi_animation_update_transforms_play_all();
-	void _gdi_animation_process_data_play_all(PlaybackData &cd, float p_delta, float p_blend, bool p_seeked, bool p_started, Playback &p_playback);
-	void _gdi_reset_all_animation_playback();
 
 public:
 
@@ -380,11 +370,10 @@ public:
 	~AnimationPlayer();
 
 private:
-	bool gdi_play_all_anim_flag;
-	bool gdi_play_all_anim_loop_flag;
-	Node *gdi_scene_root;
-	Vector<Skeleton*> gdi_update_skeleton_vec;
-	int gdi_update_skeleton_size;
+	Node						*gdi_scene_root;
+	Vector<Skeleton*>			gdi_update_skeleton_vec;
+	int							gdi_update_skeleton_size;
+	Object::ImportFileFormat	gdi_import_file_format;
 };
 
 VARIANT_ENUM_CAST(AnimationPlayer::AnimationProcessMode);

@@ -110,7 +110,7 @@ private:
 			const String &node_name, aiBone *track_bone);
 
 	// 修改点：让动画导入支持指定的Mesh
-	void _import_animation(ImportState &state, int p_animation_index, int p_bake_fps, unsigned int mesh_id);
+	void _import_animation(ImportState &state, int p_animation_index, int p_bake_fps, unsigned int mesh_id = -1);
 	Node *get_node_by_name(ImportState &state, String name);
 	aiBone *get_bone_from_stack(ImportState &state, aiString name);
 	aiBone* gdi_find_bone_from_stack(ImportState &state, const aiString &name);

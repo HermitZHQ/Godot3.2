@@ -767,6 +767,24 @@ public:
 
 	Object();
 	virtual ~Object();
+
+	// 用于区分Fbx的读取源头，比如assimp和sdk，或者以后还可以添加其他
+	enum ImportFileFormat
+	{
+		DEFAULT,
+		ASSIMP_FBX,
+		SDK_FBX,
+		OTHER,
+
+		MAX_COUNT
+	};
+
+	// 设置文件导入源头类型
+	void gdi_set_import_file_format(int format);
+	int gdi_get_import_file_format() const;
+
+private:
+	int								gdi_import_file_format;
 };
 
 bool predelete_handler(Object *p_object);
