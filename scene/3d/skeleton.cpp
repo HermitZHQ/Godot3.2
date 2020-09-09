@@ -717,6 +717,7 @@ void Skeleton::gdi_update_all_none_bone_anim_node(NodeAnim *node) {
 			parentNode = parentNode->parent;
 		}
 
+		// mesh都应该进行联动？？目前看来的情况好像是这样
 		if (nullptr != gdi_editor_root && node->is_mesh && 0 == node->bone_num) {
 			Spatial *spa = Object::cast_to<Spatial>(gdi_editor_root->find_node(node->name));
 			if (nullptr != spa) {

@@ -1738,7 +1738,13 @@ T Animation::_interpolate(const Vector<TKey<T> > &p_keys, float p_time, Interpol
 		if (p_ok)
 			*p_ok = false;
 		return T();
-	} else if (len == 1) { // one key found (0+1), return it
+	}
+	// 注释点：这里的判断和下面的一些判断都存在bug，有两个key的情况下，它算出来的len为1没有问题
+	// 因为它应该是算的数组的上限，比如4个key，算出来是3
+	// 但是只有两个key的情况也应该插值啊，为什么不呢，导致了有些只有两个key的路径动画不正常
+	// 这里我只处理了针对我的assimp的流程，避免造成其他影响
+	// 原流程代码：else if (len == 1)
+	else if (len == 1 && ImportFileFormat::ASSIMP_FBX != gdi_import_file_format) { // one key found (0+1), return it
 
 		if (p_ok)
 			*p_ok = true;
@@ -1750,6 +1756,7 @@ T Animation::_interpolate(const Vector<TKey<T> > &p_keys, float p_time, Interpol
 	ERR_FAIL_COND_V(idx == -2, T());
 
 	bool result = true;
+	bool gdi_res = false;
 	int next = 0;
 	float c = 0;
 	// prepare for all cases of interpolation
@@ -1758,7 +1765,14 @@ T Animation::_interpolate(const Vector<TKey<T> > &p_keys, float p_time, Interpol
 		// loop
 		if (idx >= 0) {
 
-			if ((idx + 1) < len) {
+			if (ImportFileFormat::DEFAULT == gdi_import_file_format && (idx + 1) < len) {
+				gdi_res = true;
+			}
+			else if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format && (idx + 1) <= len && (idx + 1) < p_keys.size()) {
+				gdi_res = true;
+			}
+
+			if (gdi_res) {
 
 				next = idx + 1;
 				float delta = p_keys[next].time - p_keys[idx].time;
@@ -1801,11 +1815,14 @@ T Animation::_interpolate(const Vector<TKey<T> > &p_keys, float p_time, Interpol
 
 		if (idx >= 0) {
 
-#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
-			if ((idx + 1) <= len && (idx + 1) < p_keys.size()) {
-#else
-			if ((idx + 1) < len) {
-#endif
+			if (ImportFileFormat::DEFAULT == gdi_import_file_format && (idx + 1) < len) {
+				gdi_res = true;
+			}
+			else if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format && (idx + 1) <= len && (idx + 1) < p_keys.size()) {
+				gdi_res = true;
+			}
+
+			if (gdi_res) {
 
 				next = idx + 1;
 				float delta = p_keys[next].time - p_keys[idx].time;

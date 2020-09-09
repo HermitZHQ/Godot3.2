@@ -889,8 +889,13 @@ void AnimationPlayer::_animation_update_transforms() {
 			if (nc->skeleton && nc->bone_idx >= 0) {
 
 				nc->skeleton->set_bone_pose(nc->bone_idx, t);
+				// test output
+				OS::get_singleton()->print("[anim skeleton], name[%S]\n", String(nc->skeleton->get_name()));
 
 			} else if (nc->spatial) {
+
+				// test output
+				OS::get_singleton()->print("[anim spatial], name[%S]\n", String(nc->spatial->get_name()));
 
 				if (ImportFileFormat::DEFAULT == gdi_import_file_format) {
 					nc->spatial->set_transform(t);

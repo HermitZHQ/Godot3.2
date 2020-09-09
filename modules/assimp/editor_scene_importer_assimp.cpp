@@ -1014,10 +1014,10 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		}
 
 		// for test
-		if (node_name.find("Finger") != -1) {
-			int i = 0;
-			++i;
-		}
+		//if (node_name.find("Finger") != -1) {
+		//	int i = 0;
+		//	++i;
+		//}
 
 		print_verbose("track name import: " + node_name);
 		if (track->mNumRotationKeys == 0 && track->mNumPositionKeys == 0 && track->mNumScalingKeys == 0) {
@@ -1075,7 +1075,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		}
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 		else if (bone == nullptr) {
-			printf("[GDI-warning]:Miss track[%s], can't find it in the nodes vec, mesh id[%d], track id[%d]\n", track->mNodeName.data, mesh_id, (int)i);
+			printf("[GDI-warning]:mesh[%s], miss track[%s], can't find it in the nodes vec, mesh id[%d], track id[%d]\n", mesh ? mesh->mName.C_Str() : "null", track->mNodeName.data, mesh_id, (int)i);
 
 			// for test
 			if (String(track->mNodeName.data) == String("Bip001 L Finger1Nub")) {
@@ -1521,7 +1521,23 @@ EditorSceneImporterAssimp::_generate_mesh_from_surface_indices(ImportState &stat
 		Array array_mesh = st->commit_to_arrays();
 		Array morphs;
 		morphs.resize(ai_mesh->mNumAnimMeshes);
+		// 修改点：为什么要固定成三角呢....node里不是有类型吗，有毛病吗
+		// 这些原生引擎里的BUG写法真的是到处都是
 		Mesh::PrimitiveType primitive = Mesh::PRIMITIVE_TRIANGLES;
+		switch (ai_mesh->mPrimitiveTypes)
+		{
+		case 2: {
+			primitive = Mesh::PRIMITIVE_LINES;
+			break;
+		}
+		case 4: {
+			primitive = Mesh::PRIMITIVE_TRIANGLES;
+			break;
+		}
+		default:
+			primitive = Mesh::PRIMITIVE_TRIANGLES;
+			break;
+		}
 
 		for (size_t j = 0; j < ai_mesh->mNumAnimMeshes; j++) {
 // 			continue;
