@@ -877,6 +877,7 @@ void AnimationPlayer::_animation_update_transforms() {
 	{
 		Transform t;
 
+		OS::get_singleton()->print("_animation_update_transforms----------------------------------->start\n");
 		for (int i = 0; i < cache_update_size; i++) {
 
 			TrackNodeCache *nc = cache_update[i];
@@ -889,8 +890,9 @@ void AnimationPlayer::_animation_update_transforms() {
 			if (nc->skeleton && nc->bone_idx >= 0) {
 
 				nc->skeleton->set_bone_pose(nc->bone_idx, t);
+				auto node = nc->skeleton->gdi_get_bone_anim_node(nc->bone_idx);
 				// test output
-				OS::get_singleton()->print("[anim skeleton], name[%S]\n", String(nc->skeleton->get_name()));
+				OS::get_singleton()->print("[anim skeleton:%S], bone name[%S]\n", String(nc->skeleton->get_name()), node->name);
 
 			} else if (nc->spatial) {
 
@@ -915,6 +917,7 @@ void AnimationPlayer::_animation_update_transforms() {
 				}
 			}
 		}
+		OS::get_singleton()->print("_animation_update_transforms----------------------------------->end\n");
 	}
 
 	cache_update_size = 0;
