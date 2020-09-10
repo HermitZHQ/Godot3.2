@@ -877,7 +877,7 @@ void AnimationPlayer::_animation_update_transforms() {
 	{
 		Transform t;
 
-		OS::get_singleton()->print("_animation_update_transforms----------------------------------->start\n");
+		//OS::get_singleton()->print("_animation_update_transforms----------------------------------->start\n");
 		for (int i = 0; i < cache_update_size; i++) {
 
 			TrackNodeCache *nc = cache_update[i];
@@ -891,23 +891,32 @@ void AnimationPlayer::_animation_update_transforms() {
 
 				nc->skeleton->set_bone_pose(nc->bone_idx, t);
 				auto node = nc->skeleton->gdi_get_bone_anim_node(nc->bone_idx);
-				// test output
-				OS::get_singleton()->print("[anim skeleton:%S], bone name[%S]\n", String(nc->skeleton->get_name()), node->name);
+				//if (node->name == "Bip001 R Hand") {
+				//	int i = 0;
+				//	++i;
+				//}
+				//// test output
+				//OS::get_singleton()->print("[anim skeleton:%S], bone name[%S]\n", String(nc->skeleton->get_name()), node->name);
 
 			} else if (nc->spatial) {
 
-				// test output
-				OS::get_singleton()->print("[anim spatial], name[%S]\n", String(nc->spatial->get_name()));
+				//if (String(nc->spatial->get_name()) == "Bip001 R Hand") {
+				//	int i = 0;
+				//	++i;
+				//}
+				//// test output
+				//OS::get_singleton()->print("[anim spatial], name[%S]\n", String(nc->spatial->get_name()));
 
 				if (ImportFileFormat::DEFAULT == gdi_import_file_format) {
 					nc->spatial->set_transform(t);
 				} 
 				else if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format){
 					// 存在找不到skeleton的情况，仍然可能为空
+					// 这种情况下，我们一般是处理的路径动画
 					if (0 == gdi_update_skeleton_size) {
 						nc->spatial->set_transform(t);
 						//OS::get_singleton()->print("[GDI-anim_player]warning, couldn't find valid skeleton\n");
-						//continue;
+						continue;
 					}
 
 					auto name = nc->spatial->get_name();
@@ -917,7 +926,7 @@ void AnimationPlayer::_animation_update_transforms() {
 				}
 			}
 		}
-		OS::get_singleton()->print("_animation_update_transforms----------------------------------->end\n");
+		//OS::get_singleton()->print("_animation_update_transforms----------------------------------->end\n");
 	}
 
 	cache_update_size = 0;

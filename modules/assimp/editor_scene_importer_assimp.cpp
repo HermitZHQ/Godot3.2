@@ -624,6 +624,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 
 	// ---------------------------------------Handle Animation infos
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
+	state.gdi_none_bone_track_vec.clear();
 	if (p_flags & IMPORT_ANIMATION && scene->mNumAnimations) {
 		state.animation_player = memnew(AnimationPlayer);
 		state.animation_player->gdi_set_import_file_format(Object::ASSIMP_FBX);
@@ -643,7 +644,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 						}
 						else {
 							_import_animation(state, i, p_bake_fps, 0);
-							print_error("[GDI]assimp import anim, wrong case");
+							print_error("[GDI-Error]assimp import anim, wrong case");
 						}
 					}
 				} 
@@ -883,7 +884,7 @@ void EditorSceneImporterAssimp::RegenerateBoneStack(ImportState &state) {
 				state.bone_stack.push_back(bone);
 
 				// 修改点：把bone在对应mesh armature的索引存入
-				// 后面需要
+				// 后面需要在导入动画时使用对应的索引
 				for (int arm_index = 0; arm_index < num_armature; ++arm_index) {
 					if (state.armature_nodes[arm_index]->mName == str_tmp_mesh_name) {
 						state.gdi_bone_stack_mesh_index.push_back(arm_index);
@@ -930,6 +931,10 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	aiMesh *mesh = -1 == mesh_id ? nullptr : state.assimp_scene->mMeshes[mesh_id];
 	// 多mesh轨道分离操作，使用不同的anim名称，就可以建立多条轨道
 	//name = name + "-" + "tracks-" + mesh->mName.data + "-" + itos(mesh_id);
+
+	if (0) {
+		return;
+	}
 #endif
 
 	if (name == String()) {
@@ -1001,6 +1006,9 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	RegenerateBoneStack(state);
 #endif
 
+	// for test
+	printf("import anim[%S]------------------>>>>>>mesh[%s]\n", name.c_str(), nullptr != mesh ? mesh->mName.C_Str() : "Null");
+
 	//regular tracks
 	for (size_t i = 0; i < anim->mNumChannels; i++) {
 		const aiNodeAnim *track = anim->mChannels[i];
@@ -1065,23 +1073,31 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		// we import all the data and do not miss anything.
 		// 公共非BoneTrack只添加第一次
 		// 因为加入了非Bone的Track支持，所以这里需要判断一下bone，获取不到的才添加
-		if (allocated_node && !bone && !anim_existed_flag) {
+		if (allocated_node && !bone /*&& !anim_existed_flag*/) {
 			node_path = state.root->get_path_to(allocated_node);
 
+#ifndef GDI_ENABLE_ASSIMP_MODIFICATION
 			if (node_path != NodePath()) {
 				_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
 						node_path, node_name, nullptr);
 			}
+#else
+			if (node_path != NodePath() && -1 == state.gdi_none_bone_track_vec.find(node_path)) {
+				state.gdi_none_bone_track_vec.push_back(node_path);
+				_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
+					node_path, node_name, nullptr);
+			}
+#endif
 		}
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 		else if (bone == nullptr) {
-			printf("[GDI-warning]:mesh[%s], miss track[%s], can't find it in the nodes vec, mesh id[%d], track id[%d]\n", mesh ? mesh->mName.C_Str() : "null", track->mNodeName.data, mesh_id, (int)i);
+			printf("[GDI-warning]:mesh[%s], missing track[%s], can't find it in the nodes vec, mesh id[%d], track id[%d]\n", mesh ? mesh->mName.C_Str() : "null", track->mNodeName.data, mesh_id, (int)i);
 
 			// for test
-			if (String(track->mNodeName.data) == String("Bip001 L Finger1Nub")) {
-				int i = 0;
-				++i;
-			}
+			//if (String(track->mNodeName.data) == String("Bip001 L Finger1Nub")) {
+			//	int i = 0;
+			//	++i;
+			//}
 
 			//String path = state.root->get_path_to(skeleton);
 			//path = "TestNoneBone";
@@ -1868,7 +1884,9 @@ void EditorSceneImporterAssimp::_generate_node(
 			OS::get_singleton()->print("[GDI-Warning]Gen node to armature with num meshes:[%d], node name[%s]\n", assimp_node->mNumMeshes, assimp_node->mName.data);
 		}
 
-		for (int i = 0; i < assimp_node->mNumMeshes; ++i) {
+		// 目前看来，这种多mesh的node，只用生成一次arm即可，不过上面的警告我还是保留
+		// 避免以后出现bug没有任何提示
+		for (int i = 0; i < 1/*assimp_node->mNumMeshes*/; ++i) {
 			aiMesh *mesh = state.assimp_scene->mMeshes[assimp_node->mMeshes[i]];
 			if (mesh->mNumBones <= 0) {
 				continue;
