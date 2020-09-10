@@ -92,6 +92,7 @@ bool AnimationPlayer::_set(const StringName &p_name, const Variant &p_value) {
 	}
 	else if (p_name == "import_file_format") {
 		gdi_import_file_format = (ImportFileFormat)((int)p_value);
+		gdi_set_import_file_format((int)p_value);
 	}
 	else
 		return false;

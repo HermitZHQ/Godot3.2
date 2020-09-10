@@ -1006,10 +1006,11 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	RegenerateBoneStack(state);
 #endif
 
-	// for test
-	printf("import anim[%S]------------------>>>>>>mesh[%s]\n", name.c_str(), nullptr != mesh ? mesh->mName.C_Str() : "Null");
+	// for debug
+	printf("import anim[%S]------------------>>>>>>mesh[%s] mesh-id[%d] bone-num[%d]\n", name.c_str(), (nullptr != mesh ? mesh->mName.C_Str() : "Null"), mesh_id, (nullptr != mesh ? mesh->mNumBones : 0));
 
 	//regular tracks
+	printf("[import-anim] total channels num[%d]\n", anim->mNumChannels);
 	for (size_t i = 0; i < anim->mNumChannels; i++) {
 		const aiNodeAnim *track = anim->mChannels[i];
 		String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
@@ -1049,6 +1050,9 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 				skeleton = state.armature_skeletons[bone->mArmature];
 #endif
 
+				// for debug
+				printf("[import-anim] track&bone:[%s]-index[%d]\n", bone->mName.C_Str(), (int)i);
+
 				if (skeleton) {
 					String path = state.root->get_path_to(skeleton);
 					path += ":" + node_name;
@@ -1073,6 +1077,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		// we import all the data and do not miss anything.
 		// 公共非BoneTrack只添加第一次
 		// 因为加入了非Bone的Track支持，所以这里需要判断一下bone，获取不到的才添加
+		// 同时需要注意对同名track的处理
 		if (allocated_node && !bone /*&& !anim_existed_flag*/) {
 			node_path = state.root->get_path_to(allocated_node);
 
@@ -1086,6 +1091,9 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 				state.gdi_none_bone_track_vec.push_back(node_path);
 				_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
 					node_path, node_name, nullptr);
+
+				// for debug
+				printf("[import-anim] track&none-bone:[%S]-index[%d]\n", String(allocated_node->get_name()).c_str(), (int)i);
 			}
 #endif
 		}
@@ -1886,9 +1894,22 @@ void EditorSceneImporterAssimp::_generate_node(
 
 		// 目前看来，这种多mesh的node，只用生成一次arm即可，不过上面的警告我还是保留
 		// 避免以后出现bug没有任何提示
-		for (int i = 0; i < 1/*assimp_node->mNumMeshes*/; ++i) {
+		unsigned int last_mesh_bone_num = 0;
+		for (int i = 0; i < assimp_node->mNumMeshes; ++i) {
 			aiMesh *mesh = state.assimp_scene->mMeshes[assimp_node->mMeshes[i]];
-			if (mesh->mNumBones <= 0) {
+			// 如果mesh的bone数量不一致的话，需要发出警告，因为目前凭经验只生成第一个arm，暂时还未发现bone数量不一直的多mesh
+			if (0 == i) {
+				last_mesh_bone_num = mesh->mNumBones;
+			}
+			else {
+				if (last_mesh_bone_num != mesh->mNumBones) {
+					printf("[GDI-Warning] assimp load node, found multi mesh node with diff bone num\n");
+				}
+				last_mesh_bone_num = mesh->mNumBones;
+			}
+
+			// 目前i > 1表示只手动生成一次arm
+			if (mesh->mNumBones <= 0 || i > 1) {
 				continue;
 			}
 

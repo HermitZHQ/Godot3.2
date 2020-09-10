@@ -125,8 +125,10 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 		set_bone_enabled(which, p_value);
 	else if (what == "pose")
 		set_bone_pose(which, p_value);
-	else if (what == "import_file_format")
+	else if (what == "import_file_format") {
 		gdi_import_file_format = (ImportFileFormat)((int)p_value);
+		gdi_set_import_file_format((int)p_value);
+	}
 	// 修改点：增加属性存储
 	else if (what == "anim_node_name") {
 		_check_load_vec_func(pos);
