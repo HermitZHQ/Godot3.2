@@ -629,7 +629,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 		state.animation_player = memnew(AnimationPlayer);
 		state.animation_player->gdi_set_import_file_format(Object::ASSIMP_FBX);
 		//String anim_player_name = "AnimPlayer-" + String(scene->mAnimations[i]->mName.data);
-		//state.animation_player->set_name(anim_player_name);
+		state.animation_player->set_name("AnimPlayer");
 		state.root->add_child(state.animation_player);
 		state.animation_player->set_owner(state.root);
 
