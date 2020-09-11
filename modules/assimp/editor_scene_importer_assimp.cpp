@@ -358,8 +358,8 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 		// 修改点：创建animNode的所有节点链表用于动画寻找父节点
-		Skeleton::NodeAnim *nodeAnimRoot = nullptr;
-		gdi_create_anim_node_from_scene(scene, &nodeAnimRoot);
+		Skeleton::NodeAnim *node_anim_root = nullptr;
+		gdi_create_anim_node_from_scene(scene, &node_anim_root);
 
 		// 修改点：手动赋值总的armature节点给所有bone node，并给mNode赋值有效地址
 		// 修改2：分开处理不同的mesh中的bone，绑定不同的armature
@@ -423,7 +423,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				spatial = skeleton;
 
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
-				skeleton->gdi_set_anim_root_node_addr((int64_t)nodeAnimRoot);
+				skeleton->gdi_set_anim_root_node_addr((int64_t)node_anim_root);
 #endif
 
 				if (!state.armature_skeletons.has(element_assimp_node)) {
@@ -718,6 +718,7 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::gdi_create_anim_nodes(const aiSce
 	if (scene->mNumAnimations > 0) {
 		if (scene->mNumAnimations > 1) {
 			// 这里我们是应该创建多套不同的AnimNodes吗？还需要验证，比如Piety这种动画
+			// 目前暂时验证的结果是不需要，但是还是保持警告的存在，万一还有其他特殊的动画
 			OS::get_singleton()->print("[GDI-Warning]animation num over 1..., what you handled maybe wrong\n");
 		}
 		aiAnimation *anim = scene->mAnimations[0];
@@ -974,6 +975,9 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		animation->set_loop(true);
 	}
 
+	// for debug
+	printf("import anim[%S]------------------>>>>>>mesh[%s] mesh-id[%d] bone-num[%d]\n", name.c_str(), (nullptr != mesh ? mesh->mName.C_Str() : "Null"), mesh_id, (nullptr != mesh ? mesh->mNumBones : 0));
+
 	// 修改点：使用mesh指定的bone生成接口
 	// generate bone stack for animation import
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
@@ -1002,24 +1006,82 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 			break;// get到有效arm就可以退出循环了
 		}
 	}
+
+	// 检测是否为特殊skeleton
+	static auto check_special_skeleton_func = [&]()->bool {
+
+		if (nullptr == mesh) {
+			return false;
+		}
+
+		int bone_num = mesh->mNumBones;
+		for (int bone_idx = 0; bone_idx < bone_num; ++bone_idx) {
+			aiBone *bone = mesh->mBones[bone_idx];
+			for (size_t i = 0; i < anim->mNumChannels; i++) {
+				if (anim->mChannels[i]->mNodeName == bone->mName) {
+					return false;
+				}
+			}
+		}
+
+		return true;
+	};
+
+	bool special_skeleton_flag = check_special_skeleton_func();
+	if (special_skeleton_flag) {
+		if (nullptr == skeleton) {
+			for (auto e = state.gdi_armature_index_map.front(); e; e = e->next()) {
+				if (e->value() == mesh_id) {
+					skeleton = state.armature_skeletons[e->key()];
+					break;
+				}
+			}
+		}
+		printf("[GDI-Warning] found special skeleton[%S]\n", String(skeleton->get_name()).c_str());
+
+		state.animation_player->gdi_set_special_skeleton_only_with_none_track_bone(skeleton->get_name());
+	}
 #else
 	RegenerateBoneStack(state);
 #endif
 
-	// for debug
-	printf("import anim[%S]------------------>>>>>>mesh[%s] mesh-id[%d] bone-num[%d]\n", name.c_str(), (nullptr != mesh ? mesh->mName.C_Str() : "Null"), mesh_id, (nullptr != mesh ? mesh->mNumBones : 0));
-
 	//regular tracks
 	printf("[import-anim] total channels num[%d]\n", anim->mNumChannels);
 	for (size_t i = 0; i < anim->mNumChannels; i++) {
-		const aiNodeAnim *track = anim->mChannels[i];
+		aiNodeAnim *track = anim->mChannels[i];
 		String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
 		// check magic node
 		bool magic_flag = false;
+		bool magic_comb_flag = false;
 		int magic_pos = node_name.find(Assimp::FBX::MAGIC_NODE_TAG.c_str());
 		if (-1 != magic_pos) {
 			magic_flag = true;
 			node_name = node_name.substr(0, magic_pos);
+			// recomb the whole magic track..., I don't see where shows the magic...
+			if (-1 != String(track->mNodeName.C_Str()).find("Translation")) {
+				aiNodeAnim *track_rot = ((i + 1) < anim->mNumChannels) ? anim->mChannels[i + 1] : nullptr;
+				if (nullptr != track_rot && -1 != String(track_rot->mNodeName.C_Str()).find("Rotation")) {
+					track->mNumRotationKeys = track_rot->mNumRotationKeys;
+					if (nullptr != track->mRotationKeys) {
+						delete[] track->mRotationKeys;
+						track->mRotationKeys = nullptr;
+					}
+					track->mRotationKeys = track_rot->mRotationKeys;
+				}
+				
+				aiNodeAnim *track_scale = ((i + 2) < anim->mNumChannels) ? anim->mChannels[i + 2] : nullptr;
+				if (nullptr != track_scale && -1 != String(track_scale->mNodeName.C_Str()).find("Scaling")) {
+					track->mNumScalingKeys = track_scale->mNumScalingKeys;
+					if (nullptr != track->mScalingKeys) {
+						delete[] track->mScalingKeys;
+						track->mScalingKeys = nullptr;
+					}
+					track->mScalingKeys = track_scale->mScalingKeys;
+				}
+
+				magic_comb_flag = true;
+				printf("[import-anim] found and combine the magic track\n");
+			}
 		}
 
 		// for test
@@ -1117,6 +1179,11 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 			//	_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
 			//		node_path, node_name, nullptr);
 			//}
+		}
+
+		if (magic_flag && magic_comb_flag) {
+			track->mRotationKeys = nullptr;
+			track->mScalingKeys = nullptr;
 		}
 #endif
 	}
@@ -1897,7 +1964,7 @@ void EditorSceneImporterAssimp::_generate_node(
 		unsigned int last_mesh_bone_num = 0;
 		for (int i = 0; i < assimp_node->mNumMeshes; ++i) {
 			aiMesh *mesh = state.assimp_scene->mMeshes[assimp_node->mMeshes[i]];
-			// 如果mesh的bone数量不一致的话，需要发出警告，因为目前凭经验只生成第一个arm，暂时还未发现bone数量不一直的多mesh
+			// 如果mesh的bone数量不一致的话，需要发出警告，因为目前凭经验只生成第一个arm，暂时还未发现同node下bone数量不一致的多mesh
 			if (0 == i) {
 				last_mesh_bone_num = mesh->mNumBones;
 			}
@@ -1908,8 +1975,8 @@ void EditorSceneImporterAssimp::_generate_node(
 				last_mesh_bone_num = mesh->mNumBones;
 			}
 
-			// 目前i > 1表示只手动生成一次arm
-			if (mesh->mNumBones <= 0 || i > 1) {
+			// 目前i > 0表示只手动生成一次arm
+			if (mesh->mNumBones <= 0 || i > 0) {
 				continue;
 			}
 

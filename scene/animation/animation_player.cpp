@@ -94,6 +94,9 @@ bool AnimationPlayer::_set(const StringName &p_name, const Variant &p_value) {
 		gdi_import_file_format = (ImportFileFormat)((int)p_value);
 		gdi_set_import_file_format((int)p_value);
 	}
+	else if (p_name == "special_skeleton_vec") {
+		gdi_special_skeleton_vec = p_value;
+	}
 	else
 		return false;
 
@@ -139,6 +142,9 @@ bool AnimationPlayer::_get(const StringName &p_name, Variant &r_ret) const {
 	}
 	else if (name == "import_file_format") {
 		r_ret = (int)gdi_get_import_file_format();
+	}
+	else if (name == "special_skeleton_vec") {
+		r_ret = gdi_special_skeleton_vec;
 	}
 	else
 		return false;
@@ -186,7 +192,9 @@ void AnimationPlayer::_get_property_list(List<PropertyInfo> *p_list) const {
 	}
 
 	p_list->push_back(PropertyInfo(Variant::ARRAY, "blend_times", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL));
+	// gdi---
 	p_list->push_back(PropertyInfo(Variant::INT, "import_file_format"));
+	p_list->push_back(PropertyInfo(Variant::ARRAY, "special_skeleton_vec"));
 }
 
 void AnimationPlayer::advance(float p_time) {
@@ -297,6 +305,7 @@ void AnimationPlayer::_ensure_node_caches(AnimationData *p_anim) {
 			// cache skeleton
 			p_anim->node_cache[i]->skeleton = Object::cast_to<Skeleton>(child);
 
+			// 修改点：保存所有的skeleton以及root供更新骨骼动画使用
 			//gdi_import_file_format = (Object::ImportFileFormat)gdi_get_import_file_format();
 			if (gdi_import_file_format == Skeleton::ASSIMP_FBX) {
 				// gdi cache update skeleton vec
@@ -304,6 +313,14 @@ void AnimationPlayer::_ensure_node_caches(AnimationData *p_anim) {
 					gdi_scene_root = p_anim->node_cache[i]->spatial->get_tree()->get_edited_scene_root();
 					if (nullptr == gdi_scene_root) {
 						gdi_scene_root = p_anim->node_cache[i]->spatial->get_tree()->get_current_scene();
+					}
+
+					int special_skeleton_num = gdi_special_skeleton_vec.size();
+					for (int skeleton_idx = 0; skeleton_idx < special_skeleton_num; ++skeleton_idx) {
+						Skeleton *skeleton = Object::cast_to<Skeleton>(gdi_scene_root->find_node(gdi_special_skeleton_vec[skeleton_idx]));
+						if (nullptr != skeleton) {
+							gdi_update_skeleton_vec.push_back(skeleton);
+						}
 					}
 				}
 				if (p_anim->node_cache[i]->skeleton && -1 == gdi_update_skeleton_vec.find(p_anim->node_cache[i]->skeleton)) {
@@ -910,8 +927,8 @@ void AnimationPlayer::_animation_update_transforms() {
 
 				if (ImportFileFormat::DEFAULT == gdi_import_file_format) {
 					nc->spatial->set_transform(t);
-				} 
-				else if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format){
+				}
+				else if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format) {
 					// 存在找不到skeleton的情况，仍然可能为空
 					// 这种情况下，我们一般是处理的路径动画
 					if (0 == gdi_update_skeleton_size) {
@@ -928,6 +945,10 @@ void AnimationPlayer::_animation_update_transforms() {
 			}
 		}
 		//OS::get_singleton()->print("_animation_update_transforms----------------------------------->end\n");
+
+		//if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format) {
+
+		//}
 	}
 
 	cache_update_size = 0;
@@ -1768,6 +1789,13 @@ void AnimationPlayer::_bind_methods() {
 
 	BIND_ENUM_CONSTANT(ANIMATION_METHOD_CALL_DEFERRED);
 	BIND_ENUM_CONSTANT(ANIMATION_METHOD_CALL_IMMEDIATE);
+}
+
+void AnimationPlayer::gdi_set_special_skeleton_only_with_none_track_bone(const String &name) {
+
+	if (-1 == gdi_special_skeleton_vec.find(name)) {
+		gdi_special_skeleton_vec.push_back(name);
+	}
 }
 
 AnimationPlayer::AnimationPlayer() {

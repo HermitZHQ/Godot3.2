@@ -925,6 +925,8 @@ void Skeleton::gdi_set_none_bone_pose(StringName name, const Transform &p_pose) 
 	if (nodeAnim) {
 		nodeAnim->local_transform = p_pose;
 	}
+
+	_make_dirty();
 }
 
 int64_t Skeleton::gdi_get_anim_root_node_addr() const {

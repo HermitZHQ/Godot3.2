@@ -366,6 +366,9 @@ public:
 	void restore_animated_values(const AnimatedValuesBackup &p_backup);
 #endif
 
+	// 设置特殊skeleton，只包含非轨道bone的ske
+	void gdi_set_special_skeleton_only_with_none_track_bone(const String &name);
+
 	AnimationPlayer();
 	~AnimationPlayer();
 
@@ -374,6 +377,7 @@ private:
 	Vector<Skeleton*>			gdi_update_skeleton_vec;
 	int							gdi_update_skeleton_size;
 	Object::ImportFileFormat	gdi_import_file_format;
+	Vector<String>				gdi_special_skeleton_vec;
 };
 
 VARIANT_ENUM_CAST(AnimationPlayer::AnimationProcessMode);
