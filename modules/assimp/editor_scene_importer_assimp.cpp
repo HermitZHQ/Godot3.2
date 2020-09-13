@@ -315,6 +315,106 @@ aiBone* EditorSceneImporterAssimp::gdi_find_bone_from_stack(ImportState &state, 
 	return nullptr;
 }
 
+void EditorSceneImporterAssimp::_gdi_optimize_track_data(aiNodeAnim *track) {
+
+	// optimize the track data
+	Vector<aiVectorKey> track_pos_vec;
+	Vector<aiQuatKey> track_quat_vec;
+	Vector<aiVectorKey> track_scale_vec;
+
+	// optimize position keys----
+	aiVector3D last_dir, tmp_dir;
+	ai_real last_len = 0, tmp_len = 0;
+	if (track->mNumPositionKeys > 0 && nullptr != track->mPositionKeys) {
+		track_pos_vec.push_back(track->mPositionKeys[0]);
+
+		for (int pos_idx = 0; pos_idx < track->mNumPositionKeys - 1; ++pos_idx) {
+			tmp_len = (track->mPositionKeys[pos_idx + 1].mValue - track->mPositionKeys[pos_idx].mValue).Length();
+			tmp_dir = (track->mPositionKeys[pos_idx + 1].mValue - track->mPositionKeys[pos_idx].mValue).NormalizeSafe();
+
+			if (pos_idx > 0) {
+				if (last_len != 0 && last_dir != tmp_dir) {
+					track_pos_vec.push_back(track->mPositionKeys[pos_idx]);
+				}
+			}
+
+			last_len = tmp_len;
+			last_dir = tmp_dir;
+		}
+		if (track_pos_vec.size() != track->mNumPositionKeys) {
+			if (track->mNumPositionKeys > 1) {
+				delete[] track->mPositionKeys;
+			}
+			else {
+				delete track->mPositionKeys;
+			}
+			track->mNumPositionKeys = track_pos_vec.size();
+			track->mPositionKeys = new aiVectorKey[track->mNumPositionKeys];
+			for (int pos_idx = 0; pos_idx < track->mNumPositionKeys; ++pos_idx) {
+				track->mPositionKeys[pos_idx] = track_pos_vec[pos_idx];
+			}
+		}
+	}
+
+	// optimize rotation keys----
+	if (track->mNumRotationKeys > 0 && nullptr != track->mRotationKeys) {
+		track_quat_vec.push_back(track->mRotationKeys[0]);
+
+		bool tmp_quat_equal_flag = false, last_quat_equal_flag = false;
+		for (int rot_idx = 0; rot_idx < track->mNumRotationKeys - 1; ++rot_idx) {
+			tmp_quat_equal_flag = (track->mRotationKeys[rot_idx + 1] == track->mRotationKeys[rot_idx]);
+
+			if (rot_idx > 0 && !last_quat_equal_flag) {
+				track_quat_vec.push_back(track->mRotationKeys[rot_idx]);
+			}
+
+			last_quat_equal_flag = tmp_quat_equal_flag;
+		}
+		if (track_quat_vec.size() != track->mNumRotationKeys) {
+			if (track->mNumRotationKeys > 1) {
+				delete[] track->mRotationKeys;
+			}
+			else {
+				delete track->mRotationKeys;
+			}
+			track->mNumRotationKeys = track_quat_vec.size();
+			track->mRotationKeys = new aiQuatKey[track->mNumRotationKeys];
+			for (int rot_idx = 0; rot_idx < track->mNumRotationKeys; ++rot_idx) {
+				track->mRotationKeys[rot_idx] = track_quat_vec[rot_idx];
+			}
+		}
+	}
+
+	// optimize scaling keys----
+	if (track->mNumScalingKeys > 0 && nullptr != track->mScalingKeys) {
+		track_scale_vec.push_back(track->mScalingKeys[0]);
+
+		bool tmp_scale_equal_flag = false, last_scale_equal_flag = false;
+		for (int scale_idx = 0; scale_idx < track->mNumScalingKeys - 1; ++scale_idx) {
+			tmp_scale_equal_flag = (track->mScalingKeys[scale_idx + 1] == track->mScalingKeys[scale_idx]);
+
+			if (scale_idx > 0 && !last_scale_equal_flag) {
+				track_scale_vec.push_back(track->mScalingKeys[scale_idx]);
+			}
+
+			last_scale_equal_flag = tmp_scale_equal_flag;
+		}
+		if (track_scale_vec.size() != track->mNumScalingKeys) {
+			if (track->mNumScalingKeys > 1) {
+				delete[] track->mScalingKeys;
+			}
+			else {
+				delete track->mScalingKeys;
+			}
+			track->mNumScalingKeys = track_scale_vec.size();
+			track->mScalingKeys = new aiVectorKey[track->mNumScalingKeys];
+			for (int scale_idx = 0; scale_idx < track->mNumScalingKeys - 1; ++scale_idx) {
+				track->mScalingKeys[scale_idx] = track_scale_vec[scale_idx];
+			}
+		}
+	}
+}
+
 Spatial *
 EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene, const uint32_t p_flags, int p_bake_fps,
 		const int32_t p_max_bone_weights) {
@@ -742,7 +842,16 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 		int anim_fps, Ref<Animation> animation, float ticks_per_second,
 		Skeleton *skeleton, const NodePath &node_path,
 		const String &node_name, aiBone *track_bone) {
+
 	const aiNodeAnim *assimp_track = assimp_anim->mChannels[track_id];
+
+	// 修改点：是否可以取消只有一个key的track？？正常的track貌似至少有两个有效key
+	//unsigned int gdi_assimp_max_track_count = assimp_track->mNumPositionKeys > assimp_track->mNumRotationKeys ? assimp_track->mNumPositionKeys : assimp_track->mNumRotationKeys;
+	//gdi_assimp_max_track_count = gdi_assimp_max_track_count > assimp_track->mNumScalingKeys ? gdi_assimp_max_track_count : assimp_track->mNumScalingKeys;
+	//if (gdi_assimp_max_track_count <= 1) {
+	//	return;
+	//}
+
 	//make transform track
 	int track_idx = animation->get_track_count();
 	animation->add_track(Animation::TYPE_TRANSFORM);
@@ -751,6 +860,7 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 
 	float increment = 1.0 / float(anim_fps);
 	float time = 0.0;
+	unsigned int gdi_key_count = 0;
 
 	bool last = false;
 
@@ -837,6 +947,11 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 
 		animation->track_set_interpolation_type(track_idx, Animation::INTERPOLATION_LINEAR);
 		animation->transform_track_insert_key(track_idx, time, pos, rot, scale);
+
+		//++gdi_key_count;
+		//if (gdi_key_count >= gdi_assimp_max_track_count) {
+		//	last = true;
+		//}
 
 		if (last) { //done this way so a key is always inserted past the end (for proper interpolation)
 			break;
@@ -932,10 +1047,6 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	aiMesh *mesh = -1 == mesh_id ? nullptr : state.assimp_scene->mMeshes[mesh_id];
 	// 多mesh轨道分离操作，使用不同的anim名称，就可以建立多条轨道
 	//name = name + "-" + "tracks-" + mesh->mName.data + "-" + itos(mesh_id);
-
-	if (0) {
-		return;
-	}
 #endif
 
 	if (name == String()) {
@@ -1050,6 +1161,12 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 	for (size_t i = 0; i < anim->mNumChannels; i++) {
 		aiNodeAnim *track = anim->mChannels[i];
 		String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
+		// for test
+		if (node_name.find("QiaoDun") != -1) {
+			int i = 0;
+			++i;
+		}
+
 		// check magic node
 		bool magic_flag = false;
 		bool magic_comb_flag = false;
@@ -1067,6 +1184,9 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 						track->mRotationKeys = nullptr;
 					}
 					track->mRotationKeys = track_rot->mRotationKeys;
+
+					track_rot->mRotationKeys = nullptr;
+					track_rot->mNumRotationKeys = 0;
 				}
 				
 				aiNodeAnim *track_scale = ((i + 2) < anim->mNumChannels) ? anim->mChannels[i + 2] : nullptr;
@@ -1077,12 +1197,17 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 						track->mScalingKeys = nullptr;
 					}
 					track->mScalingKeys = track_scale->mScalingKeys;
+
+					track_scale->mScalingKeys = nullptr;
+					track_scale->mNumScalingKeys = 0;
 				}
 
 				magic_comb_flag = true;
 				printf("[import-anim] found and combine the magic track\n");
 			}
 		}
+
+		_gdi_optimize_track_data(track);
 
 		// for test
 		//if (node_name.find("Finger") != -1) {
