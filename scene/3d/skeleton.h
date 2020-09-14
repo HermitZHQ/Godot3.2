@@ -263,8 +263,8 @@ private:
 	void _rebuild_physical_bones_cache();
 
 	// 修改点：
-	void _check_load_vec_func(int pos);
-	void _regenerate_anim_node_tree();
+	void _gdi_check_load_vec_func(int pos);
+	void _gdi_regenerate_anim_node_tree();
 
 public:
 	void physical_bones_stop_simulation();

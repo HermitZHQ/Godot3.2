@@ -45,6 +45,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/LogStream.hpp>
 #include "thirdparty/assimp/code/FBX/FBXCommon.h"
+#include "core/math/quat.h"
 
 // move into assimp
 aiBone *get_bone_by_name(const aiScene *scene, aiString bone_name) {
@@ -104,10 +105,10 @@ void EditorSceneImporterAssimp::_bind_methods() {
 Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_flags, int p_bake_fps,
 		List<String> *r_missing_deps, Error *r_err) {
 	Assimp::Importer importer;
-	importer.SetPropertyBool(AI_CONFIG_PP_FD_REMOVE, true);
+	//importer.SetPropertyBool(AI_CONFIG_PP_FD_REMOVE, true);
 	// Cannot remove pivot points because the static mesh will be in the wrong place
 	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
-// 	importer.SetPropertyBool(AI_CONFIG_GLOBAL_SCALE_FACTOR_KEY, true);
+	//importer.SetPropertyBool(AI_CONFIG_GLOBAL_SCALE_FACTOR_KEY, true);
 	int32_t max_bone_weights = 4;
 	//if (p_flags & IMPORT_ANIMATION_EIGHT_WEIGHTS) {
 	//	const int eight_bones = 8;
@@ -341,6 +342,8 @@ void EditorSceneImporterAssimp::_gdi_optimize_track_data(aiNodeAnim *track) {
 			last_len = tmp_len;
 			last_dir = tmp_dir;
 		}
+		track_pos_vec.push_back(track->mPositionKeys[track->mNumPositionKeys - 1]);
+
 		if (track_pos_vec.size() != track->mNumPositionKeys) {
 			if (track->mNumPositionKeys > 1) {
 				delete[] track->mPositionKeys;
@@ -370,6 +373,8 @@ void EditorSceneImporterAssimp::_gdi_optimize_track_data(aiNodeAnim *track) {
 
 			last_quat_equal_flag = tmp_quat_equal_flag;
 		}
+		track_quat_vec.push_back(track->mRotationKeys[track->mNumRotationKeys - 1]);
+
 		if (track_quat_vec.size() != track->mNumRotationKeys) {
 			if (track->mNumRotationKeys > 1) {
 				delete[] track->mRotationKeys;
@@ -399,6 +404,8 @@ void EditorSceneImporterAssimp::_gdi_optimize_track_data(aiNodeAnim *track) {
 
 			last_scale_equal_flag = tmp_scale_equal_flag;
 		}
+		track_scale_vec.push_back(track->mScalingKeys[track->mNumScalingKeys - 1]);
+
 		if (track_scale_vec.size() != track->mNumScalingKeys) {
 			if (track->mNumScalingKeys > 1) {
 				delete[] track->mScalingKeys;
@@ -408,7 +415,7 @@ void EditorSceneImporterAssimp::_gdi_optimize_track_data(aiNodeAnim *track) {
 			}
 			track->mNumScalingKeys = track_scale_vec.size();
 			track->mScalingKeys = new aiVectorKey[track->mNumScalingKeys];
-			for (int scale_idx = 0; scale_idx < track->mNumScalingKeys - 1; ++scale_idx) {
+			for (int scale_idx = 0; scale_idx < track->mNumScalingKeys; ++scale_idx) {
 				track->mScalingKeys[scale_idx] = track_scale_vec[scale_idx];
 			}
 		}
@@ -948,11 +955,6 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 		animation->track_set_interpolation_type(track_idx, Animation::INTERPOLATION_LINEAR);
 		animation->transform_track_insert_key(track_idx, time, pos, rot, scale);
 
-		//++gdi_key_count;
-		//if (gdi_key_count >= gdi_assimp_max_track_count) {
-		//	last = true;
-		//}
-
 		if (last) { //done this way so a key is always inserted past the end (for proper interpolation)
 			break;
 		}
@@ -1162,7 +1164,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		aiNodeAnim *track = anim->mChannels[i];
 		String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
 		// for test
-		if (node_name.find("QiaoDun") != -1) {
+		if (node_name.find("HengGang") != -1) {
 			int i = 0;
 			++i;
 		}
@@ -1207,13 +1209,13 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 			}
 		}
 
-		_gdi_optimize_track_data(track);
-
 		// for test
-		//if (node_name.find("Finger") != -1) {
-		//	int i = 0;
-		//	++i;
-		//}
+		if (node_name.find("HengGang") != -1) {
+			int i = 0;
+			++i;
+		}
+
+// 		_gdi_optimize_track_data(track);
 
 		print_verbose("track name import: " + node_name);
 		if (track->mNumRotationKeys == 0 && track->mNumPositionKeys == 0 && track->mNumScalingKeys == 0) {
@@ -1275,6 +1277,50 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 			}
 #else
 			if (node_path != NodePath() && -1 == state.gdi_none_bone_track_vec.find(node_path)) {
+				// repair the track data first
+				Spatial *spa = Object::cast_to<Spatial>(allocated_node);
+				//if (nullptr != spa) {
+				//	auto trans = spa->get_transform();
+				//	// for test
+				//	if (String(spa->get_name()).find("HengGang") != -1) {
+				//		int i = 0;
+				//		++i;
+				//	}
+
+				//	if (2 == track->mNumPositionKeys && track->mPositionKeys[0].mValue == track->mPositionKeys[1].mValue) {
+				//		for (int idx = 0; idx < 2; ++idx) {
+				//			track->mPositionKeys[idx].mValue = aiVector3D(trans.origin.x, trans.origin.y, trans.origin.z);
+				//		}
+				//	}
+
+				//	if (2 == track->mNumRotationKeys) {
+				//		auto w_diff = abs(track->mRotationKeys[1].mValue.w - track->mRotationKeys[0].mValue.w);
+				//		auto x_diff = abs(track->mRotationKeys[1].mValue.x - track->mRotationKeys[0].mValue.x);
+				//		auto y_diff = abs(track->mRotationKeys[1].mValue.y - track->mRotationKeys[0].mValue.y);
+				//		auto z_diff = abs(track->mRotationKeys[1].mValue.z - track->mRotationKeys[0].mValue.z);
+
+				//		if (w_diff < 0.003 && x_diff < 0.003 && y_diff < 0.003 && z_diff < 0.003) {
+				//			auto quat = trans.basis.get_quat();
+				//			for (int idx = 0; idx < 2; ++idx) {
+				//				track->mRotationKeys[idx].mValue = aiQuaternion(quat.w, quat.x, quat.y, quat.z);
+				//			}
+				//		}
+				//	}
+
+				//	if (2 == track->mNumScalingKeys) {
+				//		auto x_diff = abs(track->mScalingKeys[1].mValue.x - track->mScalingKeys[0].mValue.x);
+				//		auto y_diff = abs(track->mScalingKeys[1].mValue.y - track->mScalingKeys[0].mValue.y);
+				//		auto z_diff = abs(track->mScalingKeys[1].mValue.z - track->mScalingKeys[0].mValue.z);
+
+				//		if (x_diff < 0.002 && y_diff < 0.002 && z_diff < 0.002) {
+				//			auto scale = trans.basis.get_scale();
+				//			for (int idx = 0; idx < 2; ++idx) {
+				//				track->mScalingKeys[idx].mValue = aiVector3D(scale.x, scale.y, scale.z);
+				//			}
+				//		}
+				//	}
+				//}
+
 				state.gdi_none_bone_track_vec.push_back(node_path);
 				_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
 					node_path, node_name, nullptr);
@@ -1306,10 +1352,10 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 			//}
 		}
 
-		if (magic_flag && magic_comb_flag) {
-			track->mRotationKeys = nullptr;
-			track->mScalingKeys = nullptr;
-		}
+		//if (magic_flag && magic_comb_flag) {
+		//	track->mRotationKeys = nullptr;
+		//	track->mScalingKeys = nullptr;
+		//}
 #endif
 	}
 

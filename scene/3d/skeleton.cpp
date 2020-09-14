@@ -67,7 +67,7 @@ SkinReference::~SkinReference() {
 	VS::get_singleton()->free(skeleton);
 }
 
-void Skeleton::_check_load_vec_func(int pos) {
+void Skeleton::_gdi_check_load_vec_func(int pos) {
 
 	if (pos >= gdi_anim_node_load_vec.size()) {
 		NodeAnim *node = new NodeAnim;
@@ -75,23 +75,20 @@ void Skeleton::_check_load_vec_func(int pos) {
 	}
 }
 
-void Skeleton::_regenerate_anim_node_tree()
+void Skeleton::_gdi_regenerate_anim_node_tree()
 {
 	if (gdi_anim_node_load_vec.size() == 0) {
 		return;
 	}
 
-	for (int i = 0; i < gdi_anim_node_load_vec.size(); ++i)
-	{
+	for (int i = 0; i < gdi_anim_node_load_vec.size(); ++i) {
 		gdi_anim_node_load_vec.ptrw()[i]->parent = (gdi_anim_node_load_vec.ptrw()[i]->parent == 0) ?
 			0 : gdi_anim_node_load_vec.ptrw()[(int64_t)gdi_anim_node_load_vec.ptrw()[i]->parent];
 
-		for (int j = 0; j < gdi_anim_node_load_vec.ptrw()[i]->childs.size(); ++j)
-		{
+		for (int j = 0; j < gdi_anim_node_load_vec.ptrw()[i]->childs.size(); ++j) {
 			gdi_anim_node_load_vec.ptrw()[i]->childs.ptrw()[j] = gdi_anim_node_load_vec.ptrw()[(int64_t)gdi_anim_node_load_vec.ptrw()[i]->childs[j]];
 		}
 	}
-
 
 	gdi_anim_node_root = gdi_anim_node_load_vec.ptrw()[0];
 	gdi_anim_node_addr = (int64_t)gdi_anim_node_root;
@@ -131,11 +128,11 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 	}
 	// 修改点：增加属性存储
 	else if (what == "anim_node_name") {
-		_check_load_vec_func(pos);
+		_gdi_check_load_vec_func(pos);
 		gdi_anim_node_load_vec.ptrw()[pos]->name = p_value;
 	}
 	else if (what == "anim_node_child_id_array") {
-		_check_load_vec_func(pos);
+		_gdi_check_load_vec_func(pos);
 		PoolVector<int> id_vec = p_value;
 		// get out the parent id
 		gdi_anim_node_load_vec.ptrw()[pos]->parent = (NodeAnim*)(id_vec[0] == -1 ? (int64_t)0 : (int64_t)id_vec[0]);
@@ -149,31 +146,31 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 		}
 	}
 	else if (what == "anim_node_local_transform") {
-		_check_load_vec_func(pos);
+		_gdi_check_load_vec_func(pos);
 		gdi_anim_node_load_vec.ptrw()[pos]->local_transform = p_value;
 	}
 	else if (what == "anim_node_global_transform") {
-		_check_load_vec_func(pos);
+		_gdi_check_load_vec_func(pos);
 		gdi_anim_node_load_vec.ptrw()[pos]->global_transform = p_value;
 	}
 	else if (what == "anim_node_channel_id") {
-		_check_load_vec_func(pos);
+		_gdi_check_load_vec_func(pos);
 		gdi_anim_node_load_vec.ptrw()[pos]->channel_id = p_value;
 	}
 	else if (what == "anim_node_is_bone") {
-		_check_load_vec_func(pos);
+		_gdi_check_load_vec_func(pos);
 		gdi_anim_node_load_vec.ptrw()[pos]->is_bone = p_value;
 	}
 	else if (what == "anim_node_bone_num") {
-		_check_load_vec_func(pos);
+		_gdi_check_load_vec_func(pos);
 		gdi_anim_node_load_vec.ptrw()[pos]->bone_num = p_value;
 	}
 	else if (what == "anim_node_is_mesh") {
-		_check_load_vec_func(pos);
+		_gdi_check_load_vec_func(pos);
 		gdi_anim_node_load_vec.ptrw()[pos]->is_mesh = p_value;
 	}
 	else if (what == "anim_node_mesh_num") {
-		_check_load_vec_func(pos);
+		_gdi_check_load_vec_func(pos);
 		gdi_anim_node_load_vec.ptrw()[pos]->mesh_num = p_value;
 	}
 	else if (what == "bound_children") {
@@ -385,7 +382,7 @@ void Skeleton::_notification(int p_what) {
 					
 					// 修改点：检测是anim_node_root为null，是的话，从load的anim node vec中重新组合出tree
 					if (nullptr == gdi_anim_node_root) {
-						_regenerate_anim_node_tree();
+						_gdi_regenerate_anim_node_tree();
 					}
 				}
 			}
