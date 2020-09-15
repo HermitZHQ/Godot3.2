@@ -22,6 +22,7 @@
 #include "modules/enet/networked_multiplayer_enet.h"
 #include "core/io/tcp_server.h"
 #include "core/io/stream_peer_tcp.h"
+#include "scene/2d/canvas_item.h"
 
 class GDIVisualScriptNodeInstanceCustomMultiPlayer;
 
@@ -2513,7 +2514,7 @@ Node* GDIVisualScriptNodeInstanceCustomMultiPlayer::find_node_with_id_and_name(u
 	return nullptr;
 }
 
-void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *node, SyncDataInfo sdi) {
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *node, SyncDataInfo &sdi) {
 
 	// update the transform, visible
 	Spatial *spatial = Object::cast_to<Spatial>(node);
@@ -2523,6 +2524,18 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *nod
 		}
 		if (node->gdi_get_multiplayer_sync_visible_enable()) {
 			spatial->set_visible(sdi.visible);
+		}
+	}
+	else {
+		CanvasItem *canvasItem = Object::cast_to<CanvasItem>(node);
+		if (nullptr != canvasItem) {
+			if (node->gdi_get_multiplayer_sync_transform_enable()) {
+				sdi.transform2d.get_scale()
+				canvasItem->draw_set_transform_matrix(sdi.transform2d);
+			}
+			if (node->gdi_get_multiplayer_sync_visible_enable()) {
+				canvasItem->set_visible(sdi.visible);
+			}
 		}
 	}
 
@@ -2595,6 +2608,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::handle_data_change(Node *root
 			arr.push_back(data.instance_id);
 			arr.push_back(data.name);
 			arr.push_back(data.transform);
+			arr.push_back(data.transform2d);
 			arr.push_back(data.visible);
 			// mat num
 			auto albedo_num = data.sync_albedo ? data.albedo_vec.size() : 0;
@@ -2667,6 +2681,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::handle_server_msg(const Varia
 						uint64_t instance_id = arr.pop_front();
 						String name = arr.pop_front();
 						Transform trans = arr.pop_front();
+						Transform2D trans2d = arr.pop_front();
 						bool visible = arr.pop_front();
 						// albedo
 						Vector<Color> albedo_vec;
@@ -2691,7 +2706,9 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::handle_server_msg(const Varia
 							continue;
 						}
 
-						sync_data_with_node(node, SyncDataInfo(trans, visible, albedo_vec, albedo_tex_map));
+						SyncDataInfo sdi;
+						sdi.set_sync_data(trans, trans2d, visible, albedo_vec, albedo_tex_map);
+						sync_data_with_node(node, sdi);
 					}
 				}
 
@@ -2750,6 +2767,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::handle_client_msg(Variant::Ca
 				uint64_t instance_id = arr.pop_front();
 				String name = arr.pop_front();
 				Transform trans = arr.pop_front();
+				Transform2D trans2d = arr.pop_front();
 				bool visible = arr.pop_front();
 				os->print("sync data id[%d], name[%S]\n", instance_id, name);
 				// albedo
@@ -2776,7 +2794,9 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::handle_client_msg(Variant::Ca
 				}
 
 				os->print("albedo tex num[%d], mat num[%d], node[%S]\n", albedo_tex_num, mat_num, String(node->get_name()));
-				sync_data_with_node(node, SyncDataInfo(trans, visible, albedo_vec, albedo_tex_map));
+				SyncDataInfo sdi;
+				sdi.set_sync_data(trans, trans2d, visible, albedo_vec, albedo_tex_map);
+				sync_data_with_node(node, sdi);
 			}
 			break;
 		}
@@ -3021,6 +3041,17 @@ GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(Node *n
 			visible = spatial->is_visible();
 		}
 	}
+	else {
+		CanvasItem *canvasItem = Object::cast_to<CanvasItem>(node);
+		if (nullptr != canvasItem) {
+			if (sync_trans) {
+				transform2d = canvasItem->get_transform();
+			}
+			if (sync_visible) {
+				visible = canvasItem->is_visible();
+			}
+		}
+	}
 
 	// Material relevant(albedo, texture...)
 	MeshInstance *mi = Object::cast_to<MeshInstance>(node);
@@ -3050,18 +3081,20 @@ GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(Node *n
 	}
 }
 
-GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(const Transform &trans, bool v, const Vector<Color> &albedo_vec, const Map<int, String> &albedo_tex_map)
-	:transform(trans), visible(v)
-{
-	this->albedo_vec = albedo_vec;
-	this->albedo_tex_map = albedo_tex_map;
-}
-
 GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo()
 	:instance_id(0), visible(true)
 	, sync_trans(true), sync_visible(true), sync_albedo(true), sync_albedo_tex(true)
 {
 	surf_mat_vec.clear();
+}
+
+void GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::set_sync_data(const Transform &trans, const Transform2D &trans2d, bool p_visible, const Vector<Color> &p_albedo_vec, const Map<int, String> &p_albedo_tex_map) {
+
+	transform = trans;
+	transform2d = trans2d;
+	visible = p_visible;
+	albedo_vec = p_albedo_vec;
+	albedo_tex_map = p_albedo_tex_map;
 }
 
 bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(const SyncDataInfo &other) {
@@ -3124,6 +3157,7 @@ bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(cons
 	}
 
 	if (transform == other.transform &&
+		transform2d == other.transform2d &&
 		visible == other.visible &&
 		same_mat_flag) {
 		return true;

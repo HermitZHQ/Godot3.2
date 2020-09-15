@@ -328,6 +328,7 @@ public:
 		String								name;
 		String								class_name;
 		Transform							transform;
+		Transform2D							transform2d;
 		bool								visible;
 		Vector<Ref<SpatialMaterial>>		surf_mat_vec;
 		Vector<Color>						albedo_vec;
@@ -340,8 +341,9 @@ public:
 
 		SyncDataInfo();
 		SyncDataInfo(Node *node);
-		SyncDataInfo(const Transform &trans, bool v, const Vector<Color> &albedo_vec, const Map<int, String> &albedo_tex_map);
 		bool operator==(const SyncDataInfo &other);
+
+		void set_sync_data(const Transform &trans, const Transform2D &trans2d, bool p_visible, const Vector<Color> &p_albedo_vec, const Map<int, String> &p_albedo_tex_map);
 	};
 	Map<Node*, SyncDataInfo> stored_sync_data_info_map;
 	Vector<SyncDataInfo> changed_data_info_vec;
@@ -366,7 +368,7 @@ public:
 	void update_all_nodes_sync_data_info(Node *node);
 	void update_stored_nodes_info(SyncDataInfo &stored, SyncDataInfo &changed);
 	Node* find_node_with_id_and_name(uint64_t id, const String &name);
-	void sync_data_with_node(Node *node, SyncDataInfo sdi);
+	void sync_data_with_node(Node *node, SyncDataInfo &sdi);
 	void handle_data_change(Node *root);
 	void handle_server_msg(const Variant **p_inputs);
 	void handle_client_msg(Variant::CallError &r_error, String &r_error_str);
