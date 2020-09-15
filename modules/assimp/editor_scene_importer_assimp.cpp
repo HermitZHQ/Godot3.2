@@ -108,6 +108,7 @@ Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_f
 	//importer.SetPropertyBool(AI_CONFIG_PP_FD_REMOVE, true);
 	// Cannot remove pivot points because the static mesh will be in the wrong place
 	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
+	//importer.SetPropertyBool(AI_CONFIG_PP_OG_EXCLUDE_LIST, false);
 	//importer.SetPropertyBool(AI_CONFIG_GLOBAL_SCALE_FACTOR_KEY, true);
 	int32_t max_bone_weights = 4;
 	//if (p_flags & IMPORT_ANIMATION_EIGHT_WEIGHTS) {
@@ -308,7 +309,7 @@ aiBone* EditorSceneImporterAssimp::gdi_find_bone_from_stack(ImportState &state, 
 	for (iter = state.bone_stack.front(); iter; iter = iter->next()) {
 		bone = (aiBone *)iter->get();
 
-		if (bone && bone->mName == name) {			
+		if (bone && bone->mName == name) {
 			return bone;
 		}
 	}
@@ -316,8 +317,9 @@ aiBone* EditorSceneImporterAssimp::gdi_find_bone_from_stack(ImportState &state, 
 	return nullptr;
 }
 
-void EditorSceneImporterAssimp::_gdi_optimize_track_data(aiNodeAnim *track) {
+bool EditorSceneImporterAssimp::_gdi_optimize_track_data(aiNodeAnim *track) {
 
+	bool optimized_flag = false;
 	// optimize the track data
 	Vector<aiVectorKey> track_pos_vec;
 	Vector<aiQuatKey> track_quat_vec;
@@ -351,11 +353,19 @@ void EditorSceneImporterAssimp::_gdi_optimize_track_data(aiNodeAnim *track) {
 			else {
 				delete track->mPositionKeys;
 			}
-			track->mNumPositionKeys = track_pos_vec.size();
-			track->mPositionKeys = new aiVectorKey[track->mNumPositionKeys];
-			for (int pos_idx = 0; pos_idx < track->mNumPositionKeys; ++pos_idx) {
-				track->mPositionKeys[pos_idx] = track_pos_vec[pos_idx];
+
+			if (2 != track_pos_vec.size()) {
+				track->mNumPositionKeys = track_pos_vec.size();
+				track->mPositionKeys = new aiVectorKey[track->mNumPositionKeys];
+				for (int pos_idx = 0; pos_idx < track->mNumPositionKeys; ++pos_idx) {
+					track->mPositionKeys[pos_idx] = track_pos_vec[pos_idx];
+				}
+			} 
+			else {
+				track->mNumPositionKeys = 0;
+				track->mPositionKeys = nullptr;
 			}
+			optimized_flag = true;
 		}
 	}
 
@@ -382,11 +392,27 @@ void EditorSceneImporterAssimp::_gdi_optimize_track_data(aiNodeAnim *track) {
 			else {
 				delete track->mRotationKeys;
 			}
-			track->mNumRotationKeys = track_quat_vec.size();
-			track->mRotationKeys = new aiQuatKey[track->mNumRotationKeys];
-			for (int rot_idx = 0; rot_idx < track->mNumRotationKeys; ++rot_idx) {
-				track->mRotationKeys[rot_idx] = track_quat_vec[rot_idx];
+
+			if (2 != track_quat_vec.size()) {
+				track->mNumRotationKeys = track_quat_vec.size();
+				track->mRotationKeys = new aiQuatKey[track->mNumRotationKeys];
+				for (int rot_idx = 0; rot_idx < track->mNumRotationKeys; ++rot_idx) {
+					track->mRotationKeys[rot_idx] = track_quat_vec[rot_idx];
+
+					//if (abs(abs(track->mRotationKeys[rot_idx].mValue.x) - 0.707) < 0.001 &&
+					//	abs(abs(track->mRotationKeys[rot_idx].mValue.w) - 0.707) < 0.001) {
+					//	track->mRotationKeys[rot_idx].mValue.x = 0;
+					//	track->mRotationKeys[rot_idx].mValue.y = 0;
+					//	track->mRotationKeys[rot_idx].mValue.z = 0;
+					//	track->mRotationKeys[rot_idx].mValue.w = 1;
+					//}
+				}
+			} 
+			else {
+				track->mNumRotationKeys = 0;
+				track->mRotationKeys = nullptr;
 			}
+			optimized_flag = true;
 		}
 	}
 
@@ -413,13 +439,23 @@ void EditorSceneImporterAssimp::_gdi_optimize_track_data(aiNodeAnim *track) {
 			else {
 				delete track->mScalingKeys;
 			}
-			track->mNumScalingKeys = track_scale_vec.size();
-			track->mScalingKeys = new aiVectorKey[track->mNumScalingKeys];
-			for (int scale_idx = 0; scale_idx < track->mNumScalingKeys; ++scale_idx) {
-				track->mScalingKeys[scale_idx] = track_scale_vec[scale_idx];
+
+			if (2 != track_scale_vec.size()) {
+				track->mNumScalingKeys = track_scale_vec.size();
+				track->mScalingKeys = new aiVectorKey[track->mNumScalingKeys];
+				for (int scale_idx = 0; scale_idx < track->mNumScalingKeys; ++scale_idx) {
+					track->mScalingKeys[scale_idx] = track_scale_vec[scale_idx];
+				}
+			} 
+			else {
+				track->mNumScalingKeys = 0;
+				track->mScalingKeys = nullptr;
 			}
+			optimized_flag = true;
 		}
 	}
+
+	return optimized_flag;
 }
 
 Spatial *
@@ -853,11 +889,11 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 	const aiNodeAnim *assimp_track = assimp_anim->mChannels[track_id];
 
 	// 修改点：是否可以取消只有一个key的track？？正常的track貌似至少有两个有效key
-	//unsigned int gdi_assimp_max_track_count = assimp_track->mNumPositionKeys > assimp_track->mNumRotationKeys ? assimp_track->mNumPositionKeys : assimp_track->mNumRotationKeys;
-	//gdi_assimp_max_track_count = gdi_assimp_max_track_count > assimp_track->mNumScalingKeys ? gdi_assimp_max_track_count : assimp_track->mNumScalingKeys;
-	//if (gdi_assimp_max_track_count <= 1) {
-	//	return;
-	//}
+	unsigned int gdi_assimp_max_track_count = assimp_track->mNumPositionKeys > assimp_track->mNumRotationKeys ? assimp_track->mNumPositionKeys : assimp_track->mNumRotationKeys;
+	gdi_assimp_max_track_count = gdi_assimp_max_track_count > assimp_track->mNumScalingKeys ? gdi_assimp_max_track_count : assimp_track->mNumScalingKeys;
+	if (gdi_assimp_max_track_count <= 1) {
+		return;
+	}
 
 	//make transform track
 	int track_idx = animation->get_track_count();
@@ -1164,7 +1200,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		aiNodeAnim *track = anim->mChannels[i];
 		String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
 		// for test
-		if (node_name.find("HengGang") != -1) {
+		if (node_name.find("BuDong") != -1) {
 			int i = 0;
 			++i;
 		}
@@ -1190,7 +1226,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 					track_rot->mRotationKeys = nullptr;
 					track_rot->mNumRotationKeys = 0;
 				}
-				
+
 				aiNodeAnim *track_scale = ((i + 2) < anim->mNumChannels) ? anim->mChannels[i + 2] : nullptr;
 				if (nullptr != track_scale && -1 != String(track_scale->mNodeName.C_Str()).find("Scaling")) {
 					track->mNumScalingKeys = track_scale->mNumScalingKeys;
@@ -1210,12 +1246,15 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		}
 
 		// for test
-		if (node_name.find("HengGang") != -1) {
-			int i = 0;
-			++i;
-		}
+		//if (node_name.find("HengGang") != -1) {
+		//	int i = 0;
+		//	++i;
+		//}
 
-// 		_gdi_optimize_track_data(track);
+		bool optimized_flag = false;
+ 		if (magic_flag) {
+ 			optimized_flag = _gdi_optimize_track_data(track);
+ 		}
 
 		print_verbose("track name import: " + node_name);
 		if (track->mNumRotationKeys == 0 && track->mNumPositionKeys == 0 && track->mNumScalingKeys == 0) {
@@ -1279,47 +1318,35 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 			if (node_path != NodePath() && -1 == state.gdi_none_bone_track_vec.find(node_path)) {
 				// repair the track data first
 				Spatial *spa = Object::cast_to<Spatial>(allocated_node);
-				//if (nullptr != spa) {
-				//	auto trans = spa->get_transform();
-				//	// for test
-				//	if (String(spa->get_name()).find("HengGang") != -1) {
-				//		int i = 0;
-				//		++i;
-				//	}
+				if (optimized_flag && nullptr != spa) {
+					auto trans = spa->get_transform();
+					// for test
+					if (String(spa->get_name()).find("HengGang") != -1) {
+						int i = 0;
+						++i;
+					}
 
-				//	if (2 == track->mNumPositionKeys && track->mPositionKeys[0].mValue == track->mPositionKeys[1].mValue) {
-				//		for (int idx = 0; idx < 2; ++idx) {
-				//			track->mPositionKeys[idx].mValue = aiVector3D(trans.origin.x, trans.origin.y, trans.origin.z);
-				//		}
-				//	}
+					if (0 == track->mNumPositionKeys) {
+						track->mNumPositionKeys = 1;
+						track->mPositionKeys = new aiVectorKey(0, aiVector3D(trans.origin.x, trans.origin.y, trans.origin.z));
+					}
 
-				//	if (2 == track->mNumRotationKeys) {
-				//		auto w_diff = abs(track->mRotationKeys[1].mValue.w - track->mRotationKeys[0].mValue.w);
-				//		auto x_diff = abs(track->mRotationKeys[1].mValue.x - track->mRotationKeys[0].mValue.x);
-				//		auto y_diff = abs(track->mRotationKeys[1].mValue.y - track->mRotationKeys[0].mValue.y);
-				//		auto z_diff = abs(track->mRotationKeys[1].mValue.z - track->mRotationKeys[0].mValue.z);
+					if (0 == track->mNumRotationKeys) {
+						auto quat = trans.basis.get_quat();
+						auto q2 = trans.basis.get_rotation_quat();
+						track->mNumRotationKeys = 1;
+						track->mRotationKeys = new aiQuatKey(0, aiQuaternion(quat.w, quat.x, quat.y, quat.z));
+					}
 
-				//		if (w_diff < 0.003 && x_diff < 0.003 && y_diff < 0.003 && z_diff < 0.003) {
-				//			auto quat = trans.basis.get_quat();
-				//			for (int idx = 0; idx < 2; ++idx) {
-				//				track->mRotationKeys[idx].mValue = aiQuaternion(quat.w, quat.x, quat.y, quat.z);
-				//			}
-				//		}
-				//	}
+					if (0 == track->mNumScalingKeys) {
+						auto scale = trans.basis.get_scale();
+						auto s2 = trans.basis.get_scale_abs();
+						auto s3 = trans.basis.get_scale_local();
 
-				//	if (2 == track->mNumScalingKeys) {
-				//		auto x_diff = abs(track->mScalingKeys[1].mValue.x - track->mScalingKeys[0].mValue.x);
-				//		auto y_diff = abs(track->mScalingKeys[1].mValue.y - track->mScalingKeys[0].mValue.y);
-				//		auto z_diff = abs(track->mScalingKeys[1].mValue.z - track->mScalingKeys[0].mValue.z);
-
-				//		if (x_diff < 0.002 && y_diff < 0.002 && z_diff < 0.002) {
-				//			auto scale = trans.basis.get_scale();
-				//			for (int idx = 0; idx < 2; ++idx) {
-				//				track->mScalingKeys[idx].mValue = aiVector3D(scale.x, scale.y, scale.z);
-				//			}
-				//		}
-				//	}
-				//}
+						track->mNumScalingKeys = 1;
+						track->mScalingKeys = new aiVectorKey(0, aiVector3D(scale.x, scale.y, scale.z));
+					}
+				}
 
 				state.gdi_none_bone_track_vec.push_back(node_path);
 				_insert_animation_track(state, anim, i, p_bake_fps, animation, ticks_per_second, skeleton,
@@ -1332,7 +1359,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		}
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 		else if (bone == nullptr) {
-			printf("[GDI-warning]:mesh[%s], missing track[%s], can't find it in the nodes vec, mesh id[%d], track id[%d]\n", mesh ? mesh->mName.C_Str() : "null", track->mNodeName.data, mesh_id, (int)i);
+			printf("[GDI-warning]:mesh[%s], missing track[%s], can't find it in the nodes vec, mesh id[%d], track id[%d]\n", mesh ? mesh->mName.C_Str() : "null",track->mNodeName.data, mesh_id, (int)i);
 
 			// for test
 			//if (String(track->mNodeName.data) == String("Bip001 L Finger1Nub")) {
