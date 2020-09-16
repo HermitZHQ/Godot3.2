@@ -23,6 +23,8 @@
 #include "core/io/tcp_server.h"
 #include "core/io/stream_peer_tcp.h"
 #include "scene/2d/canvas_item.h"
+#include "scene/2d/node_2d.h"
+#include "scene/gui/control.h"
 
 class GDIVisualScriptNodeInstanceCustomMultiPlayer;
 
@@ -2529,12 +2531,26 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *nod
 	else {
 		CanvasItem *canvasItem = Object::cast_to<CanvasItem>(node);
 		if (nullptr != canvasItem) {
-			if (node->gdi_get_multiplayer_sync_transform_enable()) {
-				sdi.transform2d.get_scale()
-				canvasItem->draw_set_transform_matrix(sdi.transform2d);
-			}
 			if (node->gdi_get_multiplayer_sync_visible_enable()) {
 				canvasItem->set_visible(sdi.visible);
+			}
+
+			if (node->gdi_get_multiplayer_sync_transform_enable()) {
+				Control *ctrl = Object::cast_to<Control>(node);
+	
+				if (nullptr != ctrl) {
+					ctrl->set_scale(sdi.transform2d.get_scale());
+					ctrl->set_position(sdi.transform2d.get_origin());
+					ctrl->set_rotation(sdi.transform2d.get_rotation());
+				} 
+				else {
+					Node2D *node2d = Object::cast_to<Node2D>(node);
+					if (nullptr != node2d) {
+						node2d->set_scale(sdi.transform2d.get_scale());
+						node2d->set_position(sdi.transform2d.get_origin());
+						node2d->set_rotation(sdi.transform2d.get_rotation());
+					}
+				}
 			}
 		}
 	}
@@ -3073,7 +3089,9 @@ GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::SyncDataInfo(Node *n
 				if (sync_albedo_tex) {
 					auto tex = sm->get_texture(SpatialMaterial::TextureParam::TEXTURE_ALBEDO);
 					if (nullptr != *tex) {
+#ifdef TOOLS_ENABLED
 						albedo_tex_map.insert(i, tex->get_import_path());
+#endif
 					}
 				}
 			}
@@ -3133,7 +3151,12 @@ bool GDIVisualScriptNodeInstanceCustomMultiPlayer::SyncDataInfo::operator==(cons
 				auto e = albedo_tex_map.find(i);
 				auto right_tex = other.surf_mat_vec[i]->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
 				if (nullptr != *right_tex) {
+#ifdef TOOLS_ENABLED
 					String right_path = right_tex->get_import_path();
+#else
+					String right_path = "";
+					OS::get_singleton()->print("[GDI-Error]gdi visual script node error case...\n");
+#endif
 					//OS::get_singleton()->print("left path[%S], right paht[%S]\n", left_path, right_path);
 					String left_path = nullptr == e ? "" : e->value();
 

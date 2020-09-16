@@ -851,17 +851,86 @@ bool FBXConverter::GenerateTransformationNodeChain(const Model &model, const std
         return true;
     }
 
+    // 测试点：测试即使不开启pivots，也需要处理应该处理的node chain
+    if ((chainBits & chainMaskComplex)) {
+
+        NodeAnimBitMap::const_iterator it = node_anim_chain_bits.find(name);
+        const unsigned int anim_chain_bitmask = (it == node_anim_chain_bits.end() ? 0 : (*it).second);
+
+        unsigned int bit = 0x1;
+        for (size_t i = 0; i < TransformationComp_MAXIMUM; ++i, bit <<= 1) {
+            const TransformationComp comp = static_cast<TransformationComp>(i);
+
+            if ((chainBits & bit) == 0 && (anim_chain_bitmask & bit) == 0) {
+                continue;
+            }
+
+            if (comp == TransformationComp_PostRotation) {
+                chain[i] = chain[i].Inverse();
+            }
+
+            aiNode *nd = new aiNode();
+            nd->mName.Set(NameTransformationChainNode(name, comp));
+            nd->mTransformation = chain[i];
+
+            // geometric inverses go in a post-node chain
+            if (comp == TransformationComp_GeometricScalingInverse ||
+                comp == TransformationComp_GeometricRotationInverse ||
+                comp == TransformationComp_GeometricTranslationInverse) {
+                post_output_nodes.push_back(nd);
+            }
+            else {
+                output_nodes.push_back(nd);
+            }
+        }
+
+        //ai_assert(output_nodes.size());
+        //return true;
+    }
+
     // else, we can just multiply the matrices together
     aiNode *nd = new aiNode();
+
+    // 原流程操作
+    if (0 == output_nodes.size()) {
+	    // for (const auto &transform : chain) {
+	    // skip inverse chain for no preservePivots
+	    for (unsigned int i = TransformationComp_Translation; i < TransformationComp_MAXIMUM; i++) {
+	      nd->mTransformation = nd->mTransformation * chain[i];
+	    }
+    }
+    else {
+        const std::vector<const Connection *> &child_conns = doc.GetConnectionsByDestinationSequenced(model.ID(), "Model");
+        aiMatrix4x4 final_mat;
+        for (auto &node : output_nodes) {
+            final_mat = final_mat * node->mTransformation;
+        }
+        if (child_conns.size() > 0) {
+	        for (auto &node : post_output_nodes) {
+	            final_mat = final_mat * node->mTransformation;
+	        }
+        }
+        nd->mTransformation = final_mat;
+
+        for (auto &node : output_nodes) {
+            delete node;
+            node = nullptr;
+        }
+        output_nodes.clear();
+        if (child_conns.size() > 0) {
+	        for (auto &node : post_output_nodes) {
+	            delete node;
+	            node = nullptr;
+	        }
+	        post_output_nodes.clear();
+        }
+    }
+
     output_nodes.push_back(nd);
 
     // name passed to the method is already unique
     nd->mName.Set(name);
-    // for (const auto &transform : chain) {
-    // skip inverse chain for no preservePivots
-    for (unsigned int i = TransformationComp_Translation; i < TransformationComp_MAXIMUM; i++) {
-      nd->mTransformation = nd->mTransformation * chain[i];
-    }
+
     return false;
 }
   
