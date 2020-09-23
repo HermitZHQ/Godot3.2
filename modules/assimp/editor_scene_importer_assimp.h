@@ -120,6 +120,7 @@ private:
 	// 修改点：加入创建animNode的函数
 	void gdi_create_anim_node_from_scene(const aiScene *scene, Skeleton::NodeAnim **root);
 	Skeleton::NodeAnim* gdi_create_anim_nodes(const aiScene *scene, const aiNode *node, Skeleton::NodeAnim *parent);
+	void gdi_find_anim_node_by_name(Skeleton::NodeAnim *node, const String &name, __out Skeleton::NodeAnim **res_node);
 
 	template <class T>
 	T _interpolate_track(const Vector<float> &p_times, const Vector<T> &p_values, float p_time, AssetImportAnimation::Interpolation p_interp);
@@ -151,6 +152,9 @@ public:
 	static void RegenerateBoneStack(ImportState &state);
 
 	void RegenerateBoneStack(ImportState &state, aiMesh *mesh);
+
+private:
+	Skeleton::NodeAnim *gdi_node_anim_root = nullptr;
 };
 #endif
 #endif

@@ -47,6 +47,8 @@
 #include "thirdparty/assimp/code/FBX/FBXCommon.h"
 #include "core/math/quat.h"
 
+#include "assimp/mesh.h"
+
 // move into assimp
 aiBone *get_bone_by_name(const aiScene *scene, aiString bone_name) {
 	for (unsigned int mesh_id = 0; mesh_id < scene->mNumMeshes; ++mesh_id) {
@@ -501,8 +503,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
 		// 修改点：创建animNode的所有节点链表用于动画寻找父节点
-		Skeleton::NodeAnim *node_anim_root = nullptr;
-		gdi_create_anim_node_from_scene(scene, &node_anim_root);
+		gdi_create_anim_node_from_scene(scene, &gdi_node_anim_root);
 
 		// 修改点：手动赋值总的armature节点给所有bone node，并给mNode赋值有效地址
 		// 修改2：分开处理不同的mesh中的bone，绑定不同的armature
@@ -566,7 +567,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 				spatial = skeleton;
 
 #ifdef GDI_ENABLE_ASSIMP_MODIFICATION
-				skeleton->gdi_set_anim_root_node_addr((int64_t)node_anim_root);
+				skeleton->gdi_set_anim_root_node_addr((int64_t)gdi_node_anim_root);
 #endif
 
 				if (!state.armature_skeletons.has(element_assimp_node)) {
@@ -881,6 +882,23 @@ Skeleton::NodeAnim* EditorSceneImporterAssimp::gdi_create_anim_nodes(const aiSce
 	return animNode;
 }
 
+void EditorSceneImporterAssimp::gdi_find_anim_node_by_name(Skeleton::NodeAnim *node, const String &name, __out Skeleton::NodeAnim **res_node) {
+
+	if (nullptr == node || nullptr != *res_node) {
+		return;
+	}
+
+	if (node->name == name) {
+		*res_node = node;
+		return;
+	}
+
+	int child_num = node->childs.size();
+	for (int i = 0; i < child_num; ++i)	{
+		gdi_find_anim_node_by_name(node->childs[i], name, res_node);
+	}
+}
+
 void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, const aiAnimation *assimp_anim, int track_id,
 		int anim_fps, Ref<Animation> animation, float ticks_per_second,
 		Skeleton *skeleton, const NodePath &node_path,
@@ -894,6 +912,9 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 	if (gdi_assimp_max_track_count <= 1) {
 		return;
 	}
+
+	Skeleton::NodeAnim *node_anim = nullptr;
+	gdi_find_anim_node_by_name(gdi_node_anim_root, node_name, &node_anim);
 
 	//make transform track
 	int track_idx = animation->get_track_count();
@@ -933,9 +954,13 @@ void EditorSceneImporterAssimp::_insert_animation_track(ImportState &scene, cons
 	}
 
 	while (true) {
-		Vector3 pos;
-		Quat rot;
-		Vector3 scale(1, 1, 1);
+		//Vector3 pos;
+		//Quat rot;
+		//Vector3 scale(1, 1, 1);
+		
+		Vector3 pos = (nullptr == node_anim) ? Vector3() : node_anim->local_transform.get_origin();
+		Quat rot = (nullptr == node_anim) ? Quat() : node_anim->local_transform.get_basis().get_rotation_quat();
+		Vector3 scale = (nullptr == node_anim) ? Vector3(1, 1, 1) : node_anim->local_transform.get_basis().get_scale();
 
 		if (pos_values.size()) {
 			pos = _interpolate_track<Vector3>(pos_times, pos_values, time, AssetImportAnimation::INTERP_LINEAR);
@@ -1200,7 +1225,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		aiNodeAnim *track = anim->mChannels[i];
 		String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
 		// for test
-		if (node_name.find("BuDong") != -1) {
+		if (node_name.find("JiaZi") != -1) {
 			int i = 0;
 			++i;
 		}
@@ -1332,7 +1357,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 					}
 
 					if (0 == track->mNumRotationKeys) {
-						auto quat = trans.basis.get_quat();
+						auto quat = trans.basis.get_rotation_quat();
 						auto q2 = trans.basis.get_rotation_quat();
 						track->mNumRotationKeys = 1;
 						track->mRotationKeys = new aiQuatKey(0, aiQuaternion(quat.w, quat.x, quat.y, quat.z));
@@ -2123,13 +2148,63 @@ void EditorSceneImporterAssimp::_generate_node(
 		const aiNode *assimp_node) {
 
 	ERR_FAIL_COND(assimp_node == NULL);
-	state.nodes.push_back(assimp_node);
 	String parent_name = AssimpUtils::get_assimp_string(assimp_node->mParent->mName);
 
-	//if (assimp_node->mName == aiString("Dummy33_end")) {
-	//	int i = 0;
-	//	++i;
-	//}
+#ifdef GDI_ENABLE_ASSIMP_MODIFICATION
+	String node_name = AssimpUtils::get_assimp_string(assimp_node->mName);
+	String original_name = node_name;
+	// check repeat
+	bool repeat_flag = false, changed_name_flag = false;
+	int node_size = state.nodes.size();
+	for (int i = 0; i < node_size; ++i) {
+		if (AssimpUtils::get_assimp_string(state.nodes[i]->mName) == node_name) {
+			repeat_flag = true;
+			changed_name_flag = true;
+			break;
+		}
+	}
+
+	while (repeat_flag) {
+		repeat_flag = false;
+		node_name = node_name.insert(node_name.length(), "_x");
+		for (int i = 0; i < node_size; ++i) {
+			if (AssimpUtils::get_assimp_string(state.nodes[i]->mName) == node_name) {
+				repeat_flag = true;
+				break;
+			}
+		}
+	}
+	if (changed_name_flag) {
+		aiNode *tmp_assimp_node = const_cast<aiNode*>(assimp_node);
+		tmp_assimp_node->mName = aiString(node_name.ascii().get_data());
+
+		// modify parent's(mesh) bone name
+		aiNode *parent = tmp_assimp_node->mParent;
+		while (parent) {
+			if (parent->mNumMeshes > 0 && state.assimp_scene->mMeshes[parent->mMeshes[0]]->mNumBones > 0) {
+				int bone_num = state.assimp_scene->mMeshes[parent->mMeshes[0]]->mNumBones;
+				aiMesh *mesh = state.assimp_scene->mMeshes[parent->mMeshes[0]];
+				for (int i = 0; i < bone_num; ++i) {
+					if (mesh->mBones[i]->mName == aiString(original_name.ascii().get_data())) {
+						mesh->mBones[i]->mName = aiString(node_name.ascii().get_data());
+						break;
+					}
+				}
+				break;
+			}
+
+			parent = parent->mParent;
+		}
+	}
+	state.nodes.push_back(assimp_node);
+#else
+	state.nodes.push_back(assimp_node);
+#endif
+
+	if (assimp_node->mName == aiString("SM_JiaZi_002")) {
+		int i = 0;
+		++i;
+	}
 
 	// please note
 	// duplicate bone names exist
@@ -2178,13 +2253,17 @@ void EditorSceneImporterAssimp::_generate_node(
 				continue;
 			}
 
-			// test code: check the bones info
 			Vector<aiString> str_vec;
 			for (int i = 0; i < mesh->mNumBones; ++i) {
-				str_vec.push_back(mesh->mBones[i]->mName);
-				if (mesh->mBones[i]->mName == aiString("Bone001")) {
-					int i = 0;
-					++i;
+				// test code: check the bones info
+				//str_vec.push_back(mesh->mBones[i]->mName);
+				//if (mesh->mBones[i]->mName == aiString("Bone001")) {
+				//	int i = 0;
+				//	++i;
+				//}
+
+				if (changed_name_flag) {
+
 				}
 			}
 

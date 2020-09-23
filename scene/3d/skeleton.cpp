@@ -691,6 +691,10 @@ Skeleton::NodeAnim* Skeleton::gdi_find_anim_node_by_name(NodeAnim *root, String 
 
 void Skeleton::_gdi_find_anim_node_recursive(NodeAnim *nodeAnim, String boneName, NodeAnim **node) {
 
+	if (nullptr == nodeAnim) {
+		return;
+	}
+
 	if (nodeAnim->name == boneName) {
 		*node = nodeAnim;
 		return;
