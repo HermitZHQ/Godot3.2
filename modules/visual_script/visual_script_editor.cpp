@@ -2536,8 +2536,8 @@ void VisualScriptEditor::_gdi_create_process_func_node(const Vector2 &ofs) {
 	selected = name;
 	Ref<VisualScriptFunction> func_node;
 	func_node.instance();
-	func_node->set_caption(L"任务");
-	func_node->set_name(L"循环调用");
+	func_node->set_caption(TTR("Task"));
+	func_node->set_name(TTR("LoopInvoke"));
 // 	func_node->set_name(name);
 
 	undo_redo->create_action(TTR("Add Function"));
@@ -2545,7 +2545,7 @@ void VisualScriptEditor::_gdi_create_process_func_node(const Vector2 &ofs) {
 
 	for (int i = 0; i < minfo.arguments.size(); i++) {
 // 		func_node->add_argument(minfo.arguments[i].type, minfo.arguments[i].name, -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
-		func_node->add_argument(minfo.arguments[i].type, L"帧时差", -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
+		func_node->add_argument(minfo.arguments[i].type, TTR("FrameDeltaTime"), -1, minfo.arguments[i].hint, minfo.arguments[i].hint_string);
 	}
 
 // 	Vector2 ofs = _get_available_pos();
@@ -2598,8 +2598,8 @@ void VisualScriptEditor::_gdi_create_ready_func_node(const Vector2 &ofs) {
 	selected = name;
 	Ref<VisualScriptFunction> func_node;
 	func_node.instance();
-	func_node->set_caption(L"任务");
-	func_node->set_name(L"调用一次");
+	func_node->set_caption(TTR("Task"));
+	func_node->set_name(TTR("ExecuteOnce"));
 // 	func_node->set_name(name);
 
 	undo_redo->create_action(TTR("Add Function"));

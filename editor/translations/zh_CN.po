@@ -11701,6 +11701,223 @@ msgstr "路径必须指向节点！"
 msgid "Invalid index property name '%s' in node %s."
 msgstr "'%s'这个属性名的在节点'%s'中不存在。"
 
+#----------------------gdi visual script nodes(start)
+#: modules/visual_script/gdi_visual_script_custom_nodes.cpp
+#----MultiPlayerSync
+msgid "MultiPlayerSync"
+msgstr "多人协同"
+
+msgid "ServerFlag"
+msgstr "本机为服务器"
+
+msgid "ServerIP"
+msgstr "服务器IP地址"
+
+msgid "ServerPort"
+msgstr "服务器端口"
+
+msgid "ServerMaxConnectionNum"
+msgstr "最大连接数-test"
+
+msgid "ServerPassword"
+msgstr "密码"
+
+msgid "succeed"
+msgstr "成功"
+
+msgid "CreateServerOrClient"
+msgstr "创建服务器或客户端"
+
+msgid "EnableSync"
+msgstr "是否开启同步"
+
+msgid "SyncTransform"
+msgstr "同步变换"
+
+msgid "SyncVisible"
+msgstr "同步显隐"
+
+msgid "SyncAlbedo"
+msgstr "同步Albedo"
+
+msgid "SyncAlbedoTex"
+msgstr "同步AlbedoTex"
+
+#----鼠标
+msgid "HandleMouseKey"
+msgstr "鼠标按键处理"
+
+msgid "HandleMouseKey"
+msgstr "鼠标按键处理"
+
+msgid "Mouse"
+msgstr "鼠标"
+
+msgid "Pressed"
+msgstr "按下"
+
+msgid "Released"
+msgstr "释放"
+
+msgid "WheelValue"
+msgstr "滚轮值"
+
+msgid "MousePos"
+msgstr "鼠标坐标"
+
+msgid "PickupFlag"
+msgstr "拣选标识"
+
+msgid "UnhandledType"
+msgstr "未处理类型"
+
+msgid "SelectMouseKey"
+msgstr "键位选择"
+
+msgid "PickupNode"
+msgstr "拣选节点"
+
+msgid "MouseLeftBtn"
+msgstr "左键"
+
+msgid "MouseMiddleBtn"
+msgstr "中键"
+
+msgid "MouseRightBtn"
+msgstr "右键"
+
+msgid "Click"
+msgstr "单击"
+
+msgid "DoubleClick"
+msgstr "双击"
+
+msgid "Drag"
+msgstr "拖动"
+
+msgid "Wheel"
+msgstr "滚轮"
+
+msgid "WithoutOperation"
+msgstr "无操作时"
+
+msgid "(Mouse)PickupCollsionArea"
+msgstr "(鼠标)拣选碰撞区"
+
+#----其他
+msgid "InvokeWithInit"
+msgstr "初始化时调用"
+
+msgid "InvokeWithProcess"
+msgstr "循环调用"
+
+msgid "SplitTask"
+msgstr "拆分原有任务"
+
+msgid "ControlThePartialFlow"
+msgstr "可单独屏蔽部分流程"
+
+msgid "InputKeyValue(such as:a)"
+msgstr "在下方填入键值（如：a）"
+
+msgid "HandleMouseKey"
+msgstr "鼠标按键处理"
+
+msgid "TriggeredWhenOtherNodeComeInside"
+msgstr "其他节点进入时触发"
+
+msgid "TriggeredWhenTimeUp"
+msgstr "到设定时间后触发"
+
+msgid "TriggeredWhenAllTaskTrue"
+msgstr "所有任务为真时触发"
+
+msgid "RestoreSceneToInit"
+msgstr "恢复场景到初始状态"
+
+msgid "Active"
+msgstr "激活"
+
+msgid "Loop"
+msgstr "循环"
+
+msgid "SplitTask"
+msgstr "任务拆分"
+
+msgid "FlowControl"
+msgstr "流程控制"
+
+msgid "Keyboard"
+msgstr "键盘"
+
+msgid "Mouse"
+msgstr "鼠标"
+
+msgid "AreaTrigger"
+msgstr "空间触发器"
+
+msgid "Timer"
+msgstr "计时器"
+
+msgid "CombineTask"
+msgstr "任务组合"
+
+msgid "Init"
+msgstr "初始化"
+
+msgid "Triggered"
+msgstr "已触发"
+
+msgid "Instance"
+msgstr "实例"
+
+msgid "Task"
+msgstr "任务"
+
+msgid "Minute"
+msgstr "分"
+
+msgid "Second"
+msgstr "秒"
+
+msgid "Millisecond"
+msgstr "毫秒"
+
+msgid "TriggerNode"
+msgstr "触发节点"
+
+msgid "AreaNode"
+msgstr "Area节点"
+
+msgid "KeyValue"
+msgstr "键值"
+
+msgid "ExecuteOnce"
+msgstr "只执行一次"
+
+msgid "Unactive"
+msgstr "未激活"
+
+msgid "KeepPressed"
+msgstr "按下保持"
+
+msgid "SubTask"
+msgstr "子任务"
+
+msgid "LoopInvoke"
+msgstr "循环调用"
+
+msgid "FrameDeltaTime"
+msgstr "帧时差"
+
+#----可视化节点名称
+msgid "(MainTask)Active"
+msgstr "激活(主任务)"
+
+msgid "(MainTask)Loop"
+msgstr "循环(主任务)"
+#----------------------gdi visual script nodes(end)
+
 #: modules/visual_script/visual_script_nodes.cpp
 msgid ": Invalid argument of type: "
 msgstr "：无效参数类型： "

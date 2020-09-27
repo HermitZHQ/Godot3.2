@@ -92,7 +92,7 @@ private:
 	Variant::Type basic_type;
 	NodePath base_path;
 	StringName function;
-	int use_default_args;
+	int combine_task_num;
 	StringName singleton;
 	bool validate;
 
@@ -214,7 +214,7 @@ public:
 
 		MAX_COUNT
 	};
-	const String mouse_key_list[3] = { L"左键", L"右键", L"中键" };
+	const String mouse_key_list[3] = { TTR("MouseLeftBtn"), TTR("MouseRightBtn"), TTR("MouseMiddleBtn") };
 
 	String get_mouse_key_string(MouseKey key) const;
 

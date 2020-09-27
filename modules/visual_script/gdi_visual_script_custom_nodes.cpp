@@ -163,7 +163,7 @@ int GDIVisualScriptCustomNode::get_input_value_port_count() const {
 		return 3;
 	}
 	else if (custom_mode == COMBINATION) {
-		return use_default_args;
+		return combine_task_num;
 	}
 	else if (custom_mode == INIT) {
 		return 0;
@@ -219,8 +219,8 @@ String GDIVisualScriptCustomNode::get_output_sequence_port_text(int p_port) cons
 	case GDIVisualScriptCustomNode::ACTIVE:
 	case GDIVisualScriptCustomNode::LOOP:
 	case GDIVisualScriptCustomNode::TASK_SPLIT: {
-		return String(L"子任务-") + itos(p_port);
-		break;
+		String str = TTR("SubTask") + String(L"-") + itos(p_port);
+		return str;
 	}
 	case GDIVisualScriptCustomNode::TASK_CONTROL: {
 		String();
@@ -230,16 +230,20 @@ String GDIVisualScriptCustomNode::get_output_sequence_port_text(int p_port) cons
 		switch (p_port)
 		{
 		case 0: {
-			return L"按下时";
+			//return L"按下时";
+			return TTR("Pressed");
 		}
 		case 1: {
-			return L"按下保持";
+			//return L"按下保持";
+			return TTR("KeepPressed");
 		}
 		case 2: {
-			return L"释放时";
+			//return L"释放时";
+			return TTR("Released");
 		}
 		case 3: {
-			return L"无操作时";
+			//return L"无操作时";
+			return TTR("WithoutOperation");
 		}
 		default:
 			return String();
@@ -277,10 +281,12 @@ String GDIVisualScriptCustomNode::get_output_sequence_port_text(int p_port) cons
 		switch (p_port)
 		{
 		case 0: {
-			return L"激活时";
+			//return L"激活时";
+			return TTR("Active");
 		}
 		case 1: {
-			return L"未激活时";
+			//return L"未激活时";
+			return TTR("Unactive");
 		}
 		default:
 			return String();
@@ -298,28 +304,27 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 
 	PropertyInfo ret;
 	if (custom_mode == ACTIVE) {
-
-		ret.name = L"激活";
+		//ret.name = L"激活";
+		ret.name = TTR("Active");
 		ret.type = Variant::NIL;
 	}
 	else if (custom_mode == LOOP) {
-
-		ret.name = L"循环";
+		//ret.name = L"循环";
+		ret.name = TTR("Loop");
 		ret.type = Variant::NIL;
 	}
 	else if (custom_mode == TASK_CONTROL) {
-
 		switch (p_idx)
 		{
 		case 0: {
-
-			ret.name = L"激活";
+			//ret.name = L"激活";
+			ret.name = TTR("Active");
 			ret.type = Variant::BOOL;
 			break;
 		}
 		case 1: {
-
-			ret.name = L"只执行一次";
+			//ret.name = L"只执行一次";
+			ret.name = TTR("ExecuteOnce");
 			ret.type = Variant::BOOL;
 			break;
 		}
@@ -328,78 +333,76 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 		}
 	}
 	else if (custom_mode == KEYBOARD) {
-
-		ret.name = L"键值";
+		//ret.name = L"键值";
+		ret.name = TTR("KeyValue");
 		ret.type = Variant::STRING;
 		ret.hint = PROPERTY_HINT_TYPE_STRING_CHAR;
 	}
 	else if (custom_mode == MOUSE) {
-
-		ret.name = L"拣选节点";
+		//ret.name = L"拣选节点";
+		ret.name = TTR("PickupNode");
 		ret.type = Variant::OBJECT;
 	}
 	else if (custom_mode == AREA_TIGGER) {
-
 		switch (p_idx)
 		{
 		case 0: {
-			ret.name = L"Area节点";
+			//ret.name = L"Area节点";
+			ret.name = TTR("AreaNode");
 			ret.type = Variant::NODE_PATH;
 			ret.hint = PROPERTY_HINT_NODE_PATH_VALID_TYPES;
 			ret.hint_string = String("Area");
 			break;
 		}
 		case 1: {
-
-			ret.name = L"触发节点";
+			//ret.name = L"触发节点";
+			ret.name = TTR("TriggerNode");
 			ret.type = Variant::NODE_PATH;
 			break;
 		}
 		default: {
-
-			ret.name = L"未处理类型";
+			//ret.name = L"未处理类型";
+			ret.name = TTR("UnhandledType");
 			ret.type = Variant::NIL;
 			break;
 		}
 		}
 	}
 	else if (custom_mode == TIMER) {
-
 		switch (p_idx)
 		{
 		case 0: {
-
-			ret.name = L"分";
+			//ret.name = L"分";
+			ret.name = TTR("Minute");
 			ret.type = Variant::INT;
 			break;
 		}
 		case 1: {
-
-			ret.name = L"秒";
+			//ret.name = L"秒";
+			ret.name = TTR("Second");
 			ret.type = Variant::INT;
 			break;
 		}
 		case 2: {
-
-			ret.name = L"毫秒";
+			//ret.name = L"毫秒";
+			ret.name = TTR("Millisecond");
 			ret.type = Variant::INT;
 			break;
 		}
 		default: {
-
-			ret.name = L"未处理类型";
+			//ret.name = L"未处理类型";
+			ret.name = TTR("UnhandledType");
 			ret.type = Variant::NIL;
 			break;
 		}
 		}
 	}
 	else if (custom_mode == COMBINATION) {
-
-		ret.name = L"任务";
+		//ret.name = L"任务";
+		ret.name = TTR("Task");
 		ret.type = Variant::BOOL;
 	}
 	else if (custom_mode == INIT_PARTIAL) {
-
 		switch (p_idx)
 		{
 		case 0: {
@@ -446,8 +449,8 @@ PropertyInfo GDIVisualScriptCustomNode::get_input_value_port_info(int p_idx) con
 	// 		}
 	// 	}
 	else {
-
-		ret.name = L"未处理类型";
+		//ret.name = L"未处理类型";
+		ret.name = TTR("UnhandledType");
 		ret.type = Variant::NIL;
 	}
 
@@ -458,44 +461,45 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 
 	PropertyInfo ret;
 	if (custom_mode == ACTIVE) {
-
-		ret.name = L"激活";
+		//ret.name = L"激活";
+		ret.name = TTR("Active");
 		ret.type = Variant::BOOL;
 	}
 	else if (custom_mode == LOOP) {
-
-		ret.name = L"循环";
+		//ret.name = L"循环";
+		ret.name = TTR("Loop");
 		ret.type = Variant::BOOL;
 	}
 	else if (custom_mode == TASK_SPLIT) {
-
-		ret.name = L"实例";
+		//ret.name = L"实例";
+		ret.name = TTR("Instance");
 		ret.type = Variant::OBJECT;
 		// 		ret.hint = PROPERTY_HINT_OBJECT_ID;
 	}
 	else if (custom_mode == KEYBOARD) {
-
 		switch (p_idx)
 		{
 		case 0: {
-			ret.name = L"按下";
+			//ret.name = L"按下";
+			ret.name = TTR("Pressed");
 			ret.type = Variant::BOOL;
 			break;
 		}
 		case 1: {
-			ret.name = L"释放";
+			//ret.name = L"释放";
+			ret.name = TTR("Released");
 			ret.type = Variant::BOOL;
 			break;
 		}
 		default: {
-			ret.name = L"未处理类型";
+			//ret.name = L"未处理类型";
+			ret.name = TTR("UnhandledType");
 			ret.type = Variant::BOOL;
 			break;
 		}
 		}
 	}
 	else if (custom_mode == MOUSE) {
-
 		switch (p_idx)
 		{
 		case 0: {
@@ -519,39 +523,42 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 			break;
 		}
 		default: {
-			ret.name = L"未处理类型";
+			//ret.name = L"未处理类型";
+			ret.name = TTR("UnhandledType");
 			ret.type = Variant::BOOL;
 			break;
 		}
 		}
 	}
 	else if (custom_mode == AREA_TIGGER) {
-
 		switch (p_idx)
 		{
 		case 0: {
-			ret.name = L"已触发";
+			//ret.name = L"已触发";
+			ret.name = TTR("Triggered");
 			ret.type = Variant::BOOL;
 			break;
 		}
 		default: {
-			ret.name = L"未处理类型";
+			//ret.name = L"未处理类型";
+			ret.name = TTR("UnhandledType");
 			ret.type = Variant::BOOL;
 			break;
 		}
 		}
 	}
 	else if (custom_mode == TIMER || custom_mode == COMBINATION) {
-
 		switch (p_idx)
 		{
 		case 0: {
-			ret.name = L"已触发";
+			//ret.name = L"已触发";
+			ret.name = TTR("Triggered");
 			ret.type = Variant::BOOL;
 			break;
 		}
 		default: {
-			ret.name = L"未处理类型";
+			//ret.name = L"未处理类型";
+			ret.name = TTR("UnhandledType");
 			ret.type = Variant::BOOL;
 			break;
 		}
@@ -564,57 +571,81 @@ PropertyInfo GDIVisualScriptCustomNode::get_output_value_port_info(int p_idx) co
 String GDIVisualScriptCustomNode::get_caption() const {
 
 	if (custom_mode == ACTIVE)
-		return L"激活";
+		//return L"激活";
+		return TTR("Active");
 	else if (custom_mode == LOOP)
-		return L"循环";
+		//return L"循环";
+		return TTR("Loop");
 	else if (custom_mode == TASK_SPLIT)
-		return L"任务拆分";
+		//return L"任务拆分";
+		return TTR("SplitTask");
 	else if (custom_mode == TASK_CONTROL)
-		return L"任务控制";
+		//return L"任务控制";
+		return TTR("FlowControl");
 	else if (custom_mode == KEYBOARD)
-		return L"键盘";
+		//return L"键盘";
+		return TTR("Keyboard");
 	else if (custom_mode == MOUSE)
-		return L"鼠标";
+		//return L"鼠标";
+		return TTR("Mouse");
 	else if (custom_mode == AREA_TIGGER)
-		return L"空间触发器";
+		//return L"空间触发器";
+		return TTR("AreaTrigger");
 	else if (custom_mode == TIMER)
-		return L"计时器";
+		//return L"计时器";
+		return TTR("Timer");
 	else if (custom_mode == COMBINATION)
-		return L"任务组合";
+		//return L"任务组合";
+		return TTR("CombineTask");
 	else if (custom_mode == INIT)
-		return L"初始化";
+		//return L"初始化";
+		return TTR("Init");
 	else if (custom_mode == INIT_PARTIAL)
-		return L"部分初始化";
+		//return L"部分初始化";
+		return TTR("");
 	else
-		return L"未处理类型";
+		//return L"未处理类型";
+		return TTR("UnhandledType");
 }
 
 String GDIVisualScriptCustomNode::get_text() const {
 
 	if (custom_mode == ACTIVE)
-		return L"初始化时调用";
+		//return L"初始化时调用";
+		return TTR("InvokeWithInit");
 	else if (custom_mode == LOOP)
-		return L"循环调用";
+		//return L"循环调用";
+		return TTR("InvokeWithProcess");
 	else if (custom_mode == TASK_SPLIT)
-		return String(L"拆分原有任务线");
+		//return String(L"拆分原有任务线");
+		return TTR("SplitTask");
 	else if (custom_mode == TASK_CONTROL)
-		return L"可单独屏蔽部分流程";
+		//return L"可单独屏蔽部分流程";
+		return TTR("ControlThePartialFlow");
 	else if (custom_mode == KEYBOARD)
-		return L"在下方填入键值（如：a）";
+		//return L"在下方填入键值（如：a）";
+		return TTR("InputKeyValue(such as:a)");
 	else if (custom_mode == MOUSE)
-		return L"鼠标按键处理";
+		//return L"鼠标按键处理";
+		return TTR("HandleMouseKey");
 	else if (custom_mode == AREA_TIGGER)
-		return L"其他节点进入时触发";
+		//return L"其他节点进入时触发";
+		return TTR("TriggeredWhenOtherNodeComeInside");
 	else if (custom_mode == TIMER)
-		return L"到设定时间后触发";
+		//return L"到设定时间后触发";
+		return TTR("TriggeredWhenTimeUp");
 	else if (custom_mode == COMBINATION)
-		return L"所有任务为真后触发";
+		//return L"所有任务为真时触发";
+		return TTR("TriggeredWhenAllTaskTrue");
 	else if (custom_mode == INIT)
-		return L"恢复场景到初始状态";
+		//return L"恢复场景到初始状态";
+		return TTR("RestoreSceneToInit");
 	else if (custom_mode == INIT_PARTIAL)
-		return L"恢复场景到子任务分支";
+		//return L"恢复场景到子任务分支";
+		return TTR("");
 	else
-		return L"未处理类型";
+		//return L"未处理类型";
+		return TTR("UnhandledType");
 }
 
 void GDIVisualScriptCustomNode::set_custom_mode(CustomMode p_mode) {
@@ -771,16 +802,16 @@ NodePath GDIVisualScriptCustomNode::get_base_path() const {
 
 void GDIVisualScriptCustomNode::set_use_default_args(int p_amount) {
 
-	if (use_default_args == p_amount)
+	if (combine_task_num == p_amount)
 		return;
 
-	use_default_args = p_amount;
+	combine_task_num = p_amount;
 	ports_changed_notify();
 }
 
 int GDIVisualScriptCustomNode::get_use_default_args() const {
 
-	return use_default_args;
+	return combine_task_num;
 }
 
 void GDIVisualScriptCustomNode::set_validate(bool p_amount) {
@@ -983,8 +1014,11 @@ void GDIVisualScriptCustomNode::_bind_methods() {
 	// 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_path", PROPERTY_HINT_NODE_PATH_TO_EDITED_NODE), "set_base_path", "get_base_path");
 	// 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "argument_cache", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL), "_set_argument_cache", "_get_argument_cache");
 	// 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "function"), "set_function", "get_function"); //when set, if loaded properly, will override argument count.
-	ADD_PROPERTY(PropertyInfo(Variant::INT, L"(组合)任务数量"), "set_use_default_args", "get_use_default_args");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, L"(任务拆分)数量"), "set_task_split_num", "get_task_split_num");
+
+	String str = "(Combine)TaskNum";//L"(组合)任务数量")
+	ADD_PROPERTY(PropertyInfo(Variant::INT, TTR(str)), "set_use_default_args", "get_use_default_args");
+	str = "(TaskSplit)Num";//L"(任务拆分)数量")
+	ADD_PROPERTY(PropertyInfo(Variant::INT, TTR(str)), "set_task_split_num", "get_task_split_num");
 	// 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "validate"), "set_validate", "get_validate");
 	// 	ADD_PROPERTY(PropertyInfo(Variant::INT, "rpc_call_mode", PROPERTY_HINT_ENUM, "Disabled,Reliable,Unreliable,ReliableToID,UnreliableToID"), "set_rpc_call_mode", "get_rpc_call_mode"); //when set, if loaded properly, will override argument count.
 
@@ -1603,7 +1637,7 @@ GDIVisualScriptCustomNode::GDIVisualScriptCustomNode() {
 	custom_mode = ACTIVE;
 	validate = true;
 	basic_type = Variant::NIL;
-	use_default_args = 0;
+	combine_task_num = 2;
 	base_type = "Object";
 	task_id = 0;
 	task_split_num = 2;
@@ -1620,6 +1654,8 @@ GDIVisualScriptCustomNode::~GDIVisualScriptCustomNode() {
 unsigned int GDIVisualScriptCustomNode::global_task_id = 1;
 
 // ----------------------------------------------Mouse relevant
+// 鼠标节点的第二个输入端口（拣选节点的参数），是用于检测非CollisionObject以外的节点类型的
+// 对于这些节点，我们会手动计算（弱不存在会生成）一个新的aabb包围盒
 class GDIVisualScriptNodeInstanceCustomMouse :
 	public VisualScriptNodeInstance, public GDICustomNodeBase, public Object {
 public:
@@ -2138,7 +2174,8 @@ void GDIVisualScriptCustomNodeMouse::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_mouse_pick_area_path", "path"), &GDIVisualScriptCustomNodeMouse::set_mouse_pick_area_path);
 	ClassDB::bind_method(D_METHOD("get_mouse_pick_area_path"), &GDIVisualScriptCustomNodeMouse::get_mouse_pick_area_path);
 
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, L"(鼠标)拣选碰撞区", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Area,KinematicBody,PhysicalBone,RigidBody,VehicleBody,StaticBody"), "set_mouse_pick_area_path", "get_mouse_pick_area_path");
+	String str = "(Mouse)PickupCollsionArea";//L"(鼠标)拣选碰撞区"
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, TTR(str), PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Area,KinematicBody,PhysicalBone,RigidBody,VehicleBody,StaticBody"), "set_mouse_pick_area_path", "get_mouse_pick_area_path");
 }
 
 String GDIVisualScriptCustomNodeMouse::get_mouse_key_string(MouseKey key) const {
@@ -2161,22 +2198,28 @@ String GDIVisualScriptCustomNodeMouse::get_output_sequence_port_text(int p_port)
 	switch (p_port)
 	{
 	case 0: {
-		return L"单击";
+		//return L"单击";
+		return TTR("Click");
 	}
 	case 1: {
-		return L"双击";
+		//return L"双击";
+		return TTR("DoubleClick");
 	}
 	case 2: {
-		return L"拖动";
+		//return L"拖动";
+		return TTR("Drag");
 	}
 	case 3: {
-		return L"滚轮";
+		//return L"滚轮";
+		return TTR("Wheel");
 	}
 	case 4: {
-		return L"无操作时";
+		//return L"无操作时";
+		return TTR("WithoutOperation");
 	}
 	default:
-		return L"未处理索引";
+		//return L"未处理索引";
+		return TTR("UnhandledType");
 	}
 }
 
@@ -2197,14 +2240,16 @@ PropertyInfo GDIVisualScriptCustomNodeMouse::get_input_value_port_info(int p_idx
 	switch (p_idx)
 	{
 	case 0: {
-		pi.name = L"键位选择";
+		//pi.name = L"键位选择";
+		pi.name = TTR("SelectMouseKey");
 		pi.type = Variant::INT;
 		pi.hint = PROPERTY_HINT_ENUM;
 		pi.hint_string = mouse_key_list[LEFT] + "," + mouse_key_list[RIGHT] + "," + mouse_key_list[MID];
 		break;
 	}
 	case 1: {
-		pi.name = L"拣选节点";
+		//pi.name = L"拣选节点";
+		pi.name = TTR("PickupNode");
 		pi.type = Variant::OBJECT;
 		break;
 	}
@@ -2222,27 +2267,32 @@ PropertyInfo GDIVisualScriptCustomNodeMouse::get_output_value_port_info(int p_id
 	switch (p_idx)
 	{
 	case 0: {
-		pi.name = L"按下";
+		//pi.name = L"按下";
+		pi.name = TTR("Pressed");
 		pi.type = Variant::BOOL;
 		break;
 	}
 	case 1: {
-		pi.name = L"滚轮值";
+		//pi.name = L"滚轮值";
+		pi.name = TTR("WheelValue");
 		pi.type = Variant::INT;
 		break;
 	}
 	case 2: {
-		pi.name = L"鼠标坐标";
+		//pi.name = L"鼠标坐标";
+		pi.name = TTR("MousePos");
 		pi.type = Variant::VECTOR2;
 		break;
 	}
 	case 3: {
-		pi.name = L"拣选标识";
+		//pi.name = L"拣选标识";
+		pi.name = TTR("PickupFlag");
 		pi.type = Variant::BOOL;
 		break;
 	}
 	default: {
-		pi.name = L"未处理类型";
+		//pi.name = L"未处理类型";
+		pi.name = TTR("UnhandledType");
 		pi.type = Variant::NIL;
 		break;
 	}
@@ -2253,7 +2303,8 @@ PropertyInfo GDIVisualScriptCustomNodeMouse::get_output_value_port_info(int p_id
 
 String GDIVisualScriptCustomNodeMouse::get_caption() const {
 
-	return L"鼠标";
+	//return L"鼠标";
+	return TTR("Mouse");
 }
 
 String GDIVisualScriptCustomNodeMouse::get_category() const {
@@ -2263,7 +2314,8 @@ String GDIVisualScriptCustomNodeMouse::get_category() const {
 
 String GDIVisualScriptCustomNodeMouse::get_text() const {
 
-	return L"鼠标按键处理";
+	//return L"鼠标按键处理";
+	return TTR("HandleMouseKey");
 }
 
 void GDIVisualScriptCustomNodeMouse::set_mouse_pick_area_path(const NodePath &path) {
@@ -2926,27 +2978,32 @@ PropertyInfo GDIVisualScriptCustomNodeMultiPlayer::get_input_value_port_info(int
 	switch (p_idx)
 	{
 	case 0: {
-		pi.name = L"本机为服务器";
+		//pi.name = L"本机为服务器";
+		pi.name = TTR("ServerFlag");
 		pi.type = Variant::BOOL;
 		break;
 	}
 	case 1: {
-		pi.name = L"服务器IP地址";
+		//pi.name = L"服务器IP地址";
+		pi.name = TTR("ServerIP");
 		pi.type = Variant::STRING;
 		break;
 	}
 	case 2: {
-		pi.name = L"端口";
+		//pi.name = L"端口";
+		pi.name = TTR("ServerPort");
 		pi.type = Variant::INT;
 		break;
 	}
 	case 3: {
-		pi.name = L"最大连接数";
+		//pi.name = L"最大连接数";
+		pi.name = TTR("ServerMaxConnectionNum");
 		pi.type = Variant::INT;
 		break;
 	}
 	case 4: {
-		pi.name = L"密码";
+		//pi.name = L"密码";
+		pi.name = TTR("ServerPassword");
 		pi.type = Variant::INT;
 		break;
 	}
@@ -2960,14 +3017,15 @@ PropertyInfo GDIVisualScriptCustomNodeMultiPlayer::get_input_value_port_info(int
 PropertyInfo GDIVisualScriptCustomNodeMultiPlayer::get_output_value_port_info(int p_idx) const {
 
 	PropertyInfo pi;
-	pi.name = L"成功";
+	//pi.name = L"成功";
+	pi.name = TTR("succeed");
 	pi.type = Variant::BOOL;
 	return pi;
 }
 
 String GDIVisualScriptCustomNodeMultiPlayer::get_caption() const {
 
-	return L"多人协同";
+	return TTR("MultiPlayerSync");// 多人协同
 }
 
 String GDIVisualScriptCustomNodeMultiPlayer::get_category() const {
@@ -2977,7 +3035,8 @@ String GDIVisualScriptCustomNodeMultiPlayer::get_category() const {
 
 String GDIVisualScriptCustomNodeMultiPlayer::get_text() const {
 
-	return L"创建服务器或客户端";
+	//return L"创建服务器或客户端";
+	return TTR("CreateServerOrClient");
 }
 
 VisualScriptNodeInstance * GDIVisualScriptCustomNodeMultiPlayer::instance(VisualScriptInstance *p_instance) {

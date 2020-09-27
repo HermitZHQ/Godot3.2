@@ -910,11 +910,11 @@ bool FBXConverter::GenerateTransformationNodeChain(const Model &model, const std
 	            final_mat = final_mat * node->mTransformation;
 	        }
         }
-        else if (child_conns.size() == 0 && post_output_nodes.size() > 0) {
-            for (auto &node : post_output_nodes) {
-                final_mat = final_mat * node->mTransformation;
-            }
-        }
+        //else if (child_conns.size() == 0 && post_output_nodes.size() > 0) {
+        //    for (auto &node : post_output_nodes) {
+        //        final_mat = final_mat * node->mTransformation;
+        //    }
+        //}
 
         nd->mTransformation = final_mat;
 

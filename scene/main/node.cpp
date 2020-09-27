@@ -2930,12 +2930,12 @@ void Node::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "custom_multiplayer", PROPERTY_HINT_RESOURCE_TYPE, "MultiplayerAPI", 0), "set_custom_multiplayer", "get_custom_multiplayer");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_priority"), "set_process_priority", "get_process_priority");
 
-	ADD_GROUP(L"多人协同设置", L"");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, L"是否开启同步"), "gdi_set_multiplayer_sync_enable", "gdi_get_multiplayer_sync_enable");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, L"同步Transform"), "gdi_set_multiplayer_sync_transform_enable", "gdi_get_multiplayer_sync_transform_enable");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, L"同步显隐"), "gdi_set_multiplayer_sync_visible_enable", "gdi_get_multiplayer_sync_visible_enable");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, L"同步albedo"), "gdi_set_multiplayer_sync_albedo_enable", "gdi_get_multiplayer_sync_albedo_enable");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, L"同步albedo tex"), "gdi_set_multiplayer_sync_albedo_tex_enable", "gdi_get_multiplayer_sync_albedo_tex_enable");
+	ADD_GROUP(TTR("MultiPlayerSync"), L"");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, TTR("EnableSync")), "gdi_set_multiplayer_sync_enable", "gdi_get_multiplayer_sync_enable");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, TTR("SyncTransform")), "gdi_set_multiplayer_sync_transform_enable", "gdi_get_multiplayer_sync_transform_enable");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, TTR("SyncVisible")), "gdi_set_multiplayer_sync_visible_enable", "gdi_get_multiplayer_sync_visible_enable");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, TTR("SyncAlbedo")), "gdi_set_multiplayer_sync_albedo_enable", "gdi_get_multiplayer_sync_albedo_enable");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, TTR("SyncAlbedoTex")), "gdi_set_multiplayer_sync_albedo_tex_enable", "gdi_get_multiplayer_sync_albedo_tex_enable");
 
 	BIND_VMETHOD(MethodInfo("_process", PropertyInfo(Variant::REAL, "delta")));
 	BIND_VMETHOD(MethodInfo("_physics_process", PropertyInfo(Variant::REAL, "delta")));
