@@ -941,7 +941,15 @@ void AnimationPlayer::_animation_update_transforms() {
 						if (0 == child_num && !self_magic_node_flag && parent_magic_node_flag) {
 							Node *parent = nc->spatial->get_parent();
 							while (nullptr != parent) {
-								int tmp_pos = 
+								int tmp_pos = String(parent->get_name()).find(MAGIC_NODE_TAG);
+
+								if (-1 != tmp_pos) {
+									nc->spatial->raise();
+									parent = parent->get_parent();
+								}
+								else {
+									break;
+								}
 							}
 						}
 

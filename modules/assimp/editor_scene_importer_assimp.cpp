@@ -1239,30 +1239,28 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		bool magic_flag = false;
 		bool magic_comb_flag = false;
 		int magic_pos = node_name.find(Assimp::FBX::MAGIC_NODE_TAG.c_str());
-		Node *tree_node = get_node_by_name(state, node_name);
-		if (-1 == magic_pos) {
-			Node *parent = tree_node->get_parent();
-			Node *last_parent = nullptr;
-			bool remove_child_flag = false;
-			while (nullptr != parent) {
-				if (!remove_child_flag) {
-					//parent->remove_child(tree_node);
-					//remove_child_flag = true;
-				}
-				int tmp_pos = String(parent->get_name()).find(Assimp::FBX::MAGIC_NODE_TAG.c_str());
+		//Node *tree_node = get_node_by_name(state, node_name);
+		//if (-1 == magic_pos) {
+		//	Node *parent = tree_node->get_parent();
+		//	Node *last_parent = nullptr;
+		//	bool remove_child_flag = false;
+		//	while (nullptr != parent) {
+		//		if (!remove_child_flag) {
+		//			//parent->remove_child(tree_node);
+		//			//remove_child_flag = true;
+		//		}
+		//		int tmp_pos = String(parent->get_name()).find(Assimp::FBX::MAGIC_NODE_TAG.c_str());
 
-				if (-1 != tmp_pos) {
-					last_parent = parent;
-					tree_node->raise();
-					parent = parent->get_parent();
-				}
-				else {
-					break;
-				}
-			}
-
-// 			parent->add_child(tree_node);
-		}
+		//		if (-1 != tmp_pos) {
+		//			last_parent = parent;
+		//			tree_node->raise();
+		//			parent = parent->get_parent();
+		//		}
+		//		else {
+		//			break;
+		//		}
+		//	}
+		//}
 
 		if (-1 != magic_pos && 0) {
 			magic_flag = true;
