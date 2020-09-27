@@ -109,7 +109,7 @@ Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_f
 	Assimp::Importer importer;
 	//importer.SetPropertyBool(AI_CONFIG_PP_FD_REMOVE, true);
 	// Cannot remove pivot points because the static mesh will be in the wrong place
-	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
+	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, true);
 	//importer.SetPropertyBool(AI_CONFIG_PP_OG_EXCLUDE_LIST, false);
 	//importer.SetPropertyBool(AI_CONFIG_GLOBAL_SCALE_FACTOR_KEY, true);
 	int32_t max_bone_weights = 4;
@@ -1230,7 +1230,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		aiNodeAnim *track = anim->mChannels[i];
 		String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
 		// for test
-		if (node_name.find("JiaZi") != -1) {
+		if (node_name.find("SM_BuDong") != -1) {
 			int i = 0;
 			++i;
 		}
@@ -1239,7 +1239,32 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		bool magic_flag = false;
 		bool magic_comb_flag = false;
 		int magic_pos = node_name.find(Assimp::FBX::MAGIC_NODE_TAG.c_str());
-		if (-1 != magic_pos) {
+		Node *tree_node = get_node_by_name(state, node_name);
+		if (-1 == magic_pos) {
+			Node *parent = tree_node->get_parent();
+			Node *last_parent = nullptr;
+			bool remove_child_flag = false;
+			while (nullptr != parent) {
+				if (!remove_child_flag) {
+					//parent->remove_child(tree_node);
+					//remove_child_flag = true;
+				}
+				int tmp_pos = String(parent->get_name()).find(Assimp::FBX::MAGIC_NODE_TAG.c_str());
+
+				if (-1 != tmp_pos) {
+					last_parent = parent;
+					tree_node->raise();
+					parent = parent->get_parent();
+				}
+				else {
+					break;
+				}
+			}
+
+// 			parent->add_child(tree_node);
+		}
+
+		if (-1 != magic_pos && 0) {
 			magic_flag = true;
 			node_name = node_name.substr(0, magic_pos);
 			// recomb the whole magic track..., I don't see where shows the magic...
@@ -1282,7 +1307,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		//}
 
 		bool optimized_flag = false;
- 		if (magic_flag) {
+ 		if (magic_flag && 0) {
  			optimized_flag = _gdi_optimize_track_data(track);
  		}
 
@@ -1348,7 +1373,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 			if (node_path != NodePath() && -1 == state.gdi_none_bone_track_vec.find(node_path)) {
 				// repair the track data first
 				Spatial *spa = Object::cast_to<Spatial>(allocated_node);
-				if (optimized_flag && nullptr != spa) {
+				if (0 && optimized_flag && nullptr != spa) {
 					auto trans = spa->get_transform();
 					// for test
 					if (String(spa->get_name()).find("HengGang") != -1) {

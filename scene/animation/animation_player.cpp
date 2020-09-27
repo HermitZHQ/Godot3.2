@@ -893,6 +893,7 @@ void AnimationPlayer::_animation_process2(float p_delta, bool p_started) {
 
 void AnimationPlayer::_animation_update_transforms() {
 	{
+		static const char *MAGIC_NODE_TAG = "_$AssimpFbx$"; // from import
 		Transform t;
 
 		//OS::get_singleton()->print("_animation_update_transforms----------------------------------->start\n");
@@ -932,6 +933,18 @@ void AnimationPlayer::_animation_update_transforms() {
 					// 存在找不到skeleton的情况，仍然可能为空
 					// 这种情况下，我们一般是处理的路径动画
 					if (0 == gdi_update_skeleton_size) {
+						// handle magic node
+						bool self_magic_node_flag = (String(nc->spatial->get_name()).find(MAGIC_NODE_TAG) == -1) ? false : true;
+						bool parent_magic_node_flag = (nullptr == nc->spatial->get_parent()) ? false :
+							((String(nc->spatial->get_parent()->get_name()).find(MAGIC_NODE_TAG) == -1) ? false : true);
+						int child_num = nc->spatial->get_child_count();
+						if (0 == child_num && !self_magic_node_flag && parent_magic_node_flag) {
+							Node *parent = nc->spatial->get_parent();
+							while (nullptr != parent) {
+								int tmp_pos = 
+							}
+						}
+
 						nc->spatial->set_transform(t);
 						//OS::get_singleton()->print("[GDI-anim_player]warning, couldn't find valid skeleton\n");
 						continue;
