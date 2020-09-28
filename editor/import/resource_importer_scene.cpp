@@ -1174,6 +1174,10 @@ void ResourceImporterScene::get_import_options(List<ImportOption> *r_options, in
 	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "skins/use_named_skins"), true));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "external_files/store_in_subdir"), false));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "animation/import", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), true));
+	//gdi--------
+	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "animation/assimp_pivot"), false));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "FbxImporter/EnableFbxSdk"), false));
+	//--------
 	r_options->push_back(ImportOption(PropertyInfo(Variant::REAL, "animation/fps", PROPERTY_HINT_RANGE, "1,120,1"), 15));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::STRING, "animation/filter_script", PROPERTY_HINT_MULTILINE_TEXT), ""));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "animation/storage", PROPERTY_HINT_ENUM, "Built-In,Files (.anim),Files (.tres)", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), animations_out));
@@ -1281,6 +1285,14 @@ Error ResourceImporterScene::import(const String &p_source_file, const String &p
 		List<String> extensions;
 		E->get()->get_extensions(&extensions);
 
+		//gdi change, to support change fbx importer dynamically
+		if (bool(p_options["FbxImporter/EnableFbxSdk"])) {
+			String class_name = E->get()->get_class_name();
+			if (class_name == "EditorSceneImporterAssimp") {
+				continue;
+			}
+		}
+
 		for (List<String>::Element *F = extensions.front(); F; F = F->next()) {
 
 			if (F->get().to_lower() == ext) {
@@ -1304,6 +1316,9 @@ Error ResourceImporterScene::import(const String &p_source_file, const String &p
 
 	if (bool(p_options["animation/import"]))
 		import_flags |= EditorSceneImporter::IMPORT_ANIMATION;
+
+	if (bool(p_options["animation/assimp_pivot"]))
+		import_flags |= EditorSceneImporter::GDI_IMPORT_ANIMATION_ASSIMP_PIVOT;
 
 	if (int(p_options["meshes/compress"]))
 		import_flags |= EditorSceneImporter::IMPORT_USE_COMPRESSION;

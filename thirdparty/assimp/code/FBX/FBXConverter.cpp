@@ -901,34 +901,60 @@ bool FBXConverter::GenerateTransformationNodeChain(const Model &model, const std
     }
     else {
         const std::vector<const Connection *> &child_conns = doc.GetConnectionsByDestinationSequenced(model.ID(), "Model");
-        aiMatrix4x4 final_mat;
-        for (auto &node : output_nodes) {
-            final_mat = final_mat * node->mTransformation;
+        // check animation track
+        bool find_track_flag = false;
+        aiString str_tmp;
+        for (auto &anim : animations) {
+            unsigned int num_channels = anim->mNumChannels;
+            for (unsigned int channel_idx = 0; channel_idx < num_channels; ++channel_idx) {
+                str_tmp = anim->mChannels[channel_idx]->mNodeName;
+                for (auto &node : output_nodes) {
+                    if (node->mName == str_tmp) {
+                        find_track_flag = true;
+                        break;
+                    }
+                }
+
+                if (find_track_flag) {
+                    break;
+                }
+            }
+
+            if (find_track_flag) {
+                break;
+            }
         }
-        if (child_conns.size() > 0) {
-	        for (auto &node : post_output_nodes) {
+
+        if (!find_track_flag) {
+	        aiMatrix4x4 final_mat;
+	        for (auto &node : output_nodes) {
 	            final_mat = final_mat * node->mTransformation;
 	        }
-        }
-        //else if (child_conns.size() == 0 && post_output_nodes.size() > 0) {
-        //    for (auto &node : post_output_nodes) {
-        //        final_mat = final_mat * node->mTransformation;
-        //    }
-        //}
-
-        nd->mTransformation = final_mat;
-
-        for (auto &node : output_nodes) {
-            delete node;
-            node = nullptr;
-        }
-        output_nodes.clear();
-        if (child_conns.size() > 0) {
-	        for (auto &node : post_output_nodes) {
+	        if (child_conns.size() > 0) {
+		        for (auto &node : post_output_nodes) {
+		            final_mat = final_mat * node->mTransformation;
+		        }
+	        }
+	        //else if (child_conns.size() == 0 && post_output_nodes.size() > 0) {
+	        //    for (auto &node : post_output_nodes) {
+	        //        final_mat = final_mat * node->mTransformation;
+	        //    }
+	        //}
+	
+	        nd->mTransformation = final_mat;
+	
+	        for (auto &node : output_nodes) {
 	            delete node;
 	            node = nullptr;
 	        }
-	        post_output_nodes.clear();
+	        output_nodes.clear();
+	        if (child_conns.size() > 0) {
+		        for (auto &node : post_output_nodes) {
+		            delete node;
+		            node = nullptr;
+		        }
+		        post_output_nodes.clear();
+	        }
         }
     }
 
