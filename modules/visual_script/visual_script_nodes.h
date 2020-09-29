@@ -73,7 +73,7 @@ public:
 	virtual String get_text() const;
 	virtual String get_category() const { return "flow_control"; }
 	// 修改点：
-	virtual void set_caption(const String &caption);
+	virtual void gdi_set_caption(const String &caption);
 
 	void add_argument(Variant::Type p_type, const String &p_name, int p_index = -1, const PropertyHint p_hint = PROPERTY_HINT_NONE, const String &p_hint_string = String(""));
 	void set_argument_type(int p_argidx, Variant::Type p_type);

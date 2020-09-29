@@ -323,12 +323,12 @@ public:
 	Ref<StreamPeerTCP> client;
 	uint64_t client_unique_id;
 	struct SyncDataInfo 
-	{		
+	{
 		uint64_t							instance_id;
 		String								name;
 		String								class_name;
 		Transform							transform;
-		Transform2D							transform2d;
+		Transform2D							transform2d;// 只支持平移，旋转和缩放，不支持直接设置size
 		bool								visible;
 		Vector<Ref<SpatialMaterial>>		surf_mat_vec;
 		Vector<Color>						albedo_vec;

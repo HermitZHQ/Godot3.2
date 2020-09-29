@@ -103,7 +103,7 @@ bool VisualScriptFunction::_set(const StringName &p_name, const Variant &p_value
 		return true;
 	}
 
-	// 修改点：
+	// 淇敼鐐癸細
 	if (p_name == "caption") {
 		caption = p_value;
 		return true;
@@ -152,7 +152,7 @@ bool VisualScriptFunction::_get(const StringName &p_name, Variant &r_ret) const 
 		return true;
 	}
 
-	// 修改点：
+	// 淇敼鐐癸細
 	if (p_name == "caption") {
 		r_ret = get_caption();
 		return true;
@@ -180,7 +180,7 @@ void VisualScriptFunction::_get_property_list(List<PropertyInfo> *p_list) const 
 	}
 	p_list->push_back(PropertyInfo(Variant::BOOL, "stack/stackless"));
 	p_list->push_back(PropertyInfo(Variant::INT, "rpc/mode", PROPERTY_HINT_ENUM, "Disabled,Remote,Master,Puppet,Remote Sync,Master Sync,Puppet Sync"));
-	// 修改点：
+	// 淇敼鐐癸細
 	p_list->push_back(PropertyInfo(Variant::STRING, "caption"));
 }
 
@@ -233,7 +233,7 @@ String VisualScriptFunction::get_text() const {
 	return get_name(); //use name as function name I guess
 }
 
-void VisualScriptFunction::set_caption(const String &caption)
+void VisualScriptFunction::gdi_set_caption(const String &caption)
 {
 	this->caption = caption;
 }
@@ -2995,7 +2995,7 @@ PropertyInfo VisualScriptCustomNode::get_input_value_port_info(int p_idx) const 
 	if (get_script_instance() && get_script_instance()->has_method("_get_input_value_port_name")) {
 		info.name = get_script_instance()->call("_get_input_value_port_name", p_idx);
 	}
-	// 修改点：加入对hint分类支持
+	// 淇敼鐐癸細鍔犲叆瀵筯int鍒嗙被鏀寔
 	if (get_script_instance() && get_script_instance()->has_method("_get_input_value_port_hint")) {
 		info.hint = (PropertyHint)((int)get_script_instance()->call("_get_input_value_port_hint", p_idx));
 	}

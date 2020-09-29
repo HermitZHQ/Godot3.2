@@ -2536,7 +2536,7 @@ void VisualScriptEditor::_gdi_create_process_func_node(const Vector2 &ofs) {
 	selected = name;
 	Ref<VisualScriptFunction> func_node;
 	func_node.instance();
-	func_node->set_caption(TTR("Task"));
+	func_node->gdi_set_caption(TTR("Task"));
 	func_node->set_name(TTR("LoopInvoke"));
 // 	func_node->set_name(name);
 
@@ -2598,7 +2598,7 @@ void VisualScriptEditor::_gdi_create_ready_func_node(const Vector2 &ofs) {
 	selected = name;
 	Ref<VisualScriptFunction> func_node;
 	func_node.instance();
-	func_node->set_caption(TTR("Task"));
+	func_node->gdi_set_caption(TTR("Task"));
 	func_node->set_name(TTR("ExecuteOnce"));
 // 	func_node->set_name(name);
 
