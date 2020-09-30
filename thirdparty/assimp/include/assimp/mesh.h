@@ -58,6 +58,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <assimp/aabb.h>
 #include <assimp/types.h>
+#include <vector>
 
 #ifdef __cplusplus
 extern "C" {
@@ -355,7 +356,11 @@ struct aiBone {
     }
     //! Destructor - deletes the array of vertex weights
     ~aiBone() {
-        delete[] mWeights;
+        // gdi change[zhq]
+        if (nullptr != mWeights) {
+        	delete[] mWeights;
+            mWeights = nullptr;
+        }
     }
 #endif // __cplusplus
 };
@@ -770,19 +775,48 @@ struct aiMesh {
 
         // DO NOT REMOVE THIS ADDITIONAL CHECK
         if (mNumBones && mBones) {
+            // gdi change[zhq]
+            // to check repeat delete, some special fbx file has this issue
+            std::vector<uint64_t> delete_addr_vec;
+            auto check_repeat_delete_func = [&](uint64_t p_addr)->bool {
+                for (auto &addr : delete_addr_vec) {
+                    if (addr == p_addr) {
+                        return true;
+                    }
+                }
+
+                delete_addr_vec.push_back(p_addr);
+                return false;
+            };
+
+            // check repeat, then change the repeat addr to null
             for (unsigned int a = 0; a < mNumBones; a++) {
+                if (check_repeat_delete_func((uint64_t)mBones[a])) {
+                    mBones[a] = nullptr;
+                }
+            }
+
+            for (unsigned int a = 0; a < mNumBones; a++) {
+                // gdi change[zhq]
                 if (mBones[a]) {
                     delete mBones[a];
+	                mBones[a] = nullptr;
                 }
             }
             delete[] mBones;
+            // gdi change[zhq]
+            mBones = nullptr;
         }
 
         if (mNumAnimMeshes && mAnimMeshes) {
             for (unsigned int a = 0; a < mNumAnimMeshes; a++) {
                 delete mAnimMeshes[a];
+                // gdi change[zhq]
+                mAnimMeshes[a] = nullptr;
             }
             delete[] mAnimMeshes;
+            // gdi change[zhq]
+            mAnimMeshes = nullptr;
         }
 
         delete[] mFaces;

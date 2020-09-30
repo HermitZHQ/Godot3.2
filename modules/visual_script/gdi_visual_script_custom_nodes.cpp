@@ -2516,11 +2516,9 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::generate_all_nodes_sync_data_
 	//}
 
 	auto child_count = node->get_child_count();
-	if (child_count > 0) {
-		for (int i = 0; i < child_count; ++i) {
-			Node *child = node->get_child(i);
-			generate_all_nodes_sync_data_info(child);
-		}
+	for (int i = 0; i < child_count; ++i) {
+		Node *child = node->get_child(i);
+		generate_all_nodes_sync_data_info(child);
 	}
 }
 
@@ -2585,6 +2583,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::sync_data_with_node(Node *nod
 		if (nullptr != canvasItem) {
 			if (node->gdi_get_multiplayer_sync_visible_enable()) {
 				canvasItem->set_visible(sdi.visible);
+				os->print("sync data with node, server flag[%d], visible[%d]\n", is_server_flag, sdi.visible);
 			}
 
 			if (node->gdi_get_multiplayer_sync_transform_enable()) {
@@ -2837,7 +2836,7 @@ void GDIVisualScriptNodeInstanceCustomMultiPlayer::handle_client_msg(Variant::Ca
 				Transform trans = arr.pop_front();
 				Transform2D trans2d = arr.pop_front();
 				bool visible = arr.pop_front();
-				os->print("sync data id[%d], name[%S]\n", instance_id, name);
+				os->print("sync data id[%d], name[%S] visible[%d]\n", instance_id, name, (int)visible);
 				// albedo
 				Vector<Color> albedo_vec;
 				int mat_num = arr.pop_front();
@@ -3061,7 +3060,6 @@ GDIVisualScriptCustomNodeMultiPlayer::ConnectionStatus GDIVisualScriptCustomNode
 
 	return connection_status;
 }
-
 
 void GDIVisualScriptCustomNodeMultiPlayer::rpc_call_test_func() {
 

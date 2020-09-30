@@ -909,7 +909,10 @@ bool FBXConverter::GenerateTransformationNodeChain(const Model &model, const std
             for (unsigned int channel_idx = 0; channel_idx < num_channels; ++channel_idx) {
                 str_tmp = anim->mChannels[channel_idx]->mNodeName;
                 for (auto &node : output_nodes) {
-                    if (node->mName == str_tmp) {
+                    if (node->mName == str_tmp &&
+                        (anim->mChannels[channel_idx]->mNumPositionKeys > 1 ||
+                         anim->mChannels[channel_idx]->mNumRotationKeys > 1 ||
+                         anim->mChannels[channel_idx]->mNumScalingKeys > 1)) {
                         find_track_flag = true;
                         break;
                     }
