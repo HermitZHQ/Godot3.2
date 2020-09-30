@@ -11728,19 +11728,22 @@ msgstr "成功"
 msgid "CreateServerOrClient"
 msgstr "创建服务器或客户端"
 
-msgid "EnableSync"
+msgid "Multi Player Sync"
+msgstr "多人协同"
+
+msgid "Enable Sync"
 msgstr "是否开启同步"
 
-msgid "SyncTransform"
+msgid "Sync Transform"
 msgstr "同步变换"
 
-msgid "SyncVisible"
+msgid "Sync Visible"
 msgstr "同步显隐"
 
-msgid "SyncAlbedo"
+msgid "Sync Albedo"
 msgstr "同步Albedo"
 
-msgid "SyncAlbedoTex"
+msgid "Sync Albedo Tex"
 msgstr "同步AlbedoTex"
 
 #----鼠标
