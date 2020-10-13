@@ -1424,8 +1424,21 @@ bool EditorInspector::_is_property_disabled_by_feature_profile(const StringName 
 	return false;
 }
 
+static uint64_t time = 0;
+static bool enable_debug_performance = false;
+#define START_DEBUG \
+	if (enable_debug_performance) {\
+		time = OS::get_singleton()->get_system_time_msecs();\
+	}\
+
+#define  END_DEBUG \
+	if (enable_debug_performance) {\
+		OS::get_singleton()->print("cast time[%d], func[%s], line[%d]\n", OS::get_singleton()->get_system_time_msecs() - time, __FUNCTION__, __LINE__);\
+		time = OS::get_singleton()->get_system_time_msecs();\
+	}
 void EditorInspector::update_tree() {
 
+	START_DEBUG;
 	//to update properly if all is refreshed
 	StringName current_selected = property_selected;
 	int current_focusable = -1;
@@ -1452,6 +1465,7 @@ void EditorInspector::update_tree() {
 	}
 
 	_clear();
+	END_DEBUG;
 
 	if (!object)
 		return;
@@ -1498,9 +1512,18 @@ void EditorInspector::update_tree() {
 		_parse_added_editors(main_vbox, ped);
 	}
 
+	bool gdi_show_bones_property_flag = false;
+	if (object->get_class_name() == "Skeleton") {
+		Skeleton *skeleton = Object::cast_to<Skeleton>(object);
+		gdi_show_bones_property_flag = (nullptr == skeleton) ? false : skeleton->gdi_get_show_bones_property_flag();
+	}
+
 	for (List<PropertyInfo>::Element *I = plist.front(); I; I = I->next()) {
 
 		PropertyInfo &p = I->get();
+		if (p.name.find("bones/") != -1 && !gdi_show_bones_property_flag) {
+			continue;
+		}
 
 		//make sure the property can be edited
 
@@ -1821,6 +1844,7 @@ void EditorInspector::update_tree() {
 		ped->parse_end();
 		_parse_added_editors(main_vbox, ped);
 	}
+	END_DEBUG;
 
 	//see if this property exists and should be kept
 }

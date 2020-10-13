@@ -1941,6 +1941,7 @@ void EditorFileSystem::_find_group_files(EditorFileSystemDirectory *efd, Map<Str
 
 void EditorFileSystem::reimport_files(const Vector<String> &p_files) {
 
+	uint64_t time = OS::get_singleton()->get_system_time_msecs();
 	{ //check that .import folder exists
 		DirAccess *da = DirAccess::open("res://");
 		if (da->change_dir(".import") != OK) {
@@ -2016,6 +2017,7 @@ void EditorFileSystem::reimport_files(const Vector<String> &p_files) {
 	}
 
 	emit_signal("resources_reimported", p_files);
+	OS::get_singleton()->print("whole (re)import cast time[%d]\n", OS::get_singleton()->get_system_time_msecs() - time);
 }
 
 Error EditorFileSystem::_resource_import(const String &p_path) {

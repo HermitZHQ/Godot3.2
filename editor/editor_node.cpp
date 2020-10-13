@@ -1748,8 +1748,24 @@ static bool overrides_external_editor(Object *p_object) {
 	return script->get_language()->overrides_external_editor();
 }
 
+
+// for debug the performance
+static uint64_t time = 0;
+static bool enable_debug_performance = false;
+#define START_DEBUG \
+	if (enable_debug_performance) {\
+		time = OS::get_singleton()->get_system_time_msecs();\
+	}\
+
+#define  END_DEBUG \
+	if (enable_debug_performance) {\
+		OS::get_singleton()->print("cast time[%d], func[%s], line[%d]\n", OS::get_singleton()->get_system_time_msecs() - time, __FUNCTION__, __LINE__);\
+		time = OS::get_singleton()->get_system_time_msecs();\
+	}
+
 void EditorNode::_edit_current() {
 
+	START_DEBUG;
 	uint32_t current = editor_history.get_current();
 	Object *current_obj = current > 0 ? ObjectDB::get_instance(current) : NULL;
 	bool inspector_only = editor_history.is_current_inspector_only();
@@ -1860,11 +1876,13 @@ void EditorNode::_edit_current() {
 		scene_tree_dock->set_selected(selected_node);
 		inspector_dock->update(NULL);
 	}
+	END_DEBUG;
 
 	if (current_obj == prev_inspected_object) {
 		// Make sure inspected properties are restored.
 		get_inspector()->update_tree();
 	}
+	END_DEBUG;
 
 	inspector_dock->set_warning(editable_warning);
 

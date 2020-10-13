@@ -36,7 +36,9 @@
 #include "scene/3d/physics_body.h"
 #include "scene/resources/surface_tool.h"
 #include "core/os/os.h"
+
 #include <functional>
+#include "editor/editor_node.h"
 
 void SkinReference::_skin_changed() {
 	if (skeleton_node) {
@@ -98,13 +100,18 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 
 	String path = p_path;
 
+	if (path == "show bones") {
+		gdi_set_show_bones_property_flag((bool)p_value);
+		EditorNode::get_singleton()->get_inspector_dock()->get_inspector()->update_tree();
+		return true;
+	}
+
 	if (!path.begins_with("bones/"))
 		return false;
 
 	int which = path.get_slicec('/', 1).to_int();
 	String what = path.get_slicec('/', 2);
 	int pos = path.get_slicec('/', 3).to_int();
-
 
 	if (which == bones.size() && what == "name") {
 
@@ -199,6 +206,11 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 
 	String path = p_path;
 
+	if (p_path == "show bones") {
+		r_ret = gdi_get_show_bones_property_flag();
+		return true;
+	}
+
 	if (!path.begins_with("bones/"))
 		return false;
 
@@ -279,6 +291,9 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 }
 void Skeleton::_get_property_list(List<PropertyInfo> *p_list) const {
 	// 修改点：整理整个animNodeTree的顺序ID，并按照顺序存入property中，最后再尝试取出
+
+	// add show bones flag
+	p_list->push_back(PropertyInfo(Variant::BOOL, "show bones"));
 
 	for (int i = 0; i < bones.size(); i++) {
 
@@ -989,6 +1004,14 @@ Transform Skeleton::gdi_get_bone_pose_by_name(const String &name, bool &find_fla
 	return Transform();
 }
 
+void Skeleton::gdi_set_show_bones_property_flag(bool flag) {
+	gdi_show_bones_property_flag = flag;
+}
+
+bool Skeleton::gdi_get_show_bones_property_flag() const {
+	return gdi_show_bones_property_flag;
+}
+
 void Skeleton::set_bone_custom_pose(int p_bone, const Transform &p_custom_pose) {
 
 	ERR_FAIL_INDEX(p_bone, bones.size());
@@ -1286,6 +1309,9 @@ void Skeleton::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bone_custom_pose", "bone_idx"), &Skeleton::get_bone_custom_pose);
 	ClassDB::bind_method(D_METHOD("set_bone_custom_pose", "bone_idx", "custom_pose"), &Skeleton::set_bone_custom_pose);
 
+	ClassDB::bind_method(D_METHOD("gdi_get_show_bones_property_flag"), &Skeleton::gdi_get_show_bones_property_flag);
+	ClassDB::bind_method(D_METHOD("gdi_set_show_bones_property_flag", "flag"), &Skeleton::gdi_set_show_bones_property_flag);
+
 #ifndef _3D_DISABLED
 
 	ClassDB::bind_method(D_METHOD("physical_bones_stop_simulation"), &Skeleton::physical_bones_stop_simulation);
@@ -1312,6 +1338,7 @@ Skeleton::Skeleton()
 	gdi_anim_node_load_vec.clear();
 	gdi_anim_node_save_vec.clear();
 	gdi_editor_root = nullptr;
+	gdi_show_bones_property_flag = false;
 }
 
 Skeleton::~Skeleton() {

@@ -240,6 +240,9 @@ public:
 	Node* gdi_get_editor_scene_root() const;
 	Transform gdi_get_bone_pose_by_name(const String &name, bool &find_flag) const;
 
+	void gdi_set_show_bones_property_flag(bool flag);
+	bool gdi_get_show_bones_property_flag() const;
+
 	void set_bone_custom_pose(int p_bone, const Transform &p_custom_pose);
 	Transform get_bone_custom_pose(int p_bone) const;
 
@@ -284,6 +287,7 @@ private:
 	Vector<NodeAnim*>				gdi_anim_node_load_vec;
 	Node							*gdi_editor_root;
 	ImportFileFormat				gdi_import_file_format;
+	bool							gdi_show_bones_property_flag;
 };
 
 #endif

@@ -150,13 +150,16 @@ Node *EditorSceneImporterAssimp::import_scene(const String &p_path, uint32_t p_f
 								 //aiProcess_EmbedTextures |
 								 //aiProcess_SplitByBoneCount |
 								 0;
+	//uint64_t time = OS::get_singleton()->get_system_time_msecs();
 	String g_path = ProjectSettings::get_singleton()->globalize_path(p_path);
 // 	post_process_Steps = 62889679;// assimp viewer steps
 	aiScene *scene = (aiScene *)importer.ReadFile(g_path.utf8().ptr(), post_process_Steps);
 
 	ERR_FAIL_COND_V_MSG(scene == NULL, NULL, String("Open Asset Import failed to open: ") + String(importer.GetErrorString()));
 
-	return _generate_scene(p_path, scene, p_flags, p_bake_fps, max_bone_weights);
+	Spatial *spa = _generate_scene(p_path, scene, p_flags, p_bake_fps, max_bone_weights);
+	//OS::get_singleton()->print("import fbx cast time[%d]\n", OS::get_singleton()->get_system_time_msecs() - time);
+	return spa;
 }
 
 template <class T>
@@ -699,6 +702,7 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 			//	++i;
 			//}
 
+			//ERR_CONTINUE(0 == assimp_node->mNumMeshes);
 			ERR_CONTINUE(assimp_node == NULL);
 			ERR_CONTINUE(mesh_template == NULL);
 
