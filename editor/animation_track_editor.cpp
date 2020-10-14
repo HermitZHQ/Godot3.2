@@ -4131,6 +4131,9 @@ void AnimationTrackEditor::_update_tracks() {
 	bool use_filter = selected_filter->is_pressed();
 
 	for (int i = 0; i < animation->get_track_count(); i++) {
+		if (i != 0 && i != (animation->get_track_count() - 1)) {
+			continue;
+		}
 		AnimationTrackEdit *track_edit = NULL;
 
 		//find hint and info for plugin

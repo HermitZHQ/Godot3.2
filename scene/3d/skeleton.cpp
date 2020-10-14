@@ -100,7 +100,7 @@ bool Skeleton::_set(const StringName &p_path, const Variant &p_value) {
 
 	String path = p_path;
 
-	if (path == "show bones") {
+	if (path == "edit bones") {
 		gdi_set_show_bones_property_flag((bool)p_value);
 		EditorNode::get_singleton()->get_inspector()->call_deferred("_property_changed_update_all"); 
 		return true;
@@ -206,7 +206,7 @@ bool Skeleton::_get(const StringName &p_path, Variant &r_ret) const {
 
 	String path = p_path;
 
-	if (p_path == "show bones") {
+	if (p_path == "edit bones") {
 		r_ret = gdi_get_show_bones_property_flag();
 		return true;
 	}
@@ -293,7 +293,7 @@ void Skeleton::_get_property_list(List<PropertyInfo> *p_list) const {
 	// 修改点：整理整个animNodeTree的顺序ID，并按照顺序存入property中，最后再尝试取出
 
 	// add show bones flag
-	p_list->push_back(PropertyInfo(Variant::BOOL, "show bones", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED));
+	p_list->push_back(PropertyInfo(Variant::BOOL, "edit bones", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED));
 
 	for (int i = 0; i < bones.size(); i++) {
 

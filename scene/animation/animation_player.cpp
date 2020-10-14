@@ -193,7 +193,7 @@ void AnimationPlayer::_get_property_list(List<PropertyInfo> *p_list) const {
 
 	p_list->push_back(PropertyInfo(Variant::ARRAY, "blend_times", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL));
 	// gdi---
-	p_list->push_back(PropertyInfo(Variant::INT, "import_file_format"));
+	p_list->push_back(PropertyInfo(Variant::INT, "import_file_format", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR));
 	p_list->push_back(PropertyInfo(Variant::ARRAY, "special_skeleton_vec"));
 }
 
