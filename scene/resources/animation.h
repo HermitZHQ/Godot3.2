@@ -370,11 +370,16 @@ public:
 
 	void optimize(float p_allowed_linear_err = 0.05, float p_allowed_angular_err = 0.01, float p_max_optimizable_angle = Math_PI * 0.125);
 
+	// ----gdi relevant
+	void gdi_set_edit_anim_tracks_flag(bool flag);
+	bool gdi_get_edit_anim_tracks_flag() const;
+
 	Animation();
 	~Animation();
 
 private:
 	ImportFileFormat						gdi_import_file_format;
+	bool									gdi_edit_anim_tracks_flag;
 };
 
 VARIANT_ENUM_CAST(Animation::TrackType);

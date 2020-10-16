@@ -36,6 +36,7 @@
 #include "servers/audio/audio_stream.h"
 
 #ifdef TOOLS_ENABLED
+#include "editor/editor_node.h"
 #include "editor/editor_settings.h"
 #include "scene/2d/skeleton_2d.h"
 
@@ -97,6 +98,10 @@ bool AnimationPlayer::_set(const StringName &p_name, const Variant &p_value) {
 	else if (p_name == "special_skeleton_vec") {
 		gdi_special_skeleton_vec = p_value;
 	}
+	else if (p_name == "edit_tracks") {
+		gdi_edit_anim_tracks_flag = p_value;
+		EditorNode::get_singleton()->get_scene_tree_dock()->call_deferred("_selection_changed");
+	}
 	else
 		return false;
 
@@ -146,6 +151,9 @@ bool AnimationPlayer::_get(const StringName &p_name, Variant &r_ret) const {
 	else if (name == "special_skeleton_vec") {
 		r_ret = gdi_special_skeleton_vec;
 	}
+	else if (name == "edit_tracks") {
+		r_ret = gdi_edit_anim_tracks_flag;
+	}
 	else
 		return false;
 
@@ -193,6 +201,7 @@ void AnimationPlayer::_get_property_list(List<PropertyInfo> *p_list) const {
 
 	p_list->push_back(PropertyInfo(Variant::ARRAY, "blend_times", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL));
 	// gdi---
+	p_list->push_back(PropertyInfo(Variant::BOOL, "edit_tracks", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED));
 	p_list->push_back(PropertyInfo(Variant::INT, "import_file_format", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR));
 	p_list->push_back(PropertyInfo(Variant::ARRAY, "special_skeleton_vec"));
 }
@@ -1179,7 +1188,6 @@ Ref<Animation> AnimationPlayer::get_animation(const StringName &p_name) const {
 	ERR_FAIL_COND_V(!animation_set.has(p_name), Ref<Animation>());
 
 	const AnimationData &data = animation_set[p_name];
-
 	return data.animation;
 }
 void AnimationPlayer::get_animation_list(List<StringName> *p_animations) const {
@@ -1819,6 +1827,22 @@ void AnimationPlayer::gdi_set_special_skeleton_only_with_none_track_bone(const S
 	}
 }
 
+void AnimationPlayer::gdi_set_edit_anim_tracks_flag(bool flag) {
+
+	gdi_edit_anim_tracks_flag = flag;
+}
+
+bool AnimationPlayer::gdi_get_edit_anim_tracks_flag() const {
+
+	return gdi_edit_anim_tracks_flag;
+}
+
+void AnimationPlayer::gdi_update_animation_edit_tracks_flag(const StringName &p_name) {
+
+	AnimationData &data = animation_set[p_name];
+	data.animation->gdi_set_edit_anim_tracks_flag(gdi_edit_anim_tracks_flag);
+}
+
 AnimationPlayer::AnimationPlayer() {
 
 	accum_pass = 1;
@@ -1842,6 +1866,7 @@ AnimationPlayer::AnimationPlayer() {
 	gdi_update_skeleton_vec.clear();
 	gdi_update_skeleton_size = 0;
 	gdi_import_file_format = Object::DEFAULT;
+	gdi_edit_anim_tracks_flag = false;
 }
 
 AnimationPlayer::~AnimationPlayer() {

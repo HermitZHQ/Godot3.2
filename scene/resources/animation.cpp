@@ -3111,6 +3111,14 @@ void Animation::optimize(float p_allowed_linear_err, float p_allowed_angular_err
 	}
 }
 
+void Animation::gdi_set_edit_anim_tracks_flag(bool flag) {
+	gdi_edit_anim_tracks_flag = flag;
+}
+
+bool Animation::gdi_get_edit_anim_tracks_flag() const {
+	return gdi_edit_anim_tracks_flag;
+}
+
 Animation::Animation() {
 
 	step = 0.1;
@@ -3118,6 +3126,7 @@ Animation::Animation() {
 	length = 1;
 	// gdi
 	gdi_import_file_format = ImportFileFormat::DEFAULT;
+	gdi_edit_anim_tracks_flag = false;
 }
 
 Animation::~Animation() {

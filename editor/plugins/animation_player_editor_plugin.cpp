@@ -289,6 +289,8 @@ void AnimationPlayerEditor::_animation_selected(int p_which) {
 		player->set_assigned_animation(current);
 
 		Ref<Animation> anim = player->get_animation(current);
+		// ----gdi change
+		player->gdi_update_animation_edit_tracks_flag(current);
 		{
 
 			track_editor->set_animation(anim);

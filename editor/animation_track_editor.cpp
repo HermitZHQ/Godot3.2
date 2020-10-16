@@ -1922,6 +1922,10 @@ void AnimationTrackEdit::_notification(int p_what) {
 
 	if (p_what == NOTIFICATION_DRAW) {
 
+		if (!animation->gdi_get_edit_anim_tracks_flag()) {
+			return;
+		}
+
 		if (animation.is_null())
 			return;
 		ERR_FAIL_INDEX(track, animation->get_track_count());
@@ -2015,7 +2019,6 @@ void AnimationTrackEdit::_notification(int p_what) {
 
 			draw_line(Point2(limit, 0), Point2(limit, get_size().height), linecolor, Math::round(EDSCALE));
 		}
-
 		// KEYFRAMES //
 
 		draw_bg(limit, get_size().width - timeline->get_buttons_width());
@@ -2025,7 +2028,6 @@ void AnimationTrackEdit::_notification(int p_what) {
 			int limit_end = get_size().width - timeline->get_buttons_width();
 
 			for (int i = 0; i < animation->track_get_key_count(track); i++) {
-
 				float offset = animation->track_get_key_time(track, i) - timeline->get_value();
 				if (editor->is_key_selected(track, i) && editor->is_moving_selection()) {
 					offset = editor->snap_time(offset + editor->get_moving_selection_offset(), true);
@@ -4131,7 +4133,7 @@ void AnimationTrackEditor::_update_tracks() {
 	bool use_filter = selected_filter->is_pressed();
 
 	for (int i = 0; i < animation->get_track_count(); i++) {
-		if (i != 0 && i != (animation->get_track_count() - 1)) {
+		if (i != 0 && !animation->gdi_get_edit_anim_tracks_flag()) {
 			continue;
 		}
 		AnimationTrackEdit *track_edit = NULL;
