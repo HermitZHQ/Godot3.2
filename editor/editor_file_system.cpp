@@ -1992,8 +1992,10 @@ void EditorFileSystem::reimport_files(const Vector<String> &p_files) {
 	files.sort();
 
 	for (int i = 0; i < files.size(); i++) {
+		uint64_t time2 = OS::get_singleton()->get_system_time_msecs();
 		pr.step(files[i].path.get_file(), i);
-		_reimport_file(files[i].path);
+ 		_reimport_file(files[i].path);
+		OS::get_singleton()->print("file[%s] (re)import cast time[%d]\n", files[i].path.utf8().get_data(), OS::get_singleton()->get_system_time_msecs() - time2);
 	}
 
 	//reimport groups
