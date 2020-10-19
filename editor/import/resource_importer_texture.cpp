@@ -530,9 +530,9 @@ Error ResourceImporterTexture::import(const String &p_source_file, const String 
 		}
 	} else {
 		//import normally
-// 		_save_stex(image, p_save_path + ".stex", compress_mode, lossy, Image::COMPRESS_S3TC /*this is ignored */, mipmaps, tex_flags, stream, detect_3d, detect_srgb, force_rgbe, detect_normal, force_normal, false);
-		std::thread t(&ResourceImporterTexture::_save_stex, this, image, p_save_path + ".stex", compress_mode, lossy, Image::COMPRESS_S3TC /*this is ignored */, mipmaps, tex_flags, stream, detect_3d, detect_srgb, force_rgbe, detect_normal, force_normal, false);
-		t.detach();
+		_save_stex(image, p_save_path + ".stex", compress_mode, lossy, Image::COMPRESS_S3TC /*this is ignored */, mipmaps, tex_flags, stream, detect_3d, detect_srgb, force_rgbe, detect_normal, force_normal, false);
+// 		std::thread t(&ResourceImporterTexture::_save_stex, this, image, p_save_path + ".stex", compress_mode, lossy, Image::COMPRESS_S3TC /*this is ignored */, mipmaps, tex_flags, stream, detect_3d, detect_srgb, force_rgbe, detect_normal, force_normal, false);
+// 		t.detach();
 	}
 
 	if (r_metadata) {

@@ -214,6 +214,7 @@ class EditorFileSystem : public Node {
 	void _update_extensions();
 
 	void _reimport_file(const String &p_file);
+	void _reimport_file_sync(const String &p_file, bool *p_finish_flag);
 	Error _reimport_group(const String &p_group_file, const Vector<String> &p_files);
 
 	bool _test_for_reimport(const String &p_path, bool p_only_imported_files);
