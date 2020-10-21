@@ -1923,215 +1923,10 @@ void EditorFileSystem::_reimport_file(const String &p_file) {
 	EditorResourcePreview::get_singleton()->check_for_invalidation(p_file);
 }
 
-void EditorFileSystem::_reimport_file_sync(const String &p_file, bool *p_finish_flag) {
+void EditorFileSystem::_gdi_reimport_file_sync(const String &p_file, bool *p_finish_flag) {
 
 	*p_finish_flag = false;
-
-	EditorFileSystemDirectory *fs = NULL;
-	int cpos = -1;
-	bool found = _find_file(p_file, &fs, cpos);
-	ERR_FAIL_COND_MSG(!found, "Can't find file '" + p_file + "'.");
-
-	//try to obtain existing params
-
-	Map<StringName, Variant> params;
-	String importer_name;
-
-	if (FileAccess::exists(p_file + ".import")) {
-		//use existing
-		Ref<ConfigFile> cf;
-		cf.instance();
-		Error err = cf->load(p_file + ".import");
-		if (err == OK) {
-			if (cf->has_section("params")) {
-				List<String> sk;
-				cf->get_section_keys("params", &sk);
-				for (List<String>::Element *E = sk.front(); E; E = E->next()) {
-					params[E->get()] = cf->get_value("params", E->get());
-				}
-			}
-			if (cf->has_section("remap")) {
-				importer_name = cf->get_value("remap", "importer");
-			}
-		}
-
-	}
-	else {
-		late_added_files.insert(p_file); //imported files do not call update_file(), but just in case..
-	}
-
-	Ref<ResourceImporter> importer;
-	bool load_default = false;
-	//find the importer
-	if (importer_name != "") {
-		importer = ResourceFormatImporter::get_singleton()->get_importer_by_name(importer_name);
-	}
-
-	if (importer.is_null()) {
-		//not found by name, find by extension
-		importer = ResourceFormatImporter::get_singleton()->get_importer_by_extension(p_file.get_extension());
-		load_default = true;
-		if (importer.is_null()) {
-			ERR_PRINT("BUG: File queued for import, but can't be imported!");
-			ERR_FAIL();
-		}
-	}
-
-	//mix with default params, in case a parameter is missing
-
-	List<ResourceImporter::ImportOption> opts;
-	importer->get_import_options(&opts);
-	for (List<ResourceImporter::ImportOption>::Element *E = opts.front(); E; E = E->next()) {
-		if (!params.has(E->get().option.name)) { //this one is not present
-			params[E->get().option.name] = E->get().default_value;
-		}
-	}
-
-	if (load_default && ProjectSettings::get_singleton()->has_setting("importer_defaults/" + importer->get_importer_name())) {
-		//use defaults if exist
-		Dictionary d = ProjectSettings::get_singleton()->get("importer_defaults/" + importer->get_importer_name());
-		List<Variant> v;
-		d.get_key_list(&v);
-
-		for (List<Variant>::Element *E = v.front(); E; E = E->next()) {
-			params[E->get()] = d[E->get()];
-		}
-	}
-
-	//finally, perform import!!
-	String base_path = ResourceFormatImporter::get_singleton()->get_import_base_path(p_file);
-
-	List<String> import_variants;
-	List<String> gen_files;
-	Variant metadata;
-	Error err = importer->import(p_file, base_path, params, &import_variants, &gen_files, &metadata);
-
-	if (err != OK) {
-		ERR_PRINTS("Error importing '" + p_file + "'.");
-	}
-
-	//as import is complete, save the .import file
-
-	FileAccess *f = FileAccess::open(p_file + ".import", FileAccess::WRITE);
-	ERR_FAIL_COND_MSG(!f, "Cannot open file from path '" + p_file + ".import'.");
-
-	//write manually, as order matters ([remap] has to go first for performance).
-	f->store_line("[remap]");
-	f->store_line("");
-	f->store_line("importer=\"" + importer->get_importer_name() + "\"");
-	if (importer->get_resource_type() != "") {
-		f->store_line("type=\"" + importer->get_resource_type() + "\"");
-	}
-
-	Vector<String> dest_paths;
-
-	if (err == OK) {
-
-		if (importer->get_save_extension() == "") {
-			//no path
-		}
-		else if (import_variants.size()) {
-			//import with variants
-			for (List<String>::Element *E = import_variants.front(); E; E = E->next()) {
-
-				String path = base_path.c_escape() + "." + E->get() + "." + importer->get_save_extension();
-
-				f->store_line("path." + E->get() + "=\"" + path + "\"");
-				dest_paths.push_back(path);
-			}
-		}
-		else {
-			String path = base_path + "." + importer->get_save_extension();
-			f->store_line("path=\"" + path + "\"");
-			dest_paths.push_back(path);
-		}
-
-	}
-	else {
-
-		f->store_line("valid=false");
-	}
-
-	if (metadata != Variant()) {
-		f->store_line("metadata=" + metadata.get_construct_string());
-	}
-
-	f->store_line("");
-
-	f->store_line("[deps]\n");
-
-	if (gen_files.size()) {
-		Array genf;
-		for (List<String>::Element *E = gen_files.front(); E; E = E->next()) {
-			genf.push_back(E->get());
-			dest_paths.push_back(E->get());
-		}
-
-		String value;
-		VariantWriter::write_to_string(genf, value);
-		f->store_line("files=" + value);
-		f->store_line("");
-	}
-
-	f->store_line("source_file=" + Variant(p_file).get_construct_string());
-
-	if (dest_paths.size()) {
-		Array dp;
-		for (int i = 0; i < dest_paths.size(); i++) {
-			dp.push_back(dest_paths[i]);
-		}
-		f->store_line("dest_files=" + Variant(dp).get_construct_string() + "\n");
-	}
-
-	f->store_line("[params]");
-	f->store_line("");
-
-	//store options in provided order, to avoid file changing. Order is also important because first match is accepted first.
-
-	for (List<ResourceImporter::ImportOption>::Element *E = opts.front(); E; E = E->next()) {
-
-		String base = E->get().option.name;
-		String value;
-		VariantWriter::write_to_string(params[base], value);
-		f->store_line(base + "=" + value);
-	}
-
-	f->close();
-	memdelete(f);
-
-	// Store the md5's of the various files. These are stored separately so that the .import files can be version controlled.
-	FileAccess *md5s = FileAccess::open(base_path + ".md5", FileAccess::WRITE);
-	ERR_FAIL_COND_MSG(!md5s, "Cannot open MD5 file '" + base_path + ".md5'.");
-
-	md5s->store_line("source_md5=\"" + FileAccess::get_md5(p_file) + "\"");
-	if (dest_paths.size()) {
-		md5s->store_line("dest_md5=\"" + FileAccess::get_multiple_md5(dest_paths) + "\"\n");
-	}
-	md5s->close();
-	memdelete(md5s);
-
-	//update modified times, to avoid reimport
-	fs->files[cpos]->modified_time = FileAccess::get_modified_time(p_file);
-	fs->files[cpos]->import_modified_time = FileAccess::get_modified_time(p_file + ".import");
-	fs->files[cpos]->deps = _get_dependencies(p_file);
-	fs->files[cpos]->type = importer->get_resource_type();
-	fs->files[cpos]->import_valid = ResourceLoader::is_import_valid(p_file);
-
-	//if file is currently up, maybe the source it was loaded from changed, so import math must be updated for it
-	//to reload properly
-	if (ResourceCache::has(p_file)) {
-
-		Resource *r = ResourceCache::get(p_file);
-
-		if (r->get_import_path() != String()) {
-
-			String dst_path = ResourceFormatImporter::get_singleton()->get_internal_resource_path(p_file);
-			r->set_import_path(dst_path);
-			r->set_import_last_modified_time(0);
-		}
-	}
-
-	EditorResourcePreview::get_singleton()->check_for_invalidation(p_file);
+	_reimport_file(p_file);
 	*p_finish_flag = true;
 }
 
@@ -2215,11 +2010,13 @@ void EditorFileSystem::reimport_files(const Vector<String> &p_files) {
 		uint64_t time2 = OS::get_singleton()->get_system_time_msecs();
 		pr.step(files[i].path.get_file(), i);
 //  		_reimport_file(files[i].path);
-		if (files[i].path.find(".fbx") != -1) {
+
+		String ext = files[i].path.get_extension().to_lower();
+		if (ext != "png" && ext != "jpg") {
 			_reimport_file(files[i].path);
 		} 
 		else {
-			std::thread t(&EditorFileSystem::_reimport_file_sync, this, files[i].path, &finish_flag_arr[i]);
+			std::thread t(&EditorFileSystem::_gdi_reimport_file_sync, this, files[i].path, &finish_flag_arr[i]);
 			t.detach();
 		}
 		OS::get_singleton()->print("file[%s] (re)import cast time[%d]\n", files[i].path.utf8().get_data(), OS::get_singleton()->get_system_time_msecs() - time2);
