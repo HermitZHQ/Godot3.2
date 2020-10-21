@@ -94,6 +94,8 @@ struct ImportState {
 	Map<const aiNode*, unsigned int> gdi_armature_index_map;
 	// 记录非bone的track插入情况，避免重复
 	Vector<NodePath> gdi_none_bone_track_vec;
+	// 记录mesh节点的创建顺序，因为引擎自带的流程每次会以不同的顺序创建mesh，这会导致bug（流程中的reparent也有问题）的出现
+	Vector<const aiNode*> gdi_mesh_node_vec;
 
 	// EditorSceneImporter::ImportFlags
 	uint32_t import_flags;

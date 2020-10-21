@@ -693,72 +693,86 @@ EditorSceneImporterAssimp::_generate_scene(const String &p_path, aiScene *scene,
 		print_verbose("generating mesh phase from skeletal mesh");
 		List<Spatial *> cleanup_template_nodes;
 
-		for (Map<const aiNode *, Spatial *>::Element *key_value_pair = state.flat_node_map.front(); key_value_pair; key_value_pair = key_value_pair->next()) {
-			const aiNode *assimp_node = key_value_pair->key();
-			Spatial *mesh_template = key_value_pair->value();
+		// 必须保持节点树的创建顺序，否则reparent时会出现问题，此问题也是引擎底层架构的问题
+		int mesh_num = state.gdi_mesh_node_vec.size();
+		for (unsigned int i = 0; i < mesh_num; ++i) {
+			const aiNode *mesh_node = state.gdi_mesh_node_vec[i];
 
-			//if (assimp_node->mName == aiString("Maca")) {
-			//	int i = 0;
-			//	++i;
-			//}
-
-			//ERR_CONTINUE(0 == assimp_node->mNumMeshes);
-			ERR_CONTINUE(assimp_node == NULL);
-			ERR_CONTINUE(mesh_template == NULL);
-
-			Node *parent_node = mesh_template->get_parent();
-
-			if (mesh_template == state.root) {
-				continue;
-			}
-
-			if (parent_node == NULL) {
-				print_error("Found invalid parent node!");
-				continue; // root node
-			}
-
-			String node_name = AssimpUtils::get_assimp_string(assimp_node->mName);
-			Transform node_transform = AssimpUtils::assimp_matrix_transform(assimp_node->mTransformation);
-
-			if (assimp_node->mNumMeshes > 0) {
-				// 注释点：这里要格外注意，有些节点会因为有mesh，而被转换为meshInstance，之前的Spatial节点会被删除，且同名的话会被加上2，3这样的后缀
-				MeshInstance *mesh = create_mesh(state, assimp_node, node_name, parent_node, node_transform);
-				// 出现这种情况时，应该更新所有skeleton中保存的节点信息，否则无法对该mesh进行实时的更新
-				auto e = state.armature_skeletons.front();
-				if (nullptr != e && !e->value()->gdi_update_mesh_anim_node(node_name, mesh->get_name())) {
-					printf("[GDI]assimp update mesh anim node failed, mesh[%S], should not happen\n", String(mesh->get_name()).c_str());
+			for (Map<const aiNode *, Spatial *>::Element *key_value_pair = state.flat_node_map.front(); key_value_pair; key_value_pair = key_value_pair->next()) {
+				const aiNode *assimp_node = key_value_pair->key();
+				if (assimp_node != mesh_node) {
+					continue;
+				}
+				if (0 == assimp_node->mNumMeshes) {
+					continue;
 				}
 
-				if (mesh) {
-
-					parent_node->remove_child(mesh_template);
-
-					// re-parent children
-					List<Node *> children;
-					// re-parent all children to new node
-					// note: since get_child_count will change during execution we must build a list first to be safe.
-					for (int childId = 0; childId < mesh_template->get_child_count(); childId++) {
-						// get child
-						Node *child = mesh_template->get_child(childId);
-						children.push_back(child);
-					}
-
-					for (List<Node *>::Element *element = children.front(); element; element = element->next()) {
-						// reparent the children to the real mesh node.
-						mesh_template->remove_child(element->get());
-						mesh->add_child(element->get());
-						element->get()->set_owner(state.root);
-					}
-
-					// update mesh in list so that each mesh node is available
-					// this makes the template unavailable which is the desired behaviour
-					state.flat_node_map[assimp_node] = mesh;
-
-					cleanup_template_nodes.push_back(mesh_template);
-
-					// clean up this list we don't need it
-					children.clear();
+				Spatial *mesh_template = key_value_pair->value();
+	
+				//if (assimp_node->mName == aiString("Maca")) {
+				//	int i = 0;
+				//	++i;
+				//}
+	
+				ERR_CONTINUE(assimp_node == NULL);
+				ERR_CONTINUE(mesh_template == NULL);
+	
+				Node *parent_node = mesh_template->get_parent();
+	
+				if (mesh_template == state.root) {
+					continue;
 				}
+	
+				if (parent_node == NULL) {
+					print_error("Found invalid parent node!");
+					continue; // root node
+				}
+	
+				String node_name = AssimpUtils::get_assimp_string(assimp_node->mName);
+				Transform node_transform = AssimpUtils::assimp_matrix_transform(assimp_node->mTransformation);
+	
+				if (assimp_node->mNumMeshes > 0) {
+					// 注释点：这里要格外注意，有些节点会因为有mesh，而被转换为meshInstance，之前的Spatial节点会被删除，且同名的话会被加上2，3这样的后缀
+					MeshInstance *mesh = create_mesh(state, assimp_node, node_name, parent_node, node_transform);
+					// 出现这种情况时，应该更新所有skeleton中保存的节点信息，否则无法对该mesh进行实时的更新
+					auto e = state.armature_skeletons.front();
+					if (nullptr != e && !e->value()->gdi_update_mesh_anim_node(node_name, mesh->get_name())) {
+						printf("[GDI]assimp update mesh anim node failed, mesh[%S], should not happen\n", String(mesh->get_name()).c_str());
+					}
+	
+					if (mesh) {
+	
+						parent_node->remove_child(mesh_template);
+	
+						// re-parent children
+						List<Node *> children;
+						// re-parent all children to new node
+						// note: since get_child_count will change during execution we must build a list first to be safe.
+						for (int childId = 0; childId < mesh_template->get_child_count(); childId++) {
+							// get child
+							Node *child = mesh_template->get_child(childId);
+							children.push_back(child);
+						}
+	
+						for (List<Node *>::Element *element = children.front(); element; element = element->next()) {
+							// reparent the children to the real mesh node.
+							mesh_template->remove_child(element->get());
+							mesh->add_child(element->get());
+							element->get()->set_owner(state.root);
+						}
+	
+						// update mesh in list so that each mesh node is available
+						// this makes the template unavailable which is the desired behaviour
+						state.flat_node_map[assimp_node] = mesh;
+	
+						cleanup_template_nodes.push_back(mesh_template);
+	
+						// clean up this list we don't need it
+						children.clear();
+					}
+				}
+
+				break;
 			}
 		}
 
@@ -2309,6 +2323,7 @@ void EditorSceneImporterAssimp::_generate_node(
 
 			state.armature_nodes.push_back((aiNode *const)newMeshNode);
 			state.gdi_armature_index_map.insert((aiNode *const)newMeshNode, assimp_node->mMeshes[i]);
+			state.gdi_mesh_node_vec.push_back(assimp_node);
 		}
 		print_verbose("use root node be the only one armature node");
 	}
