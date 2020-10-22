@@ -71,6 +71,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sstream>
 #include <tuple>
 #include <vector>
+#include <string>
 
 namespace Assimp {
 namespace FBX {
@@ -901,9 +902,20 @@ bool FBXConverter::GenerateTransformationNodeChain(const Model &model, const std
     }
     else {
         const std::vector<const Connection *> &child_conns = doc.GetConnectionsByDestinationSequenced(model.ID(), "Model");
+
+        aiString str_tmp;
+        // node链中包含了pivot的node的话，则不能进行合成（如机器人fbx）
+        bool pivot_node_flag = false;
+        for (auto &node : output_nodes) {
+            std::string str = node->mName.C_Str();
+            if (std::string::npos != str.find("Pivot")) {
+                pivot_node_flag = true;
+                break;
+            }
+        }
         // check animation track
         bool find_track_flag = false;
-        aiString str_tmp;
+        bool should_combine_anyway_flag = false; // 连续channel如果是Translation, Rotation, Scaling的话，则需要强制合并
         for (auto &anim : animations) {
             unsigned int num_channels = anim->mNumChannels;
             for (unsigned int channel_idx = 0; channel_idx < num_channels; ++channel_idx) {
@@ -913,22 +925,40 @@ bool FBXConverter::GenerateTransformationNodeChain(const Model &model, const std
                         (anim->mChannels[channel_idx]->mNumPositionKeys > 1 ||
                          anim->mChannels[channel_idx]->mNumRotationKeys > 1 ||
                          anim->mChannels[channel_idx]->mNumScalingKeys > 1)) {
+
+                        bool trans_flag = false;
+                        std::string str_cur_name = str_tmp.C_Str();
+                        if (std::string::npos != str_cur_name.find("_Translation")) {
+                            trans_flag = true;
+                        }
+                        if (trans_flag && !pivot_node_flag) {
+                            // 确认trans存在后，检查后两位channel是否为Rotation和Scaling
+                            // 这里其实应该还要检查node的前置名称是否统一，目前根据处理经验暂时不处理
+                            std::string str_next_1_name = channel_idx + 1 < num_channels ? anim->mChannels[channel_idx + 1]->mNodeName.C_Str() : "";
+                            std::string str_next_2_name = channel_idx + 2 < num_channels ? anim->mChannels[channel_idx + 2]->mNodeName.C_Str() : "";
+                            if (std::string::npos != str_next_1_name.find("_Rotation") &&
+                                std::string::npos != str_next_2_name.find("_Scaling")) {
+                                should_combine_anyway_flag = true;
+                                break;
+                            }
+                        }
+                        
                         find_track_flag = true;
                         break;
                     }
                 }
 
-                if (find_track_flag) {
+                if (find_track_flag || should_combine_anyway_flag) {
                     break;
                 }
             }
 
-            if (find_track_flag) {
+            if (find_track_flag || should_combine_anyway_flag) {
                 break;
             }
         }
 
-        if (!find_track_flag) {
+        if (!find_track_flag || should_combine_anyway_flag) {
 	        aiMatrix4x4 final_mat;
 	        for (auto &node : output_nodes) {
 	            final_mat = final_mat * node->mTransformation;
@@ -3342,7 +3372,10 @@ void FBXConverter::InterpolateKeys(aiVectorKey *valOut, const KeyTimeList &keys,
         const aiVector3D &def_value,
         double &max_time,
         double &min_time) {
-    ai_assert(!keys.empty());
+    if (keys.empty()) {
+        return;
+    }
+//     ai_assert(!keys.empty());
     ai_assert(nullptr != valOut);
 
     std::vector<unsigned int> next_pos;
@@ -3399,7 +3432,10 @@ void FBXConverter::InterpolateKeys(aiQuatKey *valOut, const KeyTimeList &keys, c
         double &maxTime,
         double &minTime,
         Model::RotOrder order) {
-    ai_assert(!keys.empty());
+    if (keys.empty()) {
+        return;
+    }
+//     ai_assert(!keys.empty());
     ai_assert(nullptr != valOut);
 
     std::unique_ptr<aiVectorKey[]> temp(new aiVectorKey[keys.size()]);

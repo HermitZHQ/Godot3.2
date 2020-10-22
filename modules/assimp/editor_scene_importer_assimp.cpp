@@ -1248,7 +1248,7 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 		aiNodeAnim *track = anim->mChannels[i];
 		String node_name = AssimpUtils::get_assimp_string(track->mNodeName);
 		// for test
-		//if (node_name.find("SM_BuDong") != -1) {
+		//if (node_name.find("jshenfa_01_$AssimpFbx$_Translation") != -1) {
 		//	int i = 0;
 		//	++i;
 		//}
@@ -1284,36 +1284,36 @@ void EditorSceneImporterAssimp::_import_animation(ImportState &state, int p_anim
 			magic_flag = true;
 			node_name = node_name.substr(0, magic_pos);
 			// recomb the whole magic track..., I don't see where shows the magic...
-			if (-1 != String(track->mNodeName.C_Str()).find("Translation")) {
-				aiNodeAnim *track_rot = ((i + 1) < anim->mNumChannels) ? anim->mChannels[i + 1] : nullptr;
-				if (nullptr != track_rot && -1 != String(track_rot->mNodeName.C_Str()).find("Rotation")) {
-					track->mNumRotationKeys = track_rot->mNumRotationKeys;
-					if (nullptr != track->mRotationKeys) {
-						delete[] track->mRotationKeys;
-						track->mRotationKeys = nullptr;
-					}
-					track->mRotationKeys = track_rot->mRotationKeys;
-
-					track_rot->mRotationKeys = nullptr;
-					track_rot->mNumRotationKeys = 0;
-				}
-
-				aiNodeAnim *track_scale = ((i + 2) < anim->mNumChannels) ? anim->mChannels[i + 2] : nullptr;
-				if (nullptr != track_scale && -1 != String(track_scale->mNodeName.C_Str()).find("Scaling")) {
-					track->mNumScalingKeys = track_scale->mNumScalingKeys;
-					if (nullptr != track->mScalingKeys) {
-						delete[] track->mScalingKeys;
-						track->mScalingKeys = nullptr;
-					}
-					track->mScalingKeys = track_scale->mScalingKeys;
-
-					track_scale->mScalingKeys = nullptr;
-					track_scale->mNumScalingKeys = 0;
-				}
-
-				magic_comb_flag = true;
-				printf("[import-anim] found and combine the magic track\n");
-			}
+// 			if (-1 != String(track->mNodeName.C_Str()).find("Translation")) {
+// 				aiNodeAnim *track_rot = ((i + 1) < anim->mNumChannels) ? anim->mChannels[i + 1] : nullptr;
+// 				if (nullptr != track_rot && -1 != String(track_rot->mNodeName.C_Str()).find("Rotation")) {
+// 					track->mNumRotationKeys = track_rot->mNumRotationKeys;
+// 					if (nullptr != track->mRotationKeys) {
+// 						delete[] track->mRotationKeys;
+// 						track->mRotationKeys = nullptr;
+// 					}
+// 					track->mRotationKeys = track_rot->mRotationKeys;
+// 
+// 					track_rot->mRotationKeys = nullptr;
+// 					track_rot->mNumRotationKeys = 0;
+// 				}
+// 
+// 				aiNodeAnim *track_scale = ((i + 2) < anim->mNumChannels) ? anim->mChannels[i + 2] : nullptr;
+// 				if (nullptr != track_scale && -1 != String(track_scale->mNodeName.C_Str()).find("Scaling")) {
+// 					track->mNumScalingKeys = track_scale->mNumScalingKeys;
+// 					if (nullptr != track->mScalingKeys) {
+// 						delete[] track->mScalingKeys;
+// 						track->mScalingKeys = nullptr;
+// 					}
+// 					track->mScalingKeys = track_scale->mScalingKeys;
+// 
+// 					track_scale->mScalingKeys = nullptr;
+// 					track_scale->mNumScalingKeys = 0;
+// 				}
+// 
+// 				magic_comb_flag = true;
+// 				printf("[import-anim] found and combine the magic track\n");
+// 			}
 		}
 
 		// for test
@@ -2247,10 +2247,10 @@ void EditorSceneImporterAssimp::_generate_node(
 	state.nodes.push_back(assimp_node);
 #endif
 
-	if (assimp_node->mName == aiString("SM_JiaZi_002")) {
-		int i = 0;
-		++i;
-	}
+	//if (assimp_node->mName == aiString("SM_JiaZi_002")) {
+	//	int i = 0;
+	//	++i;
+	//}
 
 	// please note
 	// duplicate bone names exist
@@ -2295,7 +2295,12 @@ void EditorSceneImporterAssimp::_generate_node(
 			}
 
 			// 目前i > 0表示只手动生成一次arm
-			if (mesh->mNumBones <= 0 || i > 0) {
+			if (i > 0) {
+				continue;
+			}
+			if (mesh->mNumBones <= 0 && 1 == assimp_node->mNumMeshes) {
+				state.gdi_mesh_node_vec.push_back(assimp_node);
+				printf("----[gen mesh node]%s\n", assimp_node->mName.C_Str());
 				continue;
 			}
 
@@ -2324,6 +2329,7 @@ void EditorSceneImporterAssimp::_generate_node(
 			state.armature_nodes.push_back((aiNode *const)newMeshNode);
 			state.gdi_armature_index_map.insert((aiNode *const)newMeshNode, assimp_node->mMeshes[i]);
 			state.gdi_mesh_node_vec.push_back(assimp_node);
+			printf("----[gen mesh arm node]%s\n", name.C_Str());
 		}
 		print_verbose("use root node be the only one armature node");
 	}
