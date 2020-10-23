@@ -2000,7 +2000,7 @@ void EditorFileSystem::reimport_files(const Vector<String> &p_files) {
 
 	files.sort();
 
-	// 动态生成相对应的完成标记
+	// generate the finish flag dynamically
 	bool *finish_flag_arr = new bool[files.size()];
 	for (int i = 0; i < files.size(); i++) {
 		finish_flag_arr[i] = true;
@@ -2035,6 +2035,7 @@ void EditorFileSystem::reimport_files(const Vector<String> &p_files) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
 
+	// free dynamic mem
 	if (files.size() > 1) {
 		delete[] finish_flag_arr;
 	}
