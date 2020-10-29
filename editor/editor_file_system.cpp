@@ -2000,33 +2000,39 @@ void EditorFileSystem::reimport_files(const Vector<String> &p_files) {
 
 	files.sort();
 
-	// generate the finish flag dynamically
-	bool *finish_flag_arr = new bool[files.size()];
+	// statistics the png&jpg file num
+	// we don't need to handle bmp, its efficiency is ok
+	Vector<unsigned int> multi_threads_handle_file_index_vec;
+	Vector<unsigned int> rest_file_index_vec;
+	unsigned int progress_total_num = 0;
 	for (int i = 0; i < files.size(); i++) {
+		String ext = files[i].path.get_extension().to_lower();
+		if ("png" == ext || "jpg" == ext) {
+			multi_threads_handle_file_index_vec.push_back(i);
+			continue;
+		}
+
+		rest_file_index_vec.push_back(i);
+	}
+
+	// generate the finish flag dynamically
+	bool *finish_flag_arr = new bool[multi_threads_handle_file_index_vec.size()];
+	for (int i = 0; i < multi_threads_handle_file_index_vec.size(); i++) {
 		finish_flag_arr[i] = true;
 	}
 
-	for (int i = 0; i < files.size(); i++) {
-		uint64_t time2 = OS::get_singleton()->get_system_time_msecs();
-		pr.step(files[i].path.get_file(), i);
-//  		_reimport_file(files[i].path);
-
-		String ext = files[i].path.get_extension().to_lower();
-		if (ext != "png" && ext != "jpg") {
-			_reimport_file(files[i].path);
-		} 
-		else {
-			std::thread t(&EditorFileSystem::_gdi_reimport_file_sync, this, files[i].path, &finish_flag_arr[i]);
-			t.detach();
-		}
-		OS::get_singleton()->print("file[%s] (re)import cast time[%d]\n", files[i].path.utf8().get_data(), OS::get_singleton()->get_system_time_msecs() - time2);
+	// load texture first(multi threads)
+	for (int i = 0; i < multi_threads_handle_file_index_vec.size(); i++) {
+		pr.step(files[multi_threads_handle_file_index_vec[i]].path.get_file(), ++progress_total_num);
+		std::thread t(&EditorFileSystem::_gdi_reimport_file_sync, this, files[i].path, &finish_flag_arr[i]);
+		t.detach();
 	}
 
 	// waiting for all threads finished...
 	bool all_finished_flag = false;
 	while (!all_finished_flag) {
 		all_finished_flag = true;
-		for (unsigned int i = 0; i < files.size(); ++i) {
+		for (unsigned int i = 0; i < multi_threads_handle_file_index_vec.size(); ++i) {
 			if (!finish_flag_arr[i]) {
 				all_finished_flag = false;
 				break;
@@ -2036,11 +2042,23 @@ void EditorFileSystem::reimport_files(const Vector<String> &p_files) {
 	}
 
 	// free dynamic mem
-	if (files.size() > 1) {
+	if (multi_threads_handle_file_index_vec.size() > 1) {
 		delete[] finish_flag_arr;
 	}
 	else {
 		delete finish_flag_arr;
+	}
+
+	// then load model(fbx and so on)
+	for (int i = 0; i < rest_file_index_vec.size(); i++) {
+		//uint64_t time2 = OS::get_singleton()->get_system_time_msecs();
+
+		//_reimport_file(files[i].path);
+
+		pr.step(files[rest_file_index_vec[i]].path.get_file(), ++progress_total_num);
+		_reimport_file(files[rest_file_index_vec[i]].path);
+
+		//OS::get_singleton()->print("file[%s] (re)import cast time[%d]\n", files[i].path.utf8().get_data(), OS::get_singleton()->get_system_time_msecs() - time2);
 	}
 
 	//reimport groups
