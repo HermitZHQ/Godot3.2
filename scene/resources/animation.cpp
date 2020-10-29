@@ -1766,10 +1766,10 @@ T Animation::_interpolate(const Vector<TKey<T> > &p_keys, float p_time, Interpol
 		// loop
 		if (idx >= 0) {
 
-			if (ImportFileFormat::DEFAULT == gdi_import_file_format && (idx + 1) < len) {
+			if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format && (idx + 1) <= len && (idx + 1) < p_keys.size()) {
 				gdi_res = true;
 			}
-			else if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format && (idx + 1) <= len && (idx + 1) < p_keys.size()) {
+			else if ((idx + 1) < len) {
 				gdi_res = true;
 			}
 
@@ -1816,10 +1816,10 @@ T Animation::_interpolate(const Vector<TKey<T> > &p_keys, float p_time, Interpol
 
 		if (idx >= 0) {
 
-			if (ImportFileFormat::DEFAULT == gdi_import_file_format && (idx + 1) < len) {
+			if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format && (idx + 1) <= len && (idx + 1) < p_keys.size()) {
 				gdi_res = true;
 			}
-			else if (ImportFileFormat::ASSIMP_FBX == gdi_import_file_format && (idx + 1) <= len && (idx + 1) < p_keys.size()) {
+			else if ((idx + 1) < len) {
 				gdi_res = true;
 			}
 
